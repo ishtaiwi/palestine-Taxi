@@ -296,7 +296,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           _obscurePassword = !_obscurePassword;
                         }),
                         onChanged: () {
-                          // Re-validate confirm password when password changes
                           if (_confirmPasswordController.text.isNotEmpty) {
                             _formKey.currentState?.validate();
                           }
@@ -326,7 +325,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           if (value == null || value.isEmpty) {
                             return t('confirmPasswordHint');
                           }
-                          // Use current password value from controller
                           final currentPassword = _passwordController.text;
                           if (value != currentPassword) {
                             return _isArabic
@@ -426,9 +424,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
       decoration: _inputDecoration(label, hint),
       validator: validator,
-      // Enable Arabic input
       enableInteractiveSelection: true,
-      autovalidateMode: AutovalidateMode.onUserInteraction, // Show validation errors as user types
+      autovalidateMode: AutovalidateMode.onUserInteraction,
     );
   }
 

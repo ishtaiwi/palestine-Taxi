@@ -175,7 +175,6 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Welcome Section
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -219,7 +218,6 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Quick Actions
                       Text(
                         t('quickActions'),
                         style: const TextStyle(
@@ -236,9 +234,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               icon: Icons.directions_bus,
                               title: t('viewTrips'),
                               color: Colors.blue,
-                              onTap: () {
-                                // TODO: Navigate to trips page
-                              },
+                              onTap: () {},
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -247,9 +243,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               icon: Icons.book_online,
                               title: t('myReservations'),
                               color: Colors.green,
-                              onTap: () {
-                                // TODO: Navigate to reservations page
-                              },
+                              onTap: () {},
                             ),
                           ),
                         ],
@@ -262,9 +256,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               icon: Icons.account_balance_wallet,
                               title: t('myWallet'),
                               color: Colors.orange,
-                              onTap: () {
-                                // TODO: Navigate to wallet page
-                              },
+                              onTap: () {},
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -273,16 +265,13 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               icon: Icons.person,
                               title: t('profile'),
                               color: Colors.purple,
-                              onTap: () {
-                                // TODO: Navigate to profile page
-                              },
+                              onTap: () {},
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 24),
 
-                      // Favorite / Frequent Trips
                       Text(
                         t('favoriteTrips'),
                         style: const TextStyle(
@@ -335,7 +324,6 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                         ),
                       const SizedBox(height: 24),
 
-                      // User Info Card
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -517,9 +505,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
           Align(
             alignment: isRtl ? Alignment.centerLeft : Alignment.centerRight,
             child: FilledButton.icon(
-              onPressed: () {
-                // TODO: Trigger quick booking with pre-filled data
-              },
+              onPressed: () {},
               icon: const Icon(Icons.flash_on, size: 18),
               label: Text(
                 t('bookThisTrip'),

@@ -124,7 +124,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Welcome Section
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -168,7 +167,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Management Cards
                       Text(
                         t('systemManagement'),
                         style: const TextStyle(
@@ -185,9 +183,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               icon: Icons.people,
                               title: t('users'),
                               color: Colors.blue,
-                              onTap: () {
-                                // TODO: Navigate to users management
-                              },
+                              onTap: () {},
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -196,9 +192,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               icon: Icons.route,
                               title: t('lines'),
                               color: Colors.green,
-                              onTap: () {
-                                // TODO: Navigate to lines management
-                              },
+                              onTap: () {},
                             ),
                           ),
                         ],
@@ -211,9 +205,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               icon: Icons.directions_car,
                               title: t('vehicles'),
                               color: Colors.orange,
-                              onTap: () {
-                                // TODO: Navigate to vehicles management
-                              },
+                              onTap: () {},
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -222,9 +214,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               icon: Icons.directions_bus,
                               title: t('trips'),
                               color: Colors.purple,
-                              onTap: () {
-                                // TODO: Navigate to trips management
-                              },
+                              onTap: () {},
                             ),
                           ),
                         ],
@@ -237,9 +227,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               icon: Icons.payment,
                               title: t('payments'),
                               color: Colors.teal,
-                              onTap: () {
-                                // TODO: Navigate to payments
-                              },
+                              onTap: () {},
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -248,16 +236,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               icon: Icons.bar_chart,
                               title: t('reports'),
                               color: Colors.red,
-                              onTap: () {
-                                // TODO: Navigate to reports
-                              },
+                              onTap: () {},
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 24),
 
-                      // Statistics Card
                       Container(
                         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -316,7 +301,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                       const SizedBox(height: 16),
 
-                      // User Info
                       Container(
                         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

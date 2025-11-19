@@ -117,7 +117,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       );
 
       if (success) {
-        // Navigate to login after 2 seconds
         await Future.delayed(const Duration(seconds: 2));
         if (!mounted) return;
         Navigator.pushAndRemoveUntil(

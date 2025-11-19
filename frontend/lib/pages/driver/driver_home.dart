@@ -122,7 +122,6 @@ class _DriverHomePageState extends State<DriverHomePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Welcome Section
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -166,7 +165,6 @@ class _DriverHomePageState extends State<DriverHomePage> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Quick Actions
                       Text(
                         t('actions'),
                         style: const TextStyle(
@@ -183,9 +181,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
                               icon: Icons.list_alt,
                               title: t('myTrips'),
                               color: Colors.blue,
-                              onTap: () {
-                                // TODO: Navigate to trips page
-                              },
+                              onTap: () {},
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -194,9 +190,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
                               icon: Icons.check_circle,
                               title: t('checkin'),
                               color: Colors.green,
-                              onTap: () {
-                                // TODO: Navigate to check-in page
-                              },
+                              onTap: () {},
                             ),
                           ),
                         ],
@@ -209,9 +203,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
                               icon: Icons.directions_car,
                               title: t('myVehicle'),
                               color: Colors.orange,
-                              onTap: () {
-                                // TODO: Navigate to vehicle page
-                              },
+                              onTap: () {},
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -220,16 +212,13 @@ class _DriverHomePageState extends State<DriverHomePage> {
                               icon: Icons.person,
                               title: t('profile'),
                               color: Colors.purple,
-                              onTap: () {
-                                // TODO: Navigate to profile page
-                              },
+                              onTap: () {},
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 24),
 
-                      // Stats Card
                       Container(
                         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -274,7 +263,6 @@ class _DriverHomePageState extends State<DriverHomePage> {
                       ),
                       const SizedBox(height: 16),
 
-                      // User Info
                       Container(
                         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

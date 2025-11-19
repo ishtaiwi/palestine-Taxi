@@ -266,7 +266,6 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = false);
 
       if (result['success'] == true) {
-        // Login نجح
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -279,34 +278,30 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
 
-        // Navigate حسب Role
-        final user = result['user'] as Map<String, dynamic>?;
-        final role = user?['role']?.toString().toUpperCase();
+        final userData = result['user'] as Map<String, dynamic>?;
+        final userRole = userData?['role']?.toString().toUpperCase();
 
-        // إعادة تعيين الحقول
         _emailController.clear();
         _passwordController.clear();
 
-        // Navigation حسب الدور
         if (!mounted) return;
 
-        if (role == 'PASSENGER') {
+        if (userRole == 'PASSENGER') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const PassengerHomePage()),
           );
-        } else if (role == 'DRIVER') {
+        } else if (userRole == 'DRIVER') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const DriverHomePage()),
           );
-        } else if (role == 'ADMIN') {
+        } else if (userRole == 'ADMIN') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
           );
         } else {
-          // Default fallback
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -319,7 +314,6 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       } else {
-        // Login فشل
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(

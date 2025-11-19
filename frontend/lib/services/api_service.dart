@@ -4,25 +4,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 
 class ApiService {
-  // Helper method للحصول على token
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('auth_token');
   }
 
-  // Helper method لحفظ token
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_token', token);
   }
 
-  // Helper method لحفظ user data
   static Future<void> saveUserData(Map<String, dynamic> user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_data', jsonEncode(user));
   }
 
-  // Helper method للحصول على user data
   static Future<Map<String, dynamic>?> getUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString('user_data');
@@ -32,32 +28,28 @@ class ApiService {
     return null;
   }
 
-  // Helper method لحذف token و user data (logout)
   static Future<void> clearAuthData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
     await prefs.remove('user_data');
   }
 
-  // Helper method لحفظ تفضيل اللغة
   static Future<void> saveLanguagePreference(bool isArabic) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('language_arabic', isArabic);
   }
 
-  // Helper method للحصول على تفضيل اللغة
   static Future<bool> getLanguagePreference() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('language_arabic') ?? true; // Default to Arabic
+    return prefs.getBool('language_arabic') ?? true;
   }
 
-  // Login API
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
     try {
-      final body = jsonEncode({
+      final requestBody = jsonEncode({
         'email': email.trim(),
         'password': password,
       });
@@ -68,39 +60,47 @@ class ApiService {
           'Content-Type': 'application/json; charset=utf-8',
           'Accept': 'application/json; charset=utf-8',
         },
-        body: utf8.encode(body), // Explicitly encode as UTF-8
+        body: utf8.encode(requestBody),
       ).timeout(AppConfig.requestTimeout);
 
-      final data = jsonDecode(response.body);
+      final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        // حفظ token و user data
-        if (data['token'] != null) {
-          await saveToken(data['token']);
+        final isSuccess = responseData['success'] == true || responseData['success'] == 'true';
+        
+        if (isSuccess) {
+          if (responseData['token'] != null) {
+            await saveToken(responseData['token']);
+          }
+          if (responseData['user'] != null) {
+            await saveUserData(responseData['user']);
+          }
+          return {
+            'success': true,
+            'message': responseData['message'] ?? 'Login successful',
+            'token': responseData['token'],
+            'user': responseData['user'],
+          };
+        } else {
+          return {
+            'success': false,
+            'message': responseData['message'] ?? 'Login failed',
+          };
         }
-        if (data['user'] != null) {
-          await saveUserData(data['user']);
-        }
-        return {
-          'success': true,
-          'message': data['message'] ?? 'Login successful',
-          'token': data['token'],
-          'user': data['user'],
-        };
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Login failed',
+          'message': responseData['message'] ?? 'Login failed',
         };
       }
-    } catch (e) {
+    } catch (exception) {
       String errorMessage = 'Connection error';
-      if (e.toString().contains('TimeoutException')) {
+      if (exception.toString().contains('TimeoutException')) {
         errorMessage = 'Connection timeout. Please check your internet connection.';
-      } else if (e.toString().contains('SocketException')) {
+      } else if (exception.toString().contains('SocketException')) {
         errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
       } else {
-        errorMessage = 'Error: ${e.toString()}';
+        errorMessage = 'Error: ${exception.toString()}';
       }
       return {
         'success': false,
@@ -109,7 +109,6 @@ class ApiService {
     }
   }
 
-  // Register API
   static Future<Map<String, dynamic>> register({
     required String fullname,
     required String email,
@@ -119,22 +118,19 @@ class ApiService {
     String? licenseId,
   }) async {
     try {
-      // Encode data with UTF-8 support for Arabic characters
-      // Convert role to lowercase for backend validation
-      final bodyMap = {
+      final requestBody = {
         'fullname': fullname,
         'email': email.trim(),
         'phone': phone.trim(),
         'password': password,
-        'role': role.toLowerCase(), // Backend expects lowercase
+        'role': role.toLowerCase(),
       };
       
-      // Add licenseId if provided (for driver registration)
       if (licenseId != null && licenseId.isNotEmpty) {
-        bodyMap['licenseid'] = licenseId.trim();
+        requestBody['licenseid'] = licenseId.trim();
       }
       
-      final body = jsonEncode(bodyMap);
+      final requestBodyJson = jsonEncode(requestBody);
       
       final response = await http.post(
         Uri.parse('${AppConfig.apiBaseUrl}/auth/register'),
@@ -142,43 +138,38 @@ class ApiService {
           'Content-Type': 'application/json; charset=utf-8',
           'Accept': 'application/json; charset=utf-8',
         },
-        body: utf8.encode(body), // Explicitly encode as UTF-8
+        body: utf8.encode(requestBodyJson),
       ).timeout(AppConfig.requestTimeout);
 
-      final data = jsonDecode(response.body);
+      final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 201) {
-        // Save token and user data if available (auto-login after registration)
-        if (data['token'] != null) {
-          await saveToken(data['token']);
+        if (responseData['token'] != null) {
+          await saveToken(responseData['token']);
         }
-        if (data['user'] != null) {
-          await saveUserData(data['user']);
+        if (responseData['user'] != null) {
+          await saveUserData(responseData['user']);
         }
         return {
           'success': true,
-          'message': data['message'] ?? 'Registration successful',
-          'token': data['token'],
-          'user': data['user'],
+          'message': responseData['message'] ?? 'Registration successful',
+          'token': responseData['token'],
+          'user': responseData['user'],
         };
       } else {
-        // Handle error response
-        String errorMessage = data['message'] ?? data['error'] ?? 'Registration failed';
+        String errorMessage = responseData['message'] ?? responseData['error'] ?? 'Registration failed';
         
-        // Handle validation errors from express-validator
-        if (data['errors'] != null) {
-          if (data['errors'] is List && (data['errors'] as List).isNotEmpty) {
-            // errors.array() format from express-validator
-            final errorsList = data['errors'] as List;
-            final firstError = errorsList.first;
-            if (firstError is Map && firstError['msg'] != null) {
-              errorMessage = firstError['msg'].toString();
+        if (responseData['errors'] != null) {
+          if (responseData['errors'] is List && (responseData['errors'] as List).isNotEmpty) {
+            final validationErrors = responseData['errors'] as List;
+            final firstValidationError = validationErrors.first;
+            if (firstValidationError is Map && firstValidationError['msg'] != null) {
+              errorMessage = firstValidationError['msg'].toString();
             } else {
-              errorMessage = firstError.toString();
+              errorMessage = firstValidationError.toString();
             }
-          } else if (data['errors'] is Map && (data['errors'] as Map).isNotEmpty) {
-            // Other error format
-            final errorsMap = data['errors'] as Map;
+          } else if (responseData['errors'] is Map && (responseData['errors'] as Map).isNotEmpty) {
+            final errorsMap = responseData['errors'] as Map;
             errorMessage = errorsMap.values.first.toString();
           }
         }
@@ -188,14 +179,14 @@ class ApiService {
           'message': errorMessage,
         };
       }
-    } catch (e) {
+    } catch (exception) {
       String errorMessage = 'Connection error';
-      if (e.toString().contains('TimeoutException')) {
+      if (exception.toString().contains('TimeoutException')) {
         errorMessage = 'Connection timeout. Please check your internet connection.';
-      } else if (e.toString().contains('SocketException')) {
+      } else if (exception.toString().contains('SocketException')) {
         errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
       } else {
-        errorMessage = 'Error: ${e.toString()}';
+        errorMessage = 'Error: ${exception.toString()}';
       }
       return {
         'success': false,
@@ -204,7 +195,6 @@ class ApiService {
     }
   }
 
-  // Get Profile API (مع token)
   static Future<Map<String, dynamic>> getProfile() async {
     try {
       final token = await getToken();
@@ -223,32 +213,31 @@ class ApiService {
         },
       ).timeout(AppConfig.requestTimeout);
 
-      final data = jsonDecode(response.body);
+      final userData = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        await saveUserData(data);
+        await saveUserData(userData);
         return {
           'success': true,
-          'user': data,
+          'user': userData,
         };
       } else {
-        // إذا كان token غير صحيح، احذف البيانات المحفوظة
         if (response.statusCode == 401) {
           await clearAuthData();
         }
         return {
           'success': false,
-          'message': data['message'] ?? 'Failed to get profile',
+          'message': userData['message'] ?? 'Failed to get profile',
         };
       }
-    } catch (e) {
+    } catch (exception) {
       String errorMessage = 'Connection error';
-      if (e.toString().contains('TimeoutException')) {
+      if (exception.toString().contains('TimeoutException')) {
         errorMessage = 'Connection timeout. Please check your internet connection.';
-      } else if (e.toString().contains('SocketException')) {
+      } else if (exception.toString().contains('SocketException')) {
         errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
       } else {
-        errorMessage = 'Error: ${e.toString()}';
+        errorMessage = 'Error: ${exception.toString()}';
       }
       return {
         'success': false,
@@ -257,37 +246,38 @@ class ApiService {
     }
   }
 
-  // Request Password Reset API
   static Future<Map<String, dynamic>> requestPasswordReset({
     required String email,
   }) async {
     try {
+      final requestBody = jsonEncode({
+        'email': email.trim(),
+      });
+
       final response = await http.post(
         Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset/request'),
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Accept': 'application/json; charset=utf-8',
         },
-        body: jsonEncode({
-          'email': email.trim(),
-        }),
+        body: requestBody,
       ).timeout(AppConfig.requestTimeout);
 
-      final data = jsonDecode(response.body);
+      final responseData = jsonDecode(response.body);
 
       return {
-        'success': data['emailSent'] == true || data['message'] != null,
-        'message': data['message'] ?? 'Verification code sent to your email',
-        'debugCode': data['debugCode'], // For development only
+        'success': responseData['emailSent'] == true || responseData['message'] != null,
+        'message': responseData['message'] ?? 'Verification code sent to your email',
+        'debugCode': responseData['debugCode'],
       };
-    } catch (e) {
+    } catch (exception) {
       String errorMessage = 'Connection error';
-      if (e.toString().contains('TimeoutException')) {
+      if (exception.toString().contains('TimeoutException')) {
         errorMessage = 'Connection timeout. Please check your internet connection.';
-      } else if (e.toString().contains('SocketException')) {
+      } else if (exception.toString().contains('SocketException')) {
         errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
       } else {
-        errorMessage = 'Error: ${e.toString()}';
+        errorMessage = 'Error: ${exception.toString()}';
       }
       return {
         'success': false,
@@ -296,13 +286,12 @@ class ApiService {
     }
   }
 
-  // Verify Reset Code API
   static Future<Map<String, dynamic>> verifyResetCode({
     required String email,
     required String code,
   }) async {
     try {
-      final body = jsonEncode({
+      final requestBody = jsonEncode({
         'email': email.trim(),
         'code': code.trim(),
       });
@@ -313,28 +302,26 @@ class ApiService {
           'Content-Type': 'application/json; charset=utf-8',
           'Accept': 'application/json; charset=utf-8',
         },
-        body: utf8.encode(body),
+        body: utf8.encode(requestBody),
       ).timeout(AppConfig.requestTimeout);
 
-      final data = jsonDecode(response.body);
+      final responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 200 && data['verified'] == true) {
+      if (response.statusCode == 200 && responseData['verified'] == true) {
         return {
           'success': true,
-          'message': data['message'] ?? 'Code verified successfully',
+          'message': responseData['message'] ?? 'Code verified successfully',
           'verified': true,
         };
       } else {
-        String errorMessage =
-            data['message'] ?? data['error'] ?? 'Invalid verification code';
+        String errorMessage = responseData['message'] ?? responseData['error'] ?? 'Invalid verification code';
 
-        // Handle validation errors
-        if (data['errors'] != null) {
-          if (data['errors'] is List && (data['errors'] as List).isNotEmpty) {
-            final errorsList = data['errors'] as List;
-            final firstError = errorsList.first;
-            if (firstError is Map && firstError['msg'] != null) {
-              errorMessage = firstError['msg'].toString();
+        if (responseData['errors'] != null) {
+          if (responseData['errors'] is List && (responseData['errors'] as List).isNotEmpty) {
+            final validationErrors = responseData['errors'] as List;
+            final firstValidationError = validationErrors.first;
+            if (firstValidationError is Map && firstValidationError['msg'] != null) {
+              errorMessage = firstValidationError['msg'].toString();
             }
           }
         }
@@ -345,14 +332,14 @@ class ApiService {
           'verified': false,
         };
       }
-    } catch (e) {
+    } catch (exception) {
       String errorMessage = 'Connection error';
-      if (e.toString().contains('TimeoutException')) {
+      if (exception.toString().contains('TimeoutException')) {
         errorMessage = 'Connection timeout. Please check your internet connection.';
-      } else if (e.toString().contains('SocketException')) {
+      } else if (exception.toString().contains('SocketException')) {
         errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
       } else {
-        errorMessage = 'Error: ${e.toString()}';
+        errorMessage = 'Error: ${exception.toString()}';
       }
       return {
         'success': false,
@@ -362,14 +349,13 @@ class ApiService {
     }
   }
 
-  // Reset Password API (using email and code)
   static Future<Map<String, dynamic>> resetPassword({
     required String email,
     required String code,
     required String newPassword,
   }) async {
     try {
-      final body = jsonEncode({
+      final requestBody = jsonEncode({
         'email': email.trim(),
         'code': code.trim(),
         'newPassword': newPassword,
@@ -381,26 +367,25 @@ class ApiService {
           'Content-Type': 'application/json; charset=utf-8',
           'Accept': 'application/json; charset=utf-8',
         },
-        body: utf8.encode(body),
+        body: utf8.encode(requestBody),
       ).timeout(AppConfig.requestTimeout);
 
-      final data = jsonDecode(response.body);
+      final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
         return {
           'success': true,
-          'message': data['message'] ?? 'Password reset successful',
+          'message': responseData['message'] ?? 'Password reset successful',
         };
       } else {
-        String errorMessage = data['message'] ?? data['error'] ?? 'Password reset failed';
+        String errorMessage = responseData['message'] ?? responseData['error'] ?? 'Password reset failed';
 
-        // Handle validation errors
-        if (data['errors'] != null) {
-          if (data['errors'] is List && (data['errors'] as List).isNotEmpty) {
-            final errorsList = data['errors'] as List;
-            final firstError = errorsList.first;
-            if (firstError is Map && firstError['msg'] != null) {
-              errorMessage = firstError['msg'].toString();
+        if (responseData['errors'] != null) {
+          if (responseData['errors'] is List && (responseData['errors'] as List).isNotEmpty) {
+            final validationErrors = responseData['errors'] as List;
+            final firstValidationError = validationErrors.first;
+            if (firstValidationError is Map && firstValidationError['msg'] != null) {
+              errorMessage = firstValidationError['msg'].toString();
             }
           }
         }
@@ -410,14 +395,14 @@ class ApiService {
           'message': errorMessage,
         };
       }
-    } catch (e) {
+    } catch (exception) {
       String errorMessage = 'Connection error';
-      if (e.toString().contains('TimeoutException')) {
+      if (exception.toString().contains('TimeoutException')) {
         errorMessage = 'Connection timeout. Please check your internet connection.';
-      } else if (e.toString().contains('SocketException')) {
+      } else if (exception.toString().contains('SocketException')) {
         errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
       } else {
-        errorMessage = 'Error: ${e.toString()}';
+        errorMessage = 'Error: ${exception.toString()}';
       }
       return {
         'success': false,

@@ -26,7 +26,7 @@ class Admin {
   static async findByUserId(userid) {
     const { data, error } = await supabase
       .from('admin')
-      .select('*, user(*)')
+      .select('*')
       .eq('userid', userid)
       .single();
     

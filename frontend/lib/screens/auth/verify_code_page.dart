@@ -28,7 +28,6 @@ class _VerifyCodeScreenState extends State<VerifyCodeScreen> {
   void initState() {
     super.initState();
     _loadLanguagePreference();
-    // الحقول تبقى فارغة - المستخدم يدخل الرمز يدوياً
   }
 
   Future<void> _loadLanguagePreference() async {

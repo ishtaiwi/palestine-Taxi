@@ -41,6 +41,20 @@ class PasswordResetToken {
     return data;
   }
 
+  static async findValidByCode(code) {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('password_reset_token')
+      .select('*')
+      .eq('token', code)
+      .eq('used', false)
+      .gte('expires_at', now)
+      .single();
+
+    if (error) return null;
+    return data;
+  }
+
   static async markUsed(id) {
     const { data, error } = await supabase
       .from('password_reset_token')

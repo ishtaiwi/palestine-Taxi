@@ -1,0 +1,122 @@
+import express from 'express';
+import cors from 'cors';
+import appConfig from './config/app.js';
+import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { i18n } from './middleware/i18n.js';
+import logger from './utils/logger.js';
+import { testConnection, getConnectionStatus } from './config/dbcon.js';
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './docs/swagger.js';
+import { generalLimiter } from './middleware/rateLimit.js';
+
+
+import authRoutes from './routes/authRoutes.js';
+import lineRoutes from './routes/lineRoutes.js';
+import tripRoutes from './routes/tripRoutes.js';
+import reservationRoutes from './routes/reservationRoutes.js';
+import vehicleRoutes from './routes/vehicleRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+import walletRoutes from './routes/walletRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+
+const app = express();
+
+
+app.use(cors(appConfig.cors));
+app.use(express.json({ limit: '10mb' })); 
+app.use(express.urlencoded({ extended: true, limit: '10mb' })); 
+app.use(i18n);
+
+
+app.use((req, res, next) => {
+  res.charset = 'utf-8';
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  next();
+});
+
+
+app.use('/api/', generalLimiter);
+
+
+app.get('/health', (req, res) => {
+  const dbStatus = getConnectionStatus();
+  res.json({
+    status: 'OK',
+    message: 'Service Taxi Reservation System API',
+    timestamp: new Date().toISOString(),
+    database: dbStatus,
+  });
+});
+
+
+app.get('/api/db/test', async (req, res) => {
+  try {
+    const result = await testConnection();
+    if (result.connected) {
+      res.json({
+        success: true,
+        message: 'Database connection successful',
+        ...result,
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Database connection failed',
+        ...result,
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error testing database connection',
+      error: error.message,
+    });
+  }
+});
+
+
+app.use('/api/auth', authRoutes);
+app.use('/api/lines', lineRoutes);
+app.use('/api/trips', tripRoutes);
+app.use('/api/reservations', reservationRoutes);
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/wallets', walletRoutes);
+app.use('/api/admin', adminRoutes);
+
+
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+
+app.use(notFound);
+
+
+app.use(errorHandler);
+
+
+const PORT = appConfig.port;
+app.listen(PORT, async () => {
+  logger.info(`Server running on port ${PORT}`);
+  logger.info(`Environment: ${appConfig.nodeEnv}`);
+  logger.info(`API Base URL: http://localhost:${PORT}/api`);
+  
+  
+  logger.info('Testing database connection...');
+  const dbTest = await testConnection();
+  if (dbTest.connected) {
+    logger.info('✅ Database connection verified');
+  } else {
+    logger.warn('⚠️ Database connection failed. Please check your configuration.');
+    logger.warn(`Error: ${dbTest.error || 'Unknown error'}`);
+  }
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    logger.error(`Port ${PORT} is already in use. Please use a different port.`);
+  } else {
+    logger.error(`Server error: ${err.message}`);
+  }
+  process.exit(1);
+});
+
+export default app;
+

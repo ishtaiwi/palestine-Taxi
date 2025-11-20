@@ -22,9 +22,15 @@ class _DriverAdditionalInfoScreenState
     extends State<DriverAdditionalInfoScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _licenseIdController = TextEditingController();
+  final TextEditingController _plateNumberController = TextEditingController();
 
   bool _isArabic = true;
   bool _isLoading = false;
+  bool _isLinesLoading = false;
+  String? _linesError;
+  String? _selectedLineId;
+  String _selectedSeatLayout = '4+1';
+  List<Map<String, dynamic>> _lines = [];
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -34,6 +40,14 @@ class _DriverAdditionalInfoScreenState
       'enterLicenseId': 'أدخل رقم الرخصة',
       'createAccount': 'إنشاء الحساب',
       'back': 'الرجوع',
+      'lineSection': 'اختر خط العمل',
+      'lineLabel': 'الخط',
+      'lineHint': 'اختر الخط الذي تعمل عليه',
+      'lineRequired': 'يرجى اختيار الخط',
+      'lineLoading': 'جارٍ تحميل الخطوط...',
+      'lineRetry': 'إعادة تحميل الخطوط',
+      'lineError': 'فشل تحميل الخطوط',
+      'lineEmpty': 'لا توجد خطوط متاحة حالياً',
     },
     'en': {
       'title': 'Driver Information',
@@ -42,6 +56,14 @@ class _DriverAdditionalInfoScreenState
       'enterLicenseId': 'Enter license ID',
       'createAccount': 'Create Account',
       'back': 'Back',
+      'lineSection': 'Select your operating line',
+      'lineLabel': 'Line',
+      'lineHint': 'Choose the line you operate on',
+      'lineRequired': 'Please select a line',
+      'lineLoading': 'Loading lines...',
+      'lineRetry': 'Reload lines',
+      'lineError': 'Failed to load lines',
+      'lineEmpty': 'No lines available right now',
     },
   };
 
@@ -52,6 +74,7 @@ class _DriverAdditionalInfoScreenState
     super.initState();
     _isArabic = widget.startArabic;
     _loadLanguagePreference();
+    _fetchLines();
   }
 
   Future<void> _loadLanguagePreference() async {
@@ -73,7 +96,34 @@ class _DriverAdditionalInfoScreenState
   @override
   void dispose() {
     _licenseIdController.dispose();
+    _plateNumberController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchLines() async {
+    setState(() {
+      _isLinesLoading = true;
+      _linesError = null;
+    });
+    try {
+      final lines = await ApiService.fetchActiveLines();
+      if (!mounted) return;
+      setState(() {
+        _lines = lines;
+        _isLinesLoading = false;
+        if (_lines.isEmpty) {
+          _selectedLineId = null;
+        } else if (!_lines.any((line) => line['lineid'] == _selectedLineId)) {
+          _selectedLineId = null;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLinesLoading = false;
+        _linesError = e.toString();
+      });
+    }
   }
 
   Future<void> _handleRegister() async {
@@ -92,9 +142,38 @@ class _DriverAdditionalInfoScreenState
       return;
     }
 
+    if (_selectedLineId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(t('lineRequired')),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final resolvedLineId = _resolveSelectedLineId();
+    if (resolvedLineId == null || resolvedLineId.isEmpty) {
+      debugPrint(
+        '[DriverSignup] Failed to resolve line ID. Selected value: $_selectedLineId',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(t('lineRequired')),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
+      debugPrint(
+        '[DriverSignup] Submitting driver registration with lineId: $resolvedLineId',
+      );
       final result = await ApiService.register(
         fullname: widget.formData.fullName,
         email: widget.formData.email,
@@ -102,6 +181,9 @@ class _DriverAdditionalInfoScreenState
         password: widget.formData.password,
         role: 'DRIVER',
         licenseId: _licenseIdController.text.trim(),
+        lineId: resolvedLineId,
+        vehiclePlate: _plateNumberController.text.trim(),
+        vehicleSeatLayout: _selectedSeatLayout,
       );
 
       if (!mounted) return;
@@ -246,6 +328,28 @@ class _DriverAdditionalInfoScreenState
                           return null;
                         },
                       ),
+                      const SizedBox(height: 24),
+                      Text(
+                        t('lineSection'),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildLineSelector(),
+                      const SizedBox(height: 24),
+                      _buildTextField(
+                        controller: _plateNumberController,
+                        label: _isArabic ? 'رقم المركبة' : 'Vehicle Plate Number',
+                        hint: _isArabic
+                            ? 'أدخل رقم المركبة بصيغة 3-1234-A'
+                            : 'Enter plate like 3-1234-A',
+                        keyboardType: TextInputType.text,
+                        validator: _validatePlateNumber,
+                      ),
+                      const SizedBox(height: 24),
+                      _buildSeatLayoutSelector(),
                       const SizedBox(height: 32),
                       SizedBox(
                         width: double.infinity,
@@ -325,6 +429,60 @@ class _DriverAdditionalInfoScreenState
     );
   }
 
+  String? _validatePlateNumber(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return _isArabic ? 'رقم المركبة مطلوب' : 'Vehicle plate is required';
+    }
+    final pattern = RegExp(r'^\d-\d{4}-[A-Za-z]$');
+    if (!pattern.hasMatch(value.trim())) {
+      return _isArabic
+          ? 'استخدم الصيغة 3-1234-A'
+          : 'Use format 3-1234-A';
+    }
+    return null;
+  }
+
+  Widget _buildSeatLayoutSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _isArabic ? 'نوع المقاعد' : 'Seat configuration',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ToggleButtons(
+          isSelected: [
+            _selectedSeatLayout == '4+1',
+            _selectedSeatLayout == '7+1',
+          ],
+          borderRadius: BorderRadius.circular(12),
+          fillColor: const Color(0xFFF57C00),
+          selectedColor: Colors.white,
+          color: Colors.white70,
+          onPressed: (index) {
+            setState(() {
+              _selectedSeatLayout = index == 0 ? '4+1' : '7+1';
+            });
+          },
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(_isArabic ? '4+1 (خمس ركاب)' : '4+1 (5 seats)'),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(_isArabic ? '7+1 (ثمانية ركاب)' : '7+1 (8 seats)'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -370,6 +528,155 @@ class _DriverAdditionalInfoScreenState
       focusedBorder: baseBorder.copyWith(
         borderSide: const BorderSide(color: Color(0xFFF57C00), width: 2),
       ),
+    );
+  }
+
+  String? _resolveSelectedLineId() {
+    if (_selectedLineId == null || _selectedLineId!.isEmpty) return null;
+
+    for (final line in _lines) {
+      final id = line['lineid']?.toString();
+      final name = line['linename']?.toString();
+      if (_selectedLineId == id || _selectedLineId == name) {
+        return id;
+      }
+    }
+    return null;
+  }
+
+  Widget _buildLineSelector() {
+    if (_isLinesLoading) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white38),
+        ),
+        child: Column(
+          children: [
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFF57C00)),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              t('lineLoading'),
+              style: const TextStyle(color: Colors.white70),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_linesError != null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              t('lineError'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _linesError ?? '',
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white54),
+                ),
+                onPressed: _fetchLines,
+                icon: const Icon(Icons.refresh),
+                label: Text(t('lineRetry')),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_lines.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              t('lineEmpty'),
+              style: const TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white54),
+              ),
+              onPressed: _fetchLines,
+              icon: const Icon(Icons.refresh),
+              label: Text(t('lineRetry')),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return DropdownButtonFormField<String>(
+      value: _selectedLineId,
+      decoration: _inputDecoration(t('lineLabel'), t('lineHint')),
+      dropdownColor: const Color(0xFF142238),
+      iconEnabledColor: Colors.white,
+      style: const TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
+      ),
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      items: _lines
+          .map(
+            (line) => DropdownMenuItem<String>(
+              value: line['lineid']?.toString(),
+              child: Text(
+                line['linename']?.toString() ?? '',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (value) {
+        setState(() {
+          _selectedLineId = value;
+        });
+      },
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return t('lineRequired');
+        }
+        return null;
+      },
     );
   }
 }

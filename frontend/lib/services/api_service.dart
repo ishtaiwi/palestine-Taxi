@@ -116,6 +116,9 @@ class ApiService {
     required String password,
     String role = 'PASSENGER',
     String? licenseId,
+    String? lineId,
+    String? vehiclePlate,
+    String? vehicleSeatLayout,
   }) async {
     try {
       final requestBody = {
@@ -128,6 +131,18 @@ class ApiService {
       
       if (licenseId != null && licenseId.isNotEmpty) {
         requestBody['licenseid'] = licenseId.trim();
+      }
+
+      if (lineId != null && lineId.isNotEmpty) {
+        requestBody['lineid'] = lineId.trim();
+      }
+
+      if (vehiclePlate != null && vehiclePlate.isNotEmpty) {
+        requestBody['vehiclePlate'] = vehiclePlate.trim();
+      }
+
+      if (vehicleSeatLayout != null && vehicleSeatLayout.isNotEmpty) {
+        requestBody['vehicleSeatLayout'] = vehicleSeatLayout.trim();
       }
       
       final requestBodyJson = jsonEncode(requestBody);
@@ -192,6 +207,43 @@ class ApiService {
         'success': false,
         'message': errorMessage,
       };
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchActiveLines() async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('${AppConfig.apiBaseUrl}/lines/active'),
+            headers: {
+              'Accept': 'application/json; charset=utf-8',
+            },
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is List) {
+          return decoded
+              .whereType<Map<String, dynamic>>()
+              .map((line) => Map<String, dynamic>.from(line))
+              .toList();
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        final decoded = jsonDecode(response.body);
+        throw Exception(
+          decoded is Map && decoded['message'] is String
+              ? decoded['message']
+              : 'Failed to load lines',
+        );
+      }
+    } catch (exception) {
+      throw Exception(
+        exception.toString().contains('TimeoutException')
+            ? 'Connection timeout. Please check your internet connection.'
+            : exception.toString(),
+      );
     }
   }
 
@@ -409,6 +461,393 @@ class ApiService {
         'message': errorMessage,
       };
     }
+  }
+
+  static Future<Map<String, dynamic>> fetchDriverQueue() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http
+          .get(
+            Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          ...responseData,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': responseData['message'] ?? 'Failed to load queue',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> joinDriverQueue() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue/join'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'success': true,
+          ...responseData,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': responseData['message'] ?? 'Failed to join queue',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> leaveDriverQueue() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue/leave'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final responseData = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          ...responseData,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': responseData['message'] ?? 'Failed to leave queue',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchDriverTrips({
+    bool upcomingOnly = true,
+    String? status,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return [];
+    }
+
+    final queryParams = <String, String>{
+      if (upcomingOnly) 'upcoming': 'true',
+      if (status != null && status.isNotEmpty) 'status': status,
+    };
+
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/drivers/trips')
+        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json; charset=utf-8',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is List) {
+        return decoded.whereType<Map<String, dynamic>>().toList();
+      }
+    }
+
+    return [];
+  }
+
+  static Future<Map<String, dynamic>> fetchDriverTripReservations(String tripId) async {
+    final token = await getToken();
+    if (token == null) {
+      return {
+        'success': false,
+        'message': 'Not authenticated',
+      };
+    }
+
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/drivers/trips/$tripId/reservations'),
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json; charset=utf-8',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+      return {
+        'success': true,
+        ...decoded,
+      };
+    }
+
+    return {
+      'success': false,
+      'message': decoded is Map && decoded['message'] is String ? decoded['message'] : 'Failed to load reservations',
+    };
+  }
+
+  static Future<Map<String, dynamic>> updateDriverReservationStatus({
+    required String tripId,
+    required String bookingId,
+    required String action,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {
+        'success': false,
+        'message': 'Not authenticated',
+      };
+    }
+
+    final response = await http.patch(
+      Uri.parse('${AppConfig.apiBaseUrl}/drivers/trips/$tripId/reservations/$bookingId'),
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Accept': 'application/json; charset=utf-8',
+        'Authorization': 'Bearer $token',
+      },
+      body: utf8.encode(jsonEncode({'action': action})),
+    );
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+      return {
+        'success': true,
+        ...decoded,
+      };
+    }
+
+    return {
+      'success': false,
+      'message': decoded is Map && decoded['message'] is String ? decoded['message'] : 'Failed to update reservation',
+    };
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchDriverVehicles() async {
+    final token = await getToken();
+    if (token == null) return [];
+
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/vehicles/driver/my-vehicles'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json; charset=utf-8',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is List) {
+        return decoded.whereType<Map<String, dynamic>>().toList();
+      }
+    }
+
+    return [];
+  }
+
+  static Future<Map<String, dynamic>> createMyVehicle({
+    required String plateno,
+    required String seatlayout,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/vehicles/driver/my-vehicle'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json; charset=utf-8',
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+        body: jsonEncode({
+          'plateno': plateno.trim(),
+          'seatlayout': seatlayout,
+        }),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      
+      if (response.statusCode == 201 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Vehicle created successfully',
+          'vehicle': decoded['vehicle'],
+        };
+      }
+
+      String errorMessage = 'Failed to create vehicle';
+      if (decoded is Map) {
+        if (decoded['message'] is String) {
+          errorMessage = decoded['message'];
+        } else if (decoded['error'] is String) {
+          errorMessage = decoded['error'];
+        }
+      }
+
+      return {
+        'success': false,
+        'message': errorMessage,
+      };
+    } catch (exception) {
+      String errorMessage = 'Connection error';
+      if (exception.toString().contains('TimeoutException')) {
+        errorMessage = 'Connection timeout. Please check your internet connection.';
+      } else if (exception.toString().contains('SocketException')) {
+        errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
+      } else {
+        errorMessage = 'Error: ${exception.toString()}';
+      }
+      return {
+        'success': false,
+        'message': errorMessage,
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchVehicleSeatMap(String vehicleId) async {
+    final token = await getToken();
+    if (token == null) {
+      return {
+        'success': false,
+        'message': 'Not authenticated',
+      };
+    }
+
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/vehicles/$vehicleId/seatmap'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json; charset=utf-8',
+      },
+    );
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+      return {
+        'success': true,
+        ...decoded,
+      };
+    }
+
+    return {
+      'success': false,
+      'message': decoded is Map && decoded['message'] is String ? decoded['message'] : 'Failed to load seat map',
+    };
+  }
+
+  static Future<Map<String, dynamic>> updateVehicleBrokenSeats(
+    String vehicleId,
+    List<String> seats,
+  ) async {
+    final token = await getToken();
+    if (token == null) {
+      return {
+        'success': false,
+        'message': 'Not authenticated',
+      };
+    }
+
+    final response = await http.put(
+      Uri.parse('${AppConfig.apiBaseUrl}/vehicles/$vehicleId/broken-seats'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json; charset=utf-8',
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: jsonEncode({
+        'seats': seats,
+      }),
+    );
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+      return {
+        'success': true,
+        ...decoded,
+      };
+    }
+
+    return {
+      'success': false,
+      'message': decoded is Map && decoded['message'] is String ? decoded['message'] : 'Failed to update seat state',
+    };
   }
 }
 

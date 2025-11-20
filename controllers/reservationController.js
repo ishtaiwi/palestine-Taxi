@@ -160,6 +160,7 @@ export const createReservation = async (req, res, next) => {
       dropoffpoint: dropoffpoint || null,
       aging: aging || null,
       status: reservationStatus,
+      driver_status: 'pending',
     };
     
     const reservation = await Reservation.create(reservationData);

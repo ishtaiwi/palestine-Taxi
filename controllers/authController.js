@@ -4,6 +4,8 @@ import Driver from '../models/Driver.js';
 import Passenger from '../models/Passenger.js';
 import Admin from '../models/Admin.js';
 import Wallet from '../models/Wallet.js';
+import Line from '../models/Line.js';
+import Vehicle from '../models/Vehicle.js';
 import PasswordResetToken from '../models/PasswordResetToken.js';
 import { generateToken, hashPassword, comparePassword } from '../utils/auth.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -77,11 +79,39 @@ export const register = async (req, res, next) => {
     
     let roleRecord;
     if (normalizedRole === 'DRIVER') {
-      const { licenseid } = req.body;
+      const { licenseid, lineid, vehiclePlate, vehicleSeatLayout } = req.body;
+      if (!lineid) {
+        return res.status(400).json({
+          message: req.t('driver.line_required') || 'Line is required for drivers',
+        });
+      }
+
+      const line = await Line.findById(lineid);
+      if (!line) {
+        return res.status(404).json({
+          message: req.t('line.not_found') || 'Line not found',
+        });
+      }
+
       roleRecord = await Driver.create({
         driverid: uuidv4(),
         userid: user.userid,
         licenseid,
+        lineid,
+      });
+
+      const seatLayout = (vehicleSeatLayout || '').trim();
+      const normalizedLayout = seatLayout.length > 0 ? seatLayout : '4+1';
+      const seatNum = normalizedLayout === '7+1' ? 8 : 5;
+
+      await Vehicle.create({
+        vehicleid: uuidv4(),
+        driverid: roleRecord.driverid,
+        lineid,
+        seatnum: seatNum,
+        seatlayout: normalizedLayout,
+        plateno: vehiclePlate?.trim(),
+        status: 'active',
       });
     } else if (normalizedRole === 'PASSENGER') {
       const passengerType = (req.body.type || 'app_based').toLowerCase();

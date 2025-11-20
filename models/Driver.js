@@ -15,7 +15,7 @@ class Driver {
   static async findById(driverid) {
     const { data, error } = await supabase
       .from('driver')
-      .select('*, user(*)')
+      .select('*, user(*), line(*)')
       .eq('driverid', driverid)
       .single();
     
@@ -26,7 +26,7 @@ class Driver {
   static async findByUserId(userid) {
     const { data, error } = await supabase
       .from('driver')
-      .select('*, user(*)')
+      .select('*, user(*), line(*)')
       .eq('userid', userid)
       .single();
     

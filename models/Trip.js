@@ -65,6 +65,45 @@ class Trip {
     return data;
   }
 
+  static async findUpcomingByVehicle(vehicleid) {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('trip')
+      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .eq('vehicleid', vehicleid)
+      .in('status', ['scheduled', 'in_progress'])
+      .gte('deptime', now)
+      .order('deptime', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || null;
+  }
+
+  static async findByVehicleIds(vehicleIds = [], filters = {}) {
+    if (!vehicleIds || vehicleIds.length === 0) {
+      return [];
+    }
+
+    let query = supabase
+      .from('trip')
+      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .in('vehicleid', vehicleIds);
+
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+
+    if (filters.fromNow) {
+      query = query.gte('deptime', new Date().toISOString());
+    }
+
+    const { data, error } = await query.order('deptime', { ascending: true });
+    if (error) throw error;
+    return data;
+  }
+
   static async update(tripid, updates) {
     const { data, error } = await supabase
       .from('trip')

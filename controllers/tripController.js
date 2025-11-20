@@ -2,6 +2,7 @@ import Trip from '../models/Trip.js';
 import Line from '../models/Line.js';
 import Vehicle from '../models/Vehicle.js';
 import Reservation from '../models/Reservation.js';
+import { buildSeatRows, normalizeSeatId } from '../utils/seatLayout.js';
 import { v4 as uuidv4 } from 'uuid';
 
 
@@ -172,12 +173,19 @@ export const getTripSeatMap = async (req, res, next) => {
     const vehicle = await Vehicle.findById(trip.vehicleid);
     
     
-    const seatMap = generateSeatMap(vehicle.seatlayout, vehicle.seatnum, reservations);
+    const seatMap = generateSeatMap(
+      vehicle.seatlayout,
+      vehicle.seatnum,
+      reservations,
+      vehicle.broken_seats || []
+    );
     
     res.json({
       trip,
       seatMap,
       reservations,
+      layout: buildSeatRows(vehicle.seatlayout, vehicle.seatnum),
+      brokenSeats: vehicle.broken_seats || [],
     });
   } catch (error) {
     next(error);
@@ -185,15 +193,25 @@ export const getTripSeatMap = async (req, res, next) => {
 };
 
 
-function generateSeatMap(layout, totalSeats, reservations) {
+function generateSeatMap(layout, totalSeats, reservations, brokenSeats = []) {
   const seatMap = {};
-  const reservedSeats = reservations.map(r => r.seatlocation).filter(Boolean);
+  const reservedSeats = reservations
+    .map((r) => normalizeSeatId(r.seatlocation))
+    .filter(Boolean);
+  const brokenSeatIds = (brokenSeats || []).map((seat) => seat.toLowerCase());
   
   for (let i = 1; i <= totalSeats; i++) {
     const seatKey = `seat_${i}`;
+    let status = 'available';
+    if (brokenSeatIds.includes(seatKey)) {
+      status = 'broken';
+    } else if (reservedSeats.includes(seatKey)) {
+      status = 'reserved';
+    }
+
     seatMap[seatKey] = {
       number: i,
-      status: reservedSeats.includes(seatKey) ? 'reserved' : 'available',
+      status,
       reservation: reservations.find(r => r.seatlocation === seatKey) || null,
     };
   }

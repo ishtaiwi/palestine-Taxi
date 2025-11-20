@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../screens/auth/login_page.dart';
+import 'driver_queue_page.dart';
+import 'driver_trips_page.dart';
+import 'driver_vehicle_page.dart';
 
 class DriverHomePage extends StatefulWidget {
   const DriverHomePage({super.key});
@@ -25,6 +28,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
       'myVehicle': 'مركبتي',
       'profile': 'الملف الشخصي',
       'statistics': 'الإحصائيات',
+      'queueTitle': 'دور السائقين',
+      'queueSubtitle': 'احجز دورك وشاهد ترتيب السائقين على خطك',
       'todayTrips': 'رحلات اليوم',
       'passengers': 'الركاب',
       'rating': 'التقييم',
@@ -44,6 +49,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
       'myVehicle': 'My Vehicle',
       'profile': 'Profile',
       'statistics': 'Statistics',
+      'queueTitle': 'Driver Queue',
+      'queueSubtitle': 'Join the line and track other drivers on your route',
       'todayTrips': 'Today\'s Trips',
       'passengers': 'Passengers',
       'rating': 'Rating',
@@ -99,16 +106,25 @@ class _DriverHomePageState extends State<DriverHomePage> {
       child: Scaffold(
         backgroundColor: const Color(0xFF060A1A),
         appBar: AppBar(
-          title: Text(t('title')),
-          backgroundColor: const Color(0xFF0B132B),
+          title: Text(
+            t('title'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+            backgroundColor: const Color(0xFF0B132B),
           actions: [
             IconButton(
-              icon: Icon(_isArabic ? Icons.language : Icons.translate),
+              icon: Icon(
+                _isArabic ? Icons.language : Icons.translate,
+                color: Colors.white,
+              ),
               onPressed: () => _switchLanguage(!_isArabic),
               tooltip: _isArabic ? 'English' : 'العربية',
             ),
             IconButton(
-              icon: const Icon(Icons.logout),
+              icon: const Icon(Icons.logout, color: Colors.white),
               onPressed: _handleLogout,
               tooltip: t('logout'),
             ),
@@ -181,7 +197,14 @@ class _DriverHomePageState extends State<DriverHomePage> {
                               icon: Icons.list_alt,
                               title: t('myTrips'),
                               color: Colors.blue,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const DriverTripsPage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -190,7 +213,14 @@ class _DriverHomePageState extends State<DriverHomePage> {
                               icon: Icons.check_circle,
                               title: t('checkin'),
                               color: Colors.green,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const DriverQueuePage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -203,7 +233,14 @@ class _DriverHomePageState extends State<DriverHomePage> {
                               icon: Icons.directions_car,
                               title: t('myVehicle'),
                               color: Colors.orange,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const DriverVehiclePage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -216,6 +253,38 @@ class _DriverHomePageState extends State<DriverHomePage> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      Text(
+                        t('queueTitle'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        t('queueSubtitle'),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: DriverQueuePage(
+                          embedded: true,
+                          isArabicOverride: _isArabic,
+                        ),
                       ),
                       const SizedBox(height: 24),
 

@@ -18,6 +18,7 @@ import vehicleRoutes from './routes/vehicleRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import driverRoutes from './routes/driverRoutes.js';
 
 const app = express();
 
@@ -83,6 +84,7 @@ app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/wallets', walletRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/drivers', driverRoutes);
 
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

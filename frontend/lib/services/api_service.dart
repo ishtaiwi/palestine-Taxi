@@ -145,6 +145,18 @@ class ApiService {
         requestBody['vehicleSeatLayout'] = vehicleSeatLayout.trim();
       }
       
+      // Debug: Log what we're sending
+      print('[ApiService.register] 📤 Sending registration data:');
+      print('  - fullname: ${requestBody['fullname']}');
+      print('  - email: ${requestBody['email']}');
+      print('  - phone: ${requestBody['phone']}');
+      print('  - role: ${requestBody['role']}');
+      print('  - licenseid: ${requestBody['licenseid'] ?? 'null'}');
+      print('  - lineid: ${requestBody['lineid'] ?? 'null'}');
+      print('  - vehiclePlate: ${requestBody['vehiclePlate'] ?? 'null'}');
+      print('  - vehicleSeatLayout: ${requestBody['vehicleSeatLayout'] ?? 'null'}');
+      print('  - All keys: ${requestBody.keys.toList()}');
+      
       final requestBodyJson = jsonEncode(requestBody);
       
       final response = await http.post(
@@ -158,19 +170,54 @@ class ApiService {
 
       final responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 201) {
-        if (responseData['token'] != null) {
-          await saveToken(responseData['token']);
+      print('[ApiService.register] 📥 Received response:');
+      print('  - Status: ${response.statusCode}');
+      print('  - Has success: ${responseData['success']}');
+      print('  - Has token: ${responseData['token'] != null}');
+      print('  - Has user: ${responseData['user'] != null}');
+      print('  - Has vehicle: ${responseData['vehicle'] != null}');
+      if (responseData['vehicle'] != null) {
+        print('  - Vehicle data: ${responseData['vehicle']}');
+      }
+
+      // Check for success status (201 or 200) or explicit success field
+      final isSuccess = response.statusCode == 201 || 
+                       response.statusCode == 200 || 
+                       responseData['success'] == true ||
+                       responseData['success'] == 'true';
+
+      if (isSuccess && responseData['token'] != null) {
+        try {
+          // Save token and user data
+          if (responseData['token'] != null) {
+            await saveToken(responseData['token']);
+          }
+          if (responseData['user'] != null) {
+            await saveUserData(responseData['user']);
+          }
+          
+          print('[ApiService.register] ✅ Registration successful');
+          print('  - User saved: ${responseData['user'] != null}');
+          print('  - Token saved: ${responseData['token'] != null}');
+          
+          return {
+            'success': true,
+            'message': responseData['message'] ?? 'Registration successful',
+            'token': responseData['token'],
+            'user': responseData['user'],
+            'vehicle': responseData['vehicle'], // Include vehicle in response
+          };
+        } catch (saveError) {
+          print('[ApiService.register] ⚠️ Error saving data: $saveError');
+          // Even if saving fails, return success if registration was successful
+          return {
+            'success': true,
+            'message': responseData['message'] ?? 'Registration successful',
+            'token': responseData['token'],
+            'user': responseData['user'],
+            'vehicle': responseData['vehicle'],
+          };
         }
-        if (responseData['user'] != null) {
-          await saveUserData(responseData['user']);
-        }
-        return {
-          'success': true,
-          'message': responseData['message'] ?? 'Registration successful',
-          'token': responseData['token'],
-          'user': responseData['user'],
-        };
       } else {
         String errorMessage = responseData['message'] ?? responseData['error'] ?? 'Registration failed';
         

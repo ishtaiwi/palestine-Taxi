@@ -196,19 +196,34 @@ const ensureDriverOwnsVehicle = async (vehicleid, driverid, t) => {
 
 const buildSeatStatus = (vehicle, reservations = []) => {
   const seatRows = buildSeatRows(vehicle.seatlayout, vehicle.seatnum);
-  const brokenSeats = (vehicle.broken_seats || []).map((seat) => seat.toLowerCase());
+  const brokenSeats = (vehicle.broken_seats || []).map((seat) => seat.toLowerCase().trim());
   const reservedSeats = reservations
-    .map((reservation) => normalizeSeatId(reservation.seatlocation))
+    .map((reservation) => {
+      const normalized = normalizeSeatId(reservation.seatlocation);
+      return normalized ? normalized.toLowerCase().trim() : null;
+    })
     .filter(Boolean);
+
+  console.log('[buildSeatStatus] Building seat status:', {
+    vehicleId: vehicle.vehicleid,
+    seatLayout: vehicle.seatlayout,
+    seatNum: vehicle.seatnum,
+    brokenSeats: brokenSeats,
+    reservationsCount: reservations.length,
+    reservedSeats: reservedSeats,
+    reservationSeatLocations: reservations.map(r => r.seatlocation),
+  });
 
   let counter = 1;
   const rows = seatRows.map((row) =>
     row.map(() => {
       const seatId = `seat_${counter}`;
+      const seatIdLower = seatId.toLowerCase();
       let status = 'available';
-      if (brokenSeats.includes(seatId)) {
+      
+      if (brokenSeats.includes(seatIdLower)) {
         status = 'broken';
-      } else if (reservedSeats.includes(seatId)) {
+      } else if (reservedSeats.includes(seatIdLower)) {
         status = 'reserved';
       }
 
@@ -218,9 +233,20 @@ const buildSeatStatus = (vehicle, reservations = []) => {
         label: counter === 1 ? 'Driver' : `Seat ${counter - 1}`,
         status,
         reservation: reservations.find(
-          (reservation) => normalizeSeatId(reservation.seatlocation) === seatId
+          (reservation) => {
+            const normalized = normalizeSeatId(reservation.seatlocation);
+            return normalized && normalized.toLowerCase().trim() === seatIdLower;
+          }
         ) || null,
       };
+      
+      if (status === 'reserved') {
+        console.log(`[buildSeatStatus] Seat ${counter} is RESERVED:`, {
+          seatId: seatId,
+          reservation: seat.reservation,
+        });
+      }
+      
       counter += 1;
       return seat;
     })
@@ -249,7 +275,16 @@ export const getVehicleSeatMap = async (req, res, next) => {
 
     const seatMap = buildSeatStatus(vehicle, reservations);
 
+    console.log('[getVehicleSeatMap] Response data:', {
+      vehicleId: vehicle.vehicleid,
+      hasUpcomingTrip: !!upcomingTrip,
+      reservationsCount: reservations.length,
+      seatMapRows: seatMap.length,
+      reservedSeatsCount: reservations.length,
+    });
+
     res.json({
+      success: true,
       vehicle,
       seatMap,
       layout: buildSeatRows(vehicle.seatlayout, vehicle.seatnum),

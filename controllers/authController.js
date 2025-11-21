@@ -78,14 +78,45 @@ export const register = async (req, res, next) => {
 
     
     let roleRecord;
+    let createdVehicle = null; // Store vehicle for response
     if (normalizedRole === 'DRIVER') {
-      const { licenseid, lineid, vehiclePlate, vehicleSeatLayout } = req.body;
-      if (!lineid) {
+      // Extract all driver-related data from request
+      const { 
+        licenseid, 
+        lineid, 
+        vehiclePlate, 
+        vehicleSeatLayout 
+      } = req.body;
+      
+      // Log all received data for debugging
+      logger.info('Driver registration - received data', {
+        email: user.email,
+        userid: user.userid,
+        licenseid: licenseid || null,
+        lineid: lineid || null,
+        vehiclePlate: vehiclePlate || null,
+        vehicleSeatLayout: vehicleSeatLayout || null,
+        allBodyKeys: Object.keys(req.body),
+        allBodyValues: Object.entries(req.body).map(([k, v]) => ({ 
+          key: k, 
+          value: typeof v === 'string' ? v.substring(0, 50) : v 
+        })),
+      });
+
+      // Validate required fields
+      if (!licenseid || !licenseid.trim()) {
+        return res.status(400).json({
+          message: req.t('driver.license_required') || 'License ID is required for drivers',
+        });
+      }
+
+      if (!lineid || !lineid.trim()) {
         return res.status(400).json({
           message: req.t('driver.line_required') || 'Line is required for drivers',
         });
       }
 
+      // Verify line exists
       const line = await Line.findById(lineid);
       if (!line) {
         return res.status(404).json({
@@ -93,48 +124,313 @@ export const register = async (req, res, next) => {
         });
       }
 
-      roleRecord = await Driver.create({
+      // Create Driver record - links to User via userid
+      const driverData = {
         driverid: uuidv4(),
-        userid: user.userid,
-        licenseid,
-        lineid,
+        userid: user.userid, // Link to User
+        licenseid: licenseid.trim(),
+        lineid: lineid.trim(), // Link to Line
+      };
+
+      logger.info('Creating driver record', {
+        driverid: driverData.driverid,
+        userid: driverData.userid,
+        licenseid: driverData.licenseid,
+        lineid: driverData.lineid,
       });
 
-      const seatLayout = (vehicleSeatLayout || '').trim();
-      const normalizedLayout = seatLayout.length > 0 ? seatLayout : '4+1';
-      const seatNum = normalizedLayout === '7+1' ? 8 : 5;
-
-      await Vehicle.create({
-        vehicleid: uuidv4(),
+      roleRecord = await Driver.create(driverData);
+      
+      logger.info('Driver record created successfully', {
         driverid: roleRecord.driverid,
-        lineid,
-        seatnum: seatNum,
-        seatlayout: normalizedLayout,
-        plateno: vehiclePlate?.trim(),
+        userid: roleRecord.userid,
+      });
+
+      // Validate and create vehicle - links to Driver via driverid
+      logger.info('Preparing to create vehicle for driver', {
+        driverid: roleRecord.driverid,
+        vehiclePlate: vehiclePlate || 'not provided',
+        vehicleSeatLayout: vehicleSeatLayout || 'not provided',
+        lineid: lineid,
+      });
+
+      // Normalize seat layout
+      const seatLayout = (vehicleSeatLayout || '').trim();
+      let normalizedLayout = '4+1';
+      let seatNum = 5;
+      
+      if (seatLayout === '4+1' || seatLayout === '7+1') {
+        normalizedLayout = seatLayout;
+        seatNum = seatLayout === '7+1' ? 8 : 5;
+      } else if (seatLayout) {
+        // Try to parse if it's a number or other format
+        logger.warn('Unexpected seat layout format, defaulting to 4+1', {
+          provided: seatLayout,
+        });
+      }
+
+      logger.info('Seat layout normalized', {
+        original: seatLayout,
+        normalized: normalizedLayout,
+        seatNum: seatNum,
+        seatNumType: typeof seatNum,
+      });
+
+      // Validate and normalize plate number - optional field
+      let plateNo = null;
+      if (vehiclePlate && vehiclePlate.trim()) {
+        const trimmedPlate = vehiclePlate.trim();
+        const plateRegex = /^\d-\d{4}-[A-Za-z]$/;
+        if (plateRegex.test(trimmedPlate)) {
+          plateNo = trimmedPlate;
+          logger.info('Plate number validated', { plateNo });
+        } else {
+          logger.warn('Invalid plate format - will create vehicle without plate', { 
+            providedPlate: trimmedPlate,
+            userid: user.userid,
+            driverid: roleRecord.driverid,
+          });
+          // Don't fail registration - plate can be added later
+          plateNo = null;
+        }
+      } else {
+        logger.info('No plate number provided - vehicle will be created without plate');
+      }
+
+      // Create vehicle data - links to Driver and Line
+      const baseVehicleData = {
+        vehicleid: uuidv4(),
+        driverid: roleRecord.driverid, // Link to Driver
+        lineid: lineid.trim(), // Link to Line
+        seatnum: parseInt(seatNum, 10), // Ensure it's an integer
+        seatlayout: String(normalizedLayout), // Ensure it's a string
+        plateno: plateNo || null, // Can be null, but ensure it's not empty string
         status: 'active',
+      };
+
+      logger.info('Vehicle data prepared', {
+        vehicleid: baseVehicleData.vehicleid,
+        driverid: baseVehicleData.driverid,
+        lineid: baseVehicleData.lineid,
+        seatnum: baseVehicleData.seatnum,
+        seatlayout: baseVehicleData.seatlayout,
+        plateno: baseVehicleData.plateno,
+      });
+
+      // Create vehicle - MUST succeed or registration fails
+      let createdVehicle = null;
+      try {
+        // Try with broken_seats if column exists
+        const vehicleData = {
+          ...baseVehicleData,
+          broken_seats: [],
+        };
+        
+        logger.info('Attempting to create vehicle with broken_seats', {
+          vehicleid: vehicleData.vehicleid,
+        });
+        
+        createdVehicle = await Vehicle.create(vehicleData);
+        
+        logger.info('✅ Vehicle created successfully with all data', {
+          vehicleid: createdVehicle.vehicleid,
+          driverid: createdVehicle.driverid,
+          lineid: createdVehicle.lineid,
+          plateno: createdVehicle.plateno,
+          seatlayout: createdVehicle.seatlayout,
+          seatnum: createdVehicle.seatnum,
+          status: createdVehicle.status,
+        });
+      } catch (vehicleError) {
+        // If broken_seats column doesn't exist, create without it
+        if (vehicleError.code === '42703' || (vehicleError.message && vehicleError.message.includes('broken_seats'))) {
+          logger.info('Retrying vehicle creation without broken_seats column', {
+            error: vehicleError.message,
+          });
+          
+          try {
+            createdVehicle = await Vehicle.create(baseVehicleData);
+            
+            logger.info('✅ Vehicle created successfully (without broken_seats)', {
+              vehicleid: createdVehicle.vehicleid,
+              driverid: createdVehicle.driverid,
+              lineid: createdVehicle.lineid,
+              plateno: createdVehicle.plateno,
+              seatlayout: createdVehicle.seatlayout,
+              seatnum: createdVehicle.seatnum,
+              status: createdVehicle.status,
+            });
+          } catch (retryError) {
+            logger.error('❌ Failed to create vehicle (retry without broken_seats)', {
+              error: retryError.message,
+              code: retryError.code,
+              details: retryError.details,
+              hint: retryError.hint,
+              driverid: roleRecord.driverid,
+              vehicleData: baseVehicleData,
+            });
+            
+            // Create a more user-friendly error message
+            const userFriendlyError = new Error(
+              retryError.message || 'Failed to create vehicle. Please check your vehicle information.'
+            );
+            userFriendlyError.code = retryError.code;
+            userFriendlyError.details = retryError.details;
+            userFriendlyError.hint = retryError.hint;
+            throw userFriendlyError;
+          }
+        } else {
+          logger.error('❌ Failed to create vehicle during driver registration', {
+            error: vehicleError.message,
+            code: vehicleError.code,
+            details: vehicleError.details,
+            hint: vehicleError.hint,
+            driverid: roleRecord.driverid,
+            vehicleData: baseVehicleData,
+            fullError: vehicleError,
+          });
+          
+          // Create a more user-friendly error message
+          const userFriendlyError = new Error(
+            vehicleError.message || 'Failed to create vehicle. Please check your vehicle information.'
+          );
+          userFriendlyError.code = vehicleError.code;
+          userFriendlyError.details = vehicleError.details;
+          userFriendlyError.hint = vehicleError.hint;
+          throw userFriendlyError;
+        }
+      }
+
+      if (!createdVehicle) {
+        logger.error('❌ Vehicle creation failed but no error was thrown', {
+          driverid: roleRecord.driverid,
+        });
+        throw new Error('Failed to create vehicle for driver');
+      }
+
+      // Verify all links are correct
+      logger.info('✅ Driver registration complete - verifying data integrity', {
+        userid: user.userid,
+        driverid: roleRecord.driverid,
+        vehicleid: createdVehicle.vehicleid,
+        links: {
+          'User → Driver': roleRecord.userid === user.userid,
+          'Driver → Vehicle': createdVehicle.driverid === roleRecord.driverid,
+          'Vehicle → Line': createdVehicle.lineid === lineid,
+        },
       });
     } else if (normalizedRole === 'PASSENGER') {
-      const passengerType = (req.body.type || 'app_based').toLowerCase();
+      // All passengers are app users - type field removed from database
+      logger.info('Creating passenger record', {
+        userid: user.userid,
+      });
+      
       roleRecord = await Passenger.create({
         passengerid: uuidv4(),
         userid: user.userid,
-        type: passengerType,
+        // No type field - removed from database
+      });
+      
+      logger.info('✅ Passenger record created successfully', {
+        passengerid: roleRecord.passengerid,
+        userid: roleRecord.userid,
       });
     } else if (normalizedRole === 'ADMIN') {
+      logger.info('Creating admin record', {
+        userid: user.userid,
+        permissions: req.body.permissions || [],
+      });
+      
       roleRecord = await Admin.create({
         id: uuidv4(),
         userid: user.userid,
         permissions: req.body.permissions || [],
       });
+      
+      logger.info('✅ Admin record created successfully', {
+        adminid: roleRecord.id,
+        userid: roleRecord.userid,
+        permissions: roleRecord.permissions,
+      });
+    } else {
+      // Unknown role - this should not happen, but handle it gracefully
+      logger.error('❌ Unknown role during registration', {
+        userid: user.userid,
+        providedRole: role,
+        normalizedRole: normalizedRole,
+      });
+      
+      // Try to delete the user that was created
+      try {
+        await User.delete(user.userid);
+        logger.info('User deleted due to unknown role', { userid: user.userid });
+      } catch (deleteError) {
+        logger.error('Failed to delete user after unknown role error', {
+          userid: user.userid,
+          error: deleteError.message,
+        });
+      }
+      
+      return res.status(400).json({
+        message: req.t('auth.invalid_role') || `Invalid role: ${role}. Must be DRIVER, PASSENGER, or ADMIN`,
+      });
     }
 
-    
-    await Wallet.create({
-      walletid: uuidv4(),
+    // Verify that roleRecord was created successfully
+    if (!roleRecord) {
+      logger.error('❌ Role record was not created', {
+        userid: user.userid,
+        role: normalizedRole,
+      });
+      
+      // Try to delete the user that was created
+      try {
+        await User.delete(user.userid);
+        logger.info('User deleted due to missing role record', { userid: user.userid });
+      } catch (deleteError) {
+        logger.error('Failed to delete user after role record error', {
+          userid: user.userid,
+          error: deleteError.message,
+        });
+      }
+      
+      return res.status(500).json({
+        message: req.t('auth.role_creation_failed') || 'Failed to create role record. Please try again.',
+      });
+    }
+
+    logger.info('✅ Role record verified', {
       userid: user.userid,
-      type: 'main',
-      balance: 0,
+      role: normalizedRole,
+      roleRecordId: roleRecord.driverid || roleRecord.passengerid || roleRecord.id,
     });
+
+    
+    // Create wallet for user
+    try {
+      logger.info('Creating wallet for user', { userid: user.userid });
+      
+      await Wallet.create({
+        walletid: uuidv4(),
+        userid: user.userid,
+        type: 'main',
+        balance: 0,
+      });
+
+      logger.info('✅ Wallet created successfully for user', { userid: user.userid });
+    } catch (walletError) {
+      logger.error('❌ Failed to create wallet for user', {
+        userid: user.userid,
+        error: walletError.message,
+        code: walletError.code,
+      });
+      
+      // Don't fail registration if wallet creation fails - wallet can be created later
+      // But log it as a warning
+      logger.warn('Registration will continue despite wallet creation failure', {
+        userid: user.userid,
+      });
+    }
 
     
     const token = generateToken({
@@ -142,14 +438,73 @@ export const register = async (req, res, next) => {
       role: user.role,
     });
 
-    res.status(201).json({
+    // Build response with all related data
+    const responseData = {
+      success: true,
       message: req.t('auth.register_success') || 'Registration successful',
       token,
       user: {
         ...sanitizedUser,
         [roleKey || 'roleData']: roleRecord,
       },
+    };
+
+    // For drivers, include vehicle information in response
+    if (normalizedRole === 'DRIVER' && createdVehicle) {
+      responseData.vehicle = {
+        vehicleid: createdVehicle.vehicleid,
+        plateno: createdVehicle.plateno,
+        seatlayout: createdVehicle.seatlayout,
+        seatnum: createdVehicle.seatnum,
+        status: createdVehicle.status,
+      };
+      
+      logger.info('Response includes vehicle data', {
+        vehicleid: createdVehicle.vehicleid,
+        driverid: roleRecord.driverid,
+      });
+    }
+
+    // Final verification - ensure all records exist
+    logger.info('✅ Registration complete - final verification', {
+      userid: user.userid,
+      role: user.role,
+      hasUser: !!user,
+      hasRoleRecord: !!roleRecord,
+      hasVehicle: normalizedRole === 'DRIVER' && !!createdVehicle,
+      roleRecordType: normalizedRole,
+      roleRecordId: roleRecord?.driverid || roleRecord?.passengerid || roleRecord?.id,
     });
+
+    // Verify data integrity
+    const verificationChecks = {
+      userCreated: !!user && !!user.userid,
+      roleRecordCreated: !!roleRecord,
+      roleRecordLinked: roleRecord?.userid === user.userid,
+      walletWillBeCreated: true, // Wallet creation happens before this point
+    };
+
+    if (normalizedRole === 'DRIVER') {
+      verificationChecks.vehicleCreated = !!createdVehicle;
+      verificationChecks.vehicleLinked = createdVehicle?.driverid === roleRecord?.driverid;
+    }
+
+    logger.info('Registration verification checks', verificationChecks);
+
+    // If any critical check fails, log error but don't fail (data already committed)
+    const criticalFailures = Object.entries(verificationChecks)
+      .filter(([key, value]) => !value && !key.includes('WillBe'))
+      .map(([key]) => key);
+
+    if (criticalFailures.length > 0) {
+      logger.error('❌ Registration verification failed', {
+        userid: user.userid,
+        failures: criticalFailures,
+        verificationChecks,
+      });
+    }
+
+    res.status(201).json(responseData);
   } catch (error) {
     next(error);
   }

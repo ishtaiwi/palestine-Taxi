@@ -23,6 +23,18 @@ export const errorHandler = (err, req, res, next) => {
     error = { message, statusCode: 404 };
   }
 
+  // Handle Supabase validation errors
+  if (err.code === '23514' || err.code === '22P02' || err.message?.includes('invalid input')) {
+    const message = err.details || err.hint || err.message || 'Invalid input provided';
+    error = { message, statusCode: 400 };
+  }
+
+  // Handle Supabase constraint violations
+  if (err.code === '23502') {
+    const message = err.details || err.hint || 'Required field is missing';
+    error = { message, statusCode: 400 };
+  }
+
   
   if (err.name === 'JsonWebTokenError') {
     const message = 'Invalid token';
@@ -40,10 +52,24 @@ export const errorHandler = (err, req, res, next) => {
     error = { message, statusCode: 400 };
   }
 
+  // Extract error message - prefer details/hint from Supabase errors
+  let errorMessage = error.message || 'Server Error';
+  if (err.details && typeof err.details === 'string') {
+    errorMessage = err.details;
+  } else if (err.hint && typeof err.hint === 'string') {
+    errorMessage = err.hint;
+  }
+
   res.status(error.statusCode || 500).json({
     success: false,
-    error: error.message || 'Server Error',
-    ...(appConfig.nodeEnv === 'development' && { stack: err.stack }),
+    message: errorMessage,
+    error: errorMessage,
+    ...(appConfig.nodeEnv === 'development' && { 
+      stack: err.stack,
+      code: err.code,
+      details: err.details,
+      hint: err.hint,
+    }),
   });
 };
 

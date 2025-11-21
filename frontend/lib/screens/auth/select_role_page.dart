@@ -327,6 +327,7 @@ class _SelectRoleScreenState extends State<SelectRoleScreen> {
       setState(() => _isLoading = true);
 
       try {
+        print('[SelectRolePage] Starting passenger registration...');
         final result = await ApiService.register(
           fullname: widget.formData.fullName,
           email: widget.formData.email,
@@ -335,13 +336,27 @@ class _SelectRoleScreenState extends State<SelectRoleScreen> {
           role: 'PASSENGER',
         );
 
+        print('[SelectRolePage] Registration result: $result');
+        
         if (!mounted) return;
         setState(() => _isLoading = false);
 
-        final success = result['success'] == true || result['success'] == 'true';
+        // Check for success - be more flexible in checking
+        final hasToken = result['token'] != null;
+        final hasUser = result['user'] != null;
+        final explicitSuccess = result['success'] == true || result['success'] == 'true';
+        final success = explicitSuccess || (hasToken && hasUser);
+        
+        print('[SelectRolePage] Success check:');
+        print('  - explicitSuccess: $explicitSuccess');
+        print('  - hasToken: $hasToken');
+        print('  - hasUser: $hasUser');
+        print('  - final success: $success');
         
         if (success) {
           final message = result['message'] ?? (_isArabic ? 'تم إنشاء الحساب بنجاح' : 'Registration successful');
+          
+          print('[SelectRolePage] Registration successful, navigating to PassengerHomePage...');
           
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -352,8 +367,10 @@ class _SelectRoleScreenState extends State<SelectRoleScreen> {
               ),
             );
             
-            Future.delayed(const Duration(milliseconds: 500), () {
+            // Navigate immediately without delay
+            Future.delayed(const Duration(milliseconds: 300), () {
               if (mounted) {
+                print('[SelectRolePage] Navigating to PassengerHomePage...');
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const PassengerHomePage()),
@@ -363,7 +380,10 @@ class _SelectRoleScreenState extends State<SelectRoleScreen> {
             });
           }
         } else {
-          final errorMessage = result['message'] ?? (_isArabic ? 'فشل إنشاء الحساب' : 'Registration failed');
+          final errorMessage = result['message'] ?? 
+                             result['error'] ?? 
+                             (_isArabic ? 'فشل إنشاء الحساب' : 'Registration failed');
+          print('[SelectRolePage] Registration failed: $errorMessage');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -374,14 +394,26 @@ class _SelectRoleScreenState extends State<SelectRoleScreen> {
             );
           }
         }
-      } catch (e) {
+      } catch (e, stackTrace) {
+        print('[SelectRolePage] Exception during registration:');
+        print('  - Error: $e');
+        print('  - Stack trace: $stackTrace');
+        
         if (!mounted) return;
         setState(() => _isLoading = false);
+        
+        String errorMessage = _isArabic ? 'حدث خطأ أثناء التسجيل' : 'An error occurred during registration';
+        if (e.toString().contains('TimeoutException')) {
+          errorMessage = _isArabic ? 'انتهت مهلة الاتصال' : 'Connection timeout';
+        } else if (e.toString().contains('SocketException')) {
+          errorMessage = _isArabic ? 'لا يمكن الاتصال بالخادم' : 'Cannot connect to server';
+        } else {
+          errorMessage = _isArabic ? 'خطأ: ${e.toString()}' : 'Error: ${e.toString()}';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              _isArabic ? 'حدث خطأ: ${e.toString()}' : 'Error: ${e.toString()}',
-            ),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 4),
           ),

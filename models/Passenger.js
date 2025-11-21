@@ -49,9 +49,7 @@ class Passenger {
   static async findAll(filters = {}) {
     let query = supabase.from('passenger').select('*, user(*)');
     
-    if (filters.type) {
-      query = query.eq('type', filters.type);
-    }
+    // Type filter removed - field no longer exists in database
     
     const { data, error } = await query;
     if (error) throw error;

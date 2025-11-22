@@ -280,7 +280,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70),
+                style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
               ),
               const SizedBox(height: 16),
               FilledButton.tonal(
@@ -310,7 +310,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                 t('noVehicles'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  color: Colors.white70,
+                  color: Colors.white, // نص أبيض على خلفية غامقة
                   fontSize: 16,
                 ),
               ),
@@ -475,7 +475,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     if (_seatRows.isEmpty) {
       return Text(
         t('tapSeat'),
-        style: const TextStyle(color: Colors.white70),
+        style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
       );
     }
 
@@ -906,8 +906,8 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                       decoration: InputDecoration(
                         labelText: t('plateNumber'),
                         hintText: t('plateHint'),
-                        labelStyle: const TextStyle(color: Colors.white70),
-                        hintStyle: const TextStyle(color: Colors.white54),
+                        labelStyle: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
+                        hintStyle: const TextStyle(color: Colors.white70),
                         enabledBorder: const UnderlineInputBorder(
                           borderSide: BorderSide(color: Colors.white38),
                         ),

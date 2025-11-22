@@ -160,8 +160,11 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
       child: Scaffold(
         backgroundColor: const Color(0xFF060A1A),
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0B132B),
+          backgroundColor: const Color(0xFF1E3A5F), // خلفية فاتحة أكثر
           foregroundColor: Colors.white,
+          elevation: 2,
+          iconTheme: const IconThemeData(color: Colors.white),
+          actionsIconTheme: const IconThemeData(color: Colors.white),
           title: Text(
             t('title'),
             style: const TextStyle(
@@ -206,7 +209,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70, fontSize: 16),
+                style: const TextStyle(color: Colors.white, fontSize: 16), // نص أبيض على خلفية غامقة
               ),
               const SizedBox(height: 16),
               FilledButton.tonal(
@@ -270,7 +273,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
               child: Text(
                 t('noDrivers'),
                 style: const TextStyle(
-                  color: Colors.white70,
+                  color: Colors.white, // نص أبيض على خلفية غامقة
                   fontSize: 16,
                 ),
               ),
@@ -325,7 +328,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
                           Text(
                             user['phone']?.toString() ?? '',
                             style: const TextStyle(
-                              color: Colors.white70,
+                              color: Colors.white, // نص أبيض على خلفية غامقة
                               fontSize: 12,
                             ),
                           ),
@@ -335,7 +338,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
                     const SizedBox(width: 12),
                     Text(
                       t('statusWaiting'),
-                      style: const TextStyle(color: Colors.white54),
+                      style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
                     ),
                   ],
                 ),
@@ -364,7 +367,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
           Text(
             t('line'),
             style: const TextStyle(
-              color: Colors.white70,
+              color: Colors.white, // نص أبيض على خلفية غامقة
               fontSize: 14,
             ),
           ),
@@ -456,7 +459,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
           Text(
             label,
             style: const TextStyle(
-              color: Colors.white70,
+              color: Colors.white, // نص أبيض على خلفية غامقة
               fontSize: 12,
             ),
           ),

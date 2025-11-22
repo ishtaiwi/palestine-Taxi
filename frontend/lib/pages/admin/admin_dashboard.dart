@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../screens/auth/login_page.dart';
+import 'admin_schedules_page.dart';
+import 'admin_lines_page.dart';
+import 'admin_users_page.dart';
+import 'admin_vehicles_page.dart';
+import 'admin_trips_page.dart';
+import 'admin_payments_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -24,6 +30,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'lines': 'الخطوط',
       'vehicles': 'المركبات',
       'trips': 'الرحلات',
+      'schedules': 'الجداول اليومية',
       'payments': 'المدفوعات',
       'reports': 'التقارير',
       'generalStats': 'الإحصائيات العامة',
@@ -44,6 +51,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'lines': 'Lines',
       'vehicles': 'Vehicles',
       'trips': 'Trips',
+      'schedules': 'Daily Schedules',
       'payments': 'Payments',
       'reports': 'Reports',
       'generalStats': 'General Statistics',
@@ -101,16 +109,35 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       child: Scaffold(
         backgroundColor: const Color(0xFF060A1A),
         appBar: AppBar(
-          title: Text(t('title')),
-          backgroundColor: const Color(0xFF0B132B),
+          title: Text(
+            t('title'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: const Color(0xFF1E3A5F), // لون فاتح أكثر
+          elevation: 2,
+          iconTheme: const IconThemeData(
+            color: Colors.white, // أيقونات بيضاء
+          ),
+          actionsIconTheme: const IconThemeData(
+            color: Colors.white, // أيقونات الأزرار بيضاء
+          ),
           actions: [
             IconButton(
-              icon: Icon(_isArabic ? Icons.language : Icons.translate),
+              icon: Icon(
+                _isArabic ? Icons.language : Icons.translate,
+                color: Colors.white,
+              ),
               onPressed: () => _switchLanguage(!_isArabic),
               tooltip: _isArabic ? 'English' : 'العربية',
             ),
             IconButton(
-              icon: const Icon(Icons.logout),
+              icon: const Icon(
+                Icons.logout,
+                color: Colors.white,
+              ),
               onPressed: _handleLogout,
               tooltip: t('logout'),
             ),
@@ -183,7 +210,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               icon: Icons.people,
                               title: t('users'),
                               color: Colors.blue,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AdminUsersPage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -192,7 +226,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               icon: Icons.route,
                               title: t('lines'),
                               color: Colors.green,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AdminLinesPage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -205,7 +246,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               icon: Icons.directions_car,
                               title: t('vehicles'),
                               color: Colors.orange,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AdminVehiclesPage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -214,7 +262,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               icon: Icons.directions_bus,
                               title: t('trips'),
                               color: Colors.purple,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AdminTripsPage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -224,10 +279,33 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         children: [
                           Expanded(
                             child: _buildActionCard(
+                              icon: Icons.schedule,
+                              title: t('schedules'),
+                              color: Colors.indigo,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AdminSchedulesPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildActionCard(
                               icon: Icons.payment,
                               title: t('payments'),
                               color: Colors.teal,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AdminPaymentsPage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(width: 12),

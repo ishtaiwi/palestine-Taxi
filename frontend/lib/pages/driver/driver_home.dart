@@ -113,7 +113,11 @@ class _DriverHomePageState extends State<DriverHomePage> {
               fontWeight: FontWeight.bold,
             ),
           ),
-            backgroundColor: const Color(0xFF0B132B),
+            backgroundColor: const Color(0xFF1E3A5F), // خلفية فاتحة أكثر
+            foregroundColor: Colors.white,
+            elevation: 2,
+            iconTheme: const IconThemeData(color: Colors.white),
+            actionsIconTheme: const IconThemeData(color: Colors.white),
           actions: [
             IconButton(
               icon: Icon(
@@ -164,7 +168,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
                                   Text(
                                     t('manageTrips'),
                                     style: const TextStyle(
-                                      color: Colors.white70,
+                                      color: Colors.white, // نص أبيض على خلفية غامقة
                                       fontSize: 14,
                                     ),
                                   ),
@@ -268,7 +272,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
                       Text(
                         t('queueSubtitle'),
                         style: const TextStyle(
-                          color: Colors.white70,
+                          color: Colors.white, // نص أبيض على خلفية غامقة
                           fontSize: 13,
                         ),
                       ),
@@ -423,7 +427,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
         Text(
           label,
           style: const TextStyle(
-            color: Colors.white70,
+            color: Colors.white, // نص أبيض على خلفية غامقة
             fontSize: 12,
           ),
         ),
@@ -434,7 +438,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
-        Icon(icon, color: Colors.white70, size: 20),
+        Icon(icon, color: Colors.white, size: 20),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -443,7 +447,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
               Text(
                 label,
                 style: const TextStyle(
-                  color: Colors.white70,
+                  color: Colors.white, // نص أبيض على خلفية غامقة
                   fontSize: 12,
                 ),
               ),

@@ -81,6 +81,8 @@ export const register = async (req, res, next) => {
     let createdVehicle = null; // Store vehicle for response
     if (normalizedRole === 'DRIVER') {
       // Extract all driver-related data from request
+      // Note: vehiclePlate and vehicleSeatLayout are optional
+      // Vehicle will be created automatically with default values if not provided
       const { 
         licenseid, 
         lineid, 
@@ -89,18 +91,14 @@ export const register = async (req, res, next) => {
       } = req.body;
       
       // Log all received data for debugging
-      logger.info('Driver registration - received data', {
+      logger.info('Driver registration - vehicle will be created automatically', {
         email: user.email,
         userid: user.userid,
         licenseid: licenseid || null,
         lineid: lineid || null,
         vehiclePlate: vehiclePlate || null,
         vehicleSeatLayout: vehicleSeatLayout || null,
-        allBodyKeys: Object.keys(req.body),
-        allBodyValues: Object.entries(req.body).map(([k, v]) => ({ 
-          key: k, 
-          value: typeof v === 'string' ? v.substring(0, 50) : v 
-        })),
+        note: 'Vehicle will be created automatically even if vehiclePlate or vehicleSeatLayout are missing',
       });
 
       // Validate required fields
@@ -115,6 +113,9 @@ export const register = async (req, res, next) => {
           message: req.t('driver.line_required') || 'Line is required for drivers',
         });
       }
+
+      // Note: Vehicle will be created automatically even if vehiclePlate or vehicleSeatLayout are not provided
+      // Default values: seatlayout = '4+1', plateno = null (can be added later)
 
       // Verify line exists
       const line = await Line.findById(lineid);
@@ -146,18 +147,18 @@ export const register = async (req, res, next) => {
         userid: roleRecord.userid,
       });
 
-      // Validate and create vehicle - links to Driver via driverid
-      logger.info('Preparing to create vehicle for driver', {
+      // Create vehicle automatically for driver - links to Driver via driverid
+      logger.info('Preparing to create vehicle automatically for driver', {
         driverid: roleRecord.driverid,
-        vehiclePlate: vehiclePlate || 'not provided',
-        vehicleSeatLayout: vehicleSeatLayout || 'not provided',
+        vehiclePlate: vehiclePlate || 'not provided (will be created without plate)',
+        vehicleSeatLayout: vehicleSeatLayout || 'not provided (default: 4+1)',
         lineid: lineid,
       });
 
-      // Normalize seat layout
+      // Normalize seat layout - default to 4+1 if not provided
       const seatLayout = (vehicleSeatLayout || '').trim();
-      let normalizedLayout = '4+1';
-      let seatNum = 5;
+      let normalizedLayout = '4+1'; // Default layout
+      let seatNum = 5; // Default seat count
       
       if (seatLayout === '4+1' || seatLayout === '7+1') {
         normalizedLayout = seatLayout;
@@ -167,16 +168,21 @@ export const register = async (req, res, next) => {
         logger.warn('Unexpected seat layout format, defaulting to 4+1', {
           provided: seatLayout,
         });
+      } else {
+        // No seat layout provided - use default
+        logger.info('No seat layout provided - using default 4+1', {
+          driverid: roleRecord.driverid,
+        });
       }
 
       logger.info('Seat layout normalized', {
-        original: seatLayout,
+        original: seatLayout || 'not provided',
         normalized: normalizedLayout,
         seatNum: seatNum,
         seatNumType: typeof seatNum,
       });
 
-      // Validate and normalize plate number - optional field
+      // Validate and normalize plate number - optional field (can be added later)
       let plateNo = null;
       if (vehiclePlate && vehiclePlate.trim()) {
         const trimmedPlate = vehiclePlate.trim();
@@ -185,7 +191,7 @@ export const register = async (req, res, next) => {
           plateNo = trimmedPlate;
           logger.info('Plate number validated', { plateNo });
         } else {
-          logger.warn('Invalid plate format - will create vehicle without plate', { 
+          logger.warn('Invalid plate format - will create vehicle without plate (can be added later)', { 
             providedPlate: trimmedPlate,
             userid: user.userid,
             driverid: roleRecord.driverid,
@@ -194,7 +200,7 @@ export const register = async (req, res, next) => {
           plateNo = null;
         }
       } else {
-        logger.info('No plate number provided - vehicle will be created without plate');
+        logger.info('No plate number provided - vehicle will be created without plate (can be added later)');
       }
 
       // Create vehicle data - links to Driver and Line
@@ -217,7 +223,8 @@ export const register = async (req, res, next) => {
         plateno: baseVehicleData.plateno,
       });
 
-      // Create vehicle - MUST succeed or registration fails
+      // Create vehicle automatically - MUST succeed or registration fails
+      // Vehicle is created with default values if not provided
       let createdVehicle = null;
       try {
         // Try with broken_seats if column exists
@@ -226,17 +233,22 @@ export const register = async (req, res, next) => {
           broken_seats: [],
         };
         
-        logger.info('Attempting to create vehicle with broken_seats', {
+        logger.info('Attempting to create vehicle automatically (with broken_seats)', {
           vehicleid: vehicleData.vehicleid,
+          driverid: vehicleData.driverid,
+          lineid: vehicleData.lineid,
+          seatlayout: vehicleData.seatlayout,
+          seatnum: vehicleData.seatnum,
+          plateno: vehicleData.plateno || 'null (can be added later)',
         });
         
         createdVehicle = await Vehicle.create(vehicleData);
         
-        logger.info('✅ Vehicle created successfully with all data', {
+        logger.info('✅ Vehicle created automatically with all data', {
           vehicleid: createdVehicle.vehicleid,
           driverid: createdVehicle.driverid,
           lineid: createdVehicle.lineid,
-          plateno: createdVehicle.plateno,
+          plateno: createdVehicle.plateno || 'null (can be added later)',
           seatlayout: createdVehicle.seatlayout,
           seatnum: createdVehicle.seatnum,
           status: createdVehicle.status,
@@ -251,17 +263,17 @@ export const register = async (req, res, next) => {
           try {
             createdVehicle = await Vehicle.create(baseVehicleData);
             
-            logger.info('✅ Vehicle created successfully (without broken_seats)', {
+            logger.info('✅ Vehicle created automatically (without broken_seats)', {
               vehicleid: createdVehicle.vehicleid,
               driverid: createdVehicle.driverid,
               lineid: createdVehicle.lineid,
-              plateno: createdVehicle.plateno,
+              plateno: createdVehicle.plateno || 'null (can be added later)',
               seatlayout: createdVehicle.seatlayout,
               seatnum: createdVehicle.seatnum,
               status: createdVehicle.status,
             });
           } catch (retryError) {
-            logger.error('❌ Failed to create vehicle (retry without broken_seats)', {
+            logger.error('❌ Failed to create vehicle automatically (retry without broken_seats)', {
               error: retryError.message,
               code: retryError.code,
               details: retryError.details,
@@ -272,7 +284,7 @@ export const register = async (req, res, next) => {
             
             // Create a more user-friendly error message
             const userFriendlyError = new Error(
-              retryError.message || 'Failed to create vehicle. Please check your vehicle information.'
+              retryError.message || 'Failed to create vehicle automatically. Please contact support.'
             );
             userFriendlyError.code = retryError.code;
             userFriendlyError.details = retryError.details;
@@ -280,7 +292,7 @@ export const register = async (req, res, next) => {
             throw userFriendlyError;
           }
         } else {
-          logger.error('❌ Failed to create vehicle during driver registration', {
+          logger.error('❌ Failed to create vehicle automatically during driver registration', {
             error: vehicleError.message,
             code: vehicleError.code,
             details: vehicleError.details,
@@ -292,7 +304,7 @@ export const register = async (req, res, next) => {
           
           // Create a more user-friendly error message
           const userFriendlyError = new Error(
-            vehicleError.message || 'Failed to create vehicle. Please check your vehicle information.'
+            vehicleError.message || 'Failed to create vehicle automatically. Please contact support.'
           );
           userFriendlyError.code = vehicleError.code;
           userFriendlyError.details = vehicleError.details;
@@ -305,8 +317,14 @@ export const register = async (req, res, next) => {
         logger.error('❌ Vehicle creation failed but no error was thrown', {
           driverid: roleRecord.driverid,
         });
-        throw new Error('Failed to create vehicle for driver');
+        throw new Error('Failed to create vehicle automatically for driver');
       }
+      
+      logger.info('✅ Vehicle created automatically for driver', {
+        vehicleid: createdVehicle.vehicleid,
+        driverid: roleRecord.driverid,
+        note: 'Vehicle can be updated later with plate number and other details',
+      });
 
       // Verify all links are correct
       logger.info('✅ Driver registration complete - verifying data integrity', {

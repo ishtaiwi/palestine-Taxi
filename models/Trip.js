@@ -15,7 +15,7 @@ class Trip {
   static async findById(tripid) {
     const { data, error } = await supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .select('*, line(*), vehicle(*, driver(*, user(*))), schedule_template(*)')
       .eq('tripid', tripid)
       .single();
     
@@ -26,7 +26,7 @@ class Trip {
   static async findAll(filters = {}) {
     let query = supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))');
+      .select('*, line(*), vehicle(*, driver(*, user(*))), schedule_template(*)');
     
     if (filters.lineid) {
       query = query.eq('lineid', filters.lineid);
@@ -38,6 +38,10 @@ class Trip {
     
     if (filters.date) {
       query = query.gte('deptime', filters.date);
+    }
+    
+    if (filters.templateid) {
+      query = query.eq('templateid', filters.templateid);
     }
     
     const { data, error } = await query.order('deptime', { ascending: true });
@@ -139,6 +143,78 @@ class Trip {
       return await this.update(tripid, { totalbookings: (trip.totalbookings || 0) + 1 });
     }
     
+    return data;
+  }
+
+  static async findOpenTrips(filters = {}) {
+    const now = new Date().toISOString();
+    let query = supabase
+      .from('trip')
+      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .lte('trip_opening_time', now)
+      .eq('status', 'scheduled');
+    
+    if (filters.lineid) {
+      query = query.eq('lineid', filters.lineid);
+    }
+    
+    const { data, error } = await query.order('deptime', { ascending: true });
+    if (error) throw error;
+    return data;
+  }
+
+  static async findTripsNeedingOpening(openingWindowMinutes = 45) {
+    const now = new Date();
+    const openingTime = new Date(now.getTime() + openingWindowMinutes * 60 * 1000);
+    
+    const { data, error } = await supabase
+      .from('trip')
+      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .eq('status', 'scheduled')
+      .is('trip_opening_time', null)
+      .lte('deptime', openingTime.toISOString())
+      .order('deptime', { ascending: true });
+    
+    if (error) throw error;
+    return data;
+  }
+
+  static async findTripsNeedingDeparture() {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('trip')
+      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .eq('status', 'scheduled')
+      .lte('deptime', now)
+      .order('deptime', { ascending: true });
+    
+    if (error) throw error;
+    return data;
+  }
+
+  static async assignDriver(tripid, driverid) {
+    return await this.update(tripid, {
+      assigned_driverid: driverid,
+      assignment_time: new Date().toISOString(),
+    });
+  }
+
+  static async findAssignedTrips(driverid, filters = {}) {
+    let query = supabase
+      .from('trip')
+      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .eq('assigned_driverid', driverid);
+    
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+    
+    if (filters.fromNow) {
+      query = query.gte('deptime', new Date().toISOString());
+    }
+    
+    const { data, error } = await query.order('deptime', { ascending: true });
+    if (error) throw error;
     return data;
   }
 }

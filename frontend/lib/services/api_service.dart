@@ -896,5 +896,1074 @@ class ApiService {
       'message': decoded is Map && decoded['message'] is String ? decoded['message'] : 'Failed to update seat state',
     };
   }
+
+  // ==================== Passenger APIs ====================
+
+  /// Fetch upcoming trips for passengers
+  static Future<List<Map<String, dynamic>>> fetchUpcomingTrips({
+    String? lineid,
+    String? date,
+  }) async {
+    try {
+      final queryParams = <String, String>{};
+      if (lineid != null && lineid.isNotEmpty) queryParams['lineid'] = lineid;
+      if (date != null && date.isNotEmpty) queryParams['date'] = date;
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/trips/upcoming')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is List) {
+          return decoded.whereType<Map<String, dynamic>>().toList();
+        }
+      }
+      return [];
+    } catch (exception) {
+      throw Exception('Failed to fetch trips: ${exception.toString()}');
+    }
+  }
+
+  /// Fetch trip by ID with full details
+  static Future<Map<String, dynamic>> fetchTripById(String tripId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripId'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return decoded is Map<String, dynamic> ? decoded : {};
+      }
+      throw Exception('Failed to fetch trip');
+    } catch (exception) {
+      throw Exception('Failed to fetch trip: ${exception.toString()}');
+    }
+  }
+
+  /// Create a reservation (supports Future and Instant bookings)
+  static Future<Map<String, dynamic>> createReservation({
+    String? tripid,
+    String? lineid,
+    String? seatlocation,
+    String? dropoffpoint,
+    String? aging,
+    String? paymentmethod,
+    String? booking_type, // 'future' or 'instant'
+    String? scheduled_trip_time, // Required for future bookings
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final body = <String, dynamic>{};
+      if (tripid != null) body['tripid'] = tripid;
+      if (lineid != null) body['lineid'] = lineid;
+      if (seatlocation != null) body['seatlocation'] = seatlocation;
+      if (dropoffpoint != null) body['dropoffpoint'] = dropoffpoint;
+      if (aging != null) body['aging'] = aging;
+      if (paymentmethod != null) body['paymentmethod'] = paymentmethod;
+      if (booking_type != null) body['booking_type'] = booking_type;
+      if (scheduled_trip_time != null) body['scheduled_trip_time'] = scheduled_trip_time;
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/reservations'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode(body)),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return {
+          'success': true,
+          ...decoded,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to create reservation',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  /// Fetch passenger reservations
+  static Future<List<Map<String, dynamic>>> fetchPassengerReservations({
+    String? status,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) return [];
+
+      final queryParams = <String, String>{};
+      if (status != null && status.isNotEmpty) queryParams['status'] = status;
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/reservations/passenger')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is List) {
+          return decoded.whereType<Map<String, dynamic>>().toList();
+        }
+      }
+      return [];
+    } catch (exception) {
+      throw Exception('Failed to fetch reservations: ${exception.toString()}');
+    }
+  }
+
+  /// Cancel a reservation
+  static Future<Map<String, dynamic>> cancelReservation(String bookingId) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.put(
+        Uri.parse('${AppConfig.apiBaseUrl}/reservations/$bookingId/cancel'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          ...decoded,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to cancel reservation',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  /// Fetch wallet balance and transactions
+  static Future<Map<String, dynamic>> fetchWallet() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/wallets/my-wallet'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          ...decoded,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to fetch wallet',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  /// Add balance to wallet
+  static Future<Map<String, dynamic>> addWalletBalance(double amount) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/wallets/add-balance'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode({'amount': amount})),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'success': true,
+          ...decoded,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to add balance',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  // ==================== Driver APIs (Additional) ====================
+
+  /// Start a trip (departure)
+  static Future<Map<String, dynamic>> startTrip(String tripId) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripId/start'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          ...decoded,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to start trip',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  /// End a trip
+  static Future<Map<String, dynamic>> endTrip(String tripId) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripId/end'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          ...decoded,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to end trip',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  /// Check-in a passenger (via QR code or booking ID)
+  static Future<Map<String, dynamic>> checkInReservation(String bookingId) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/reservations/check-in'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode({'bookingid': bookingId})),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          ...decoded,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to check-in',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  // ============================================
+  // SCHEDULE TEMPLATES API
+  // ============================================
+
+  /// Fetch all schedule templates
+  static Future<List<Map<String, dynamic>>> fetchSchedules({String? lineid, bool? active}) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      String url = '${AppConfig.apiBaseUrl}/schedules';
+      final queryParams = <String, String>{};
+      if (lineid != null) queryParams['lineid'] = lineid;
+      if (active != null) queryParams['active'] = active.toString();
+
+      if (queryParams.isNotEmpty) {
+        url += '?${Uri(queryParameters: queryParams).query}';
+      }
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is Map && decoded['schedules'] is List) {
+          return (decoded['schedules'] as List)
+              .map((s) => Map<String, dynamic>.from(s))
+              .toList();
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        throw Exception(
+          decoded is Map && decoded['message'] is String
+              ? decoded['message']
+              : 'Failed to load schedules',
+        );
+      }
+    } catch (exception) {
+      throw Exception(
+        exception.toString().contains('TimeoutException')
+            ? 'Connection timeout. Please check your internet connection.'
+            : exception.toString(),
+      );
+    }
+  }
+
+  /// Get schedule template by ID
+  static Future<Map<String, dynamic>> getScheduleById(String templateid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/schedules/$templateid'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is Map && decoded['schedule'] is Map) {
+          return Map<String, dynamic>.from(decoded['schedule']);
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        throw Exception(
+          decoded is Map && decoded['message'] is String
+              ? decoded['message']
+              : 'Failed to load schedule',
+        );
+      }
+    } catch (exception) {
+      throw Exception(
+        exception.toString().contains('TimeoutException')
+            ? 'Connection timeout. Please check your internet connection.'
+            : exception.toString(),
+      );
+    }
+  }
+
+  /// Create a new schedule template
+  static Future<Map<String, dynamic>> createSchedule({
+    required String lineid,
+    required int startHour,
+    required int endHour,
+    required int intervalMinutes,
+    bool active = true,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/schedules'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode({
+          'lineid': lineid,
+          'start_hour': startHour,
+          'end_hour': endHour,
+          'interval_minutes': intervalMinutes,
+          'active': active,
+        })),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Schedule created successfully',
+          'schedule': decoded['schedule'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to create schedule',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  /// Update a schedule template
+  static Future<Map<String, dynamic>> updateSchedule(
+    String templateid, {
+    String? lineid,
+    int? startHour,
+    int? endHour,
+    int? intervalMinutes,
+    bool? active,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final body = <String, dynamic>{};
+      if (lineid != null) body['lineid'] = lineid;
+      if (startHour != null) body['start_hour'] = startHour;
+      if (endHour != null) body['end_hour'] = endHour;
+      if (intervalMinutes != null) body['interval_minutes'] = intervalMinutes;
+      if (active != null) body['active'] = active;
+
+      final response = await http.put(
+        Uri.parse('${AppConfig.apiBaseUrl}/schedules/$templateid'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode(body)),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Schedule updated successfully',
+          'schedule': decoded['schedule'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to update schedule',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  /// Delete a schedule template
+  static Future<Map<String, dynamic>> deleteSchedule(String templateid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.delete(
+        Uri.parse('${AppConfig.apiBaseUrl}/schedules/$templateid'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Schedule deleted successfully',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to delete schedule',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  /// Manually create trips for a schedule template
+  static Future<Map<String, dynamic>> createTripsForSchedule(
+    String templateid, {
+    String? targetDate,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final body = <String, dynamic>{};
+      if (targetDate != null) body['target_date'] = targetDate;
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/schedules/$templateid/create-trips'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode(body)),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Trips created successfully',
+          'result': decoded['result'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to create trips',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  /// Manually trigger daily trip creation for all schedules
+  static Future<Map<String, dynamic>> triggerDailyTripCreation() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/schedules/daily/create-trips'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Daily trips creation completed',
+          'result': decoded['result'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to create daily trips',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  // ============================================
+  // ADMIN - LINES API
+  // ============================================
+
+  /// Get all lines (admin)
+  static Future<List<Map<String, dynamic>>> getAllLines() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/lines'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is List) {
+          return decoded.map((line) => Map<String, dynamic>.from(line)).toList();
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        throw Exception('Failed to load lines');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  /// Create line (admin)
+  static Future<Map<String, dynamic>> createLine({
+    required String linename,
+    required double baseprice,
+    double? additionalprice,
+    int? estduration,
+    double? distance,
+    bool active = true,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/lines'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode({
+          'linename': linename,
+          'baseprice': baseprice,
+          'additionalprice': additionalprice ?? 0,
+          'estduration': estduration,
+          'distance': distance,
+          'active': active,
+        })),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 201,
+        'message': decoded['message'] ?? (response.statusCode == 201 ? 'Line created' : 'Failed'),
+        'line': decoded['line'],
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
+  /// Update line (admin)
+  static Future<Map<String, dynamic>> updateLine(
+    String lineid, {
+    String? linename,
+    double? baseprice,
+    double? additionalprice,
+    int? estduration,
+    double? distance,
+    bool? active,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final body = <String, dynamic>{};
+      if (linename != null) body['linename'] = linename;
+      if (baseprice != null) body['baseprice'] = baseprice;
+      if (additionalprice != null) body['additionalprice'] = additionalprice;
+      if (estduration != null) body['estduration'] = estduration;
+      if (distance != null) body['distance'] = distance;
+      if (active != null) body['active'] = active;
+
+      final response = await http.put(
+        Uri.parse('${AppConfig.apiBaseUrl}/lines/$lineid'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode(body)),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'message': decoded['message'] ?? (response.statusCode == 200 ? 'Line updated' : 'Failed'),
+        'line': decoded['line'],
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
+  /// Delete line (admin)
+  static Future<Map<String, dynamic>> deleteLine(String lineid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final response = await http.delete(
+        Uri.parse('${AppConfig.apiBaseUrl}/lines/$lineid'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'message': decoded['message'] ?? (response.statusCode == 200 ? 'Line deleted' : 'Failed'),
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
+  // ============================================
+  // ADMIN - USERS API
+  // ============================================
+
+  /// Get all users (admin)
+  static Future<List<Map<String, dynamic>>> getAllUsers() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/users'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is Map && decoded['users'] is List) {
+          return (decoded['users'] as List)
+              .map((u) => Map<String, dynamic>.from(u))
+              .toList();
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        throw Exception('Failed to load users');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  /// Delete user (admin)
+  static Future<Map<String, dynamic>> deleteUser(String userid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final response = await http.delete(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/users/$userid'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'message': decoded['message'] ?? (response.statusCode == 200 ? 'User deleted' : 'Failed'),
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
+  // ============================================
+  // ADMIN - VEHICLES API
+  // ============================================
+
+  /// Get all vehicles (admin)
+  static Future<List<Map<String, dynamic>>> getAllVehicles() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/vehicles'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is List) {
+          return decoded.map((v) => Map<String, dynamic>.from(v)).toList();
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        throw Exception('Failed to load vehicles');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  // ============================================
+  // ADMIN - TRIPS API
+  // ============================================
+
+  /// Get all trips (admin)
+  static Future<List<Map<String, dynamic>>> getAllTrips({String? lineid, String? status}) async {
+    try {
+      String url = '${AppConfig.apiBaseUrl}/trips';
+      final params = <String, String>{};
+      if (lineid != null) params['lineid'] = lineid;
+      if (status != null) params['status'] = status;
+      if (params.isNotEmpty) {
+        url += '?${Uri(queryParameters: params).query}';
+      }
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is List) {
+          return decoded.map((t) => Map<String, dynamic>.from(t)).toList();
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        throw Exception('Failed to load trips');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  // ============================================
+  // ADMIN - PAYMENTS API
+  // ============================================
+
+  /// Get all payments (admin)
+  static Future<List<Map<String, dynamic>>> getAllPayments() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/payments'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is Map && decoded['payments'] is List) {
+          return (decoded['payments'] as List)
+              .map((p) => Map<String, dynamic>.from(p))
+              .toList();
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        throw Exception('Failed to load payments');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
 }
 

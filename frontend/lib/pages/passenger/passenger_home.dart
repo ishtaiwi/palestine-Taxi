@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../screens/auth/login_page.dart';
+import 'passenger_trips_page.dart';
+import 'passenger_reservations_page.dart';
+import 'passenger_wallet_page.dart';
 
 class PassengerHomePage extends StatefulWidget {
   const PassengerHomePage({super.key});
@@ -151,9 +154,11 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          backgroundColor: const Color(0xFF0B132B),
+          backgroundColor: const Color(0xFF1E3A5F),
           foregroundColor: Colors.white,
-          elevation: 0,
+          elevation: 2,
+          iconTheme: const IconThemeData(color: Colors.white),
+          actionsIconTheme: const IconThemeData(color: Colors.white),
           actions: [
             IconButton(
               icon: Icon(_isArabic ? Icons.language : Icons.translate),
@@ -201,7 +206,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                   Text(
                                     t('bookNow'),
                                     style: const TextStyle(
-                                      color: Colors.white70,
+                                      color: Colors.white,
                                       fontSize: 14,
                                     ),
                                   ),
@@ -234,7 +239,14 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               icon: Icons.directions_bus,
                               title: t('viewTrips'),
                               color: Colors.blue,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PassengerTripsPage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -243,7 +255,14 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               icon: Icons.book_online,
                               title: t('myReservations'),
                               color: Colors.green,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PassengerReservationsPage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -256,7 +275,14 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               icon: Icons.account_balance_wallet,
                               title: t('myWallet'),
                               color: Colors.orange,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PassengerWalletPage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -409,7 +435,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
-        Icon(icon, color: Colors.white70, size: 20),
+        Icon(icon, color: Colors.white, size: 20),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -418,7 +444,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
               Text(
                 label,
                 style: const TextStyle(
-                  color: Colors.white70,
+                  color: Colors.white,
                   fontSize: 12,
                 ),
               ),
@@ -497,7 +523,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
           Text(
             '${t('lastBooked')}: $lastBooked',
             style: const TextStyle(
-              color: Colors.white70,
+              color: Colors.white, // نص أبيض على خلفية غامقة
               fontSize: 13,
             ),
           ),
@@ -512,6 +538,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: accentColor,
+                foregroundColor: Colors.white,
               ),
             ),
           ),

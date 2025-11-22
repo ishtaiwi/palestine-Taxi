@@ -83,6 +83,10 @@ export const createTrip = async (req, res, next) => {
       });
     }
     
+    // Calculate trip_opening_time (45 minutes before departure)
+    const deptimeDate = new Date(deptime);
+    const openingTime = new Date(deptimeDate.getTime() - 45 * 60 * 1000);
+    
     const tripData = {
       tripid: uuidv4(),
       lineid,
@@ -91,6 +95,10 @@ export const createTrip = async (req, res, next) => {
       status: 'scheduled',
       availableseats: availableseats || vehicle.seatnum,
       totalbookings: 0,
+      trip_opening_time: openingTime.toISOString(),
+      auto_departure_enabled: true,
+      early_departure_allowed: true,
+      scheduled_departure_enforced: true,
     };
     
     const trip = await Trip.create(tripData);

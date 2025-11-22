@@ -19,6 +19,13 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import driverRoutes from './routes/driverRoutes.js';
+import scheduleRoutes from './routes/scheduleRoutes.js';
+
+// Background Jobs
+import { startTripOpeningJob } from './jobs/tripOpeningJob.js';
+import { startDepartureCheckJob } from './jobs/departureCheckJob.js';
+import { startNoShowCheckJob } from './jobs/noShowCheckJob.js';
+import { startDailyTripCreationJob } from './jobs/dailyTripCreationJob.js';
 
 const app = express();
 
@@ -85,6 +92,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/wallets', walletRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/drivers', driverRoutes);
+app.use('/api/schedules', scheduleRoutes);
 
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -107,9 +115,18 @@ app.listen(PORT, async () => {
   const dbTest = await testConnection();
   if (dbTest.connected) {
     logger.info('✅ Database connection verified');
+    
+    // Start background jobs
+    logger.info('Starting background jobs...');
+    startTripOpeningJob();
+    startDepartureCheckJob();
+    startNoShowCheckJob();
+    startDailyTripCreationJob();
+    logger.info('✅ All background jobs started');
   } else {
     logger.warn('⚠️ Database connection failed. Please check your configuration.');
     logger.warn(`Error: ${dbTest.error || 'Unknown error'}`);
+    logger.warn('⚠️ Background jobs not started due to database connection failure');
   }
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {

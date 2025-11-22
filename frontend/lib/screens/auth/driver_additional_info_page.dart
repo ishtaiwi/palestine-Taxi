@@ -48,6 +48,11 @@ class _DriverAdditionalInfoScreenState
       'lineRetry': 'إعادة تحميل الخطوط',
       'lineError': 'فشل تحميل الخطوط',
       'lineEmpty': 'لا توجد خطوط متاحة حالياً',
+      'vehicleInfo': 'معلومات المركبة (اختياري)',
+      'vehicleInfoNote': 'سيتم إنشاء المركبة تلقائياً. يمكنك إضافة رقم اللوحة وتخطيط المقاعد لاحقاً.',
+      'plateNumber': 'رقم اللوحة',
+      'plateNumberHint': 'مثال: 3-1234-A (اختياري)',
+      'seatLayout': 'تخطيط المقاعد',
     },
     'en': {
       'title': 'Driver Information',
@@ -64,6 +69,11 @@ class _DriverAdditionalInfoScreenState
       'lineRetry': 'Reload lines',
       'lineError': 'Failed to load lines',
       'lineEmpty': 'No lines available right now',
+      'vehicleInfo': 'Vehicle Information (Optional)',
+      'vehicleInfoNote': 'Vehicle will be created automatically. You can add plate number and seat layout later.',
+      'plateNumber': 'Plate Number',
+      'plateNumberHint': 'Example: 3-1234-A (optional)',
+      'seatLayout': 'Seat Layout',
     },
   };
 
@@ -174,6 +184,8 @@ class _DriverAdditionalInfoScreenState
       debugPrint(
         '[DriverSignup] Submitting driver registration with lineId: $resolvedLineId',
       );
+      // Vehicle will be created automatically even if plate number is empty
+      // Default: seatlayout = '4+1', plateno = null (can be added later)
       final result = await ApiService.register(
         fullname: widget.formData.fullName,
         email: widget.formData.email,
@@ -182,8 +194,10 @@ class _DriverAdditionalInfoScreenState
         role: 'DRIVER',
         licenseId: _licenseIdController.text.trim(),
         lineId: resolvedLineId,
-        vehiclePlate: _plateNumberController.text.trim(),
-        vehicleSeatLayout: _selectedSeatLayout,
+        vehiclePlate: _plateNumberController.text.trim().isEmpty 
+            ? null 
+            : _plateNumberController.text.trim(), // Send null if empty
+        vehicleSeatLayout: _selectedSeatLayout, // Always send (default: '4+1')
       );
 
       if (!mounted) return;
@@ -339,12 +353,35 @@ class _DriverAdditionalInfoScreenState
                       const SizedBox(height: 12),
                       _buildLineSelector(),
                       const SizedBox(height: 24),
+                      // Vehicle Information Section (Optional)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                t('vehicleInfoNote'),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       _buildTextField(
                         controller: _plateNumberController,
-                        label: _isArabic ? 'رقم المركبة' : 'Vehicle Plate Number',
-                        hint: _isArabic
-                            ? 'أدخل رقم المركبة بصيغة 3-1234-A'
-                            : 'Enter plate like 3-1234-A',
+                        label: t('plateNumber'),
+                        hint: t('plateNumberHint'),
                         keyboardType: TextInputType.text,
                         validator: _validatePlateNumber,
                       ),

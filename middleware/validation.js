@@ -186,10 +186,17 @@ export const validateTrip = [
 
 export const validateReservation = [
   body('tripid')
-    .notEmpty()
-    .withMessage('Trip ID is required')
+    .optional()
     .isUUID()
     .withMessage('Invalid trip ID format'),
+  body('booking_type')
+    .optional()
+    .isIn(['future', 'instant'])
+    .withMessage('booking_type must be either "future" or "instant"'),
+  body('scheduled_trip_time')
+    .optional()
+    .isISO8601()
+    .withMessage('scheduled_trip_time must be a valid ISO 8601 date'),
   body('seatlocation')
     .optional()
     .trim()
@@ -200,6 +207,22 @@ export const validateReservation = [
     .trim()
     .isLength({ max: 200 })
     .withMessage('Drop-off point must be less than 200 characters'),
+  // Custom validation: tripid required for instant bookings
+  body('tripid')
+    .custom((value, { req }) => {
+      if (req.body.booking_type === 'instant' && !value) {
+        throw new Error('tripid is required for instant bookings');
+      }
+      return true;
+    }),
+  // Custom validation: scheduled_trip_time required for future bookings
+  body('scheduled_trip_time')
+    .custom((value, { req }) => {
+      if (req.body.booking_type === 'future' && !value) {
+        throw new Error('scheduled_trip_time is required for future bookings');
+      }
+      return true;
+    }),
   validate,
 ];
 

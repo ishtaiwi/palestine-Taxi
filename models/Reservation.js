@@ -74,7 +74,60 @@ class Reservation {
       query = query.eq('tripid', filters.tripid);
     }
     
+    if (filters.booking_type) {
+      query = query.eq('booking_type', filters.booking_type);
+    }
+    
     const { data, error } = await query.order('bookedat', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
+
+  static async findByBookingType(bookingType, filters = {}) {
+    let query = supabase
+      .from('reservation')
+      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user(*)))), payment(*)')
+      .eq('booking_type', bookingType);
+    
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+    
+    if (filters.scheduled_trip_time) {
+      query = query.eq('scheduled_trip_time', filters.scheduled_trip_time);
+    }
+    
+    const { data, error } = await query.order('bookedat', { ascending: true });
+    if (error) throw error;
+    return data;
+  }
+
+  static async findFutureBookingsForTrip(scheduledTripTime, filters = {}) {
+    let query = supabase
+      .from('reservation')
+      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user(*)))), payment(*)')
+      .eq('booking_type', 'future')
+      .eq('scheduled_trip_time', scheduledTripTime)
+      .in('status', ['confirmed', 'pending']);
+    
+    if (filters.tripid) {
+      query = query.eq('tripid', filters.tripid);
+    }
+    
+    const { data, error } = await query.order('bookedat', { ascending: true });
+    if (error) throw error;
+    return data;
+  }
+
+  static async findInstantBookingsForTrip(tripid, filters = {}) {
+    let query = supabase
+      .from('reservation')
+      .select('*, passenger(*, user(*)), payment(*)')
+      .eq('tripid', tripid)
+      .eq('booking_type', 'instant')
+      .in('status', ['confirmed', 'pending']);
+    
+    const { data, error } = await query.order('bookedat', { ascending: true });
     if (error) throw error;
     return data;
   }

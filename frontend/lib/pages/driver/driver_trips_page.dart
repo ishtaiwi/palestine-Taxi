@@ -38,6 +38,13 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       'rejected': 'مرفوض',
       'none': 'لا توجد طلبات حالياً',
       'refresh': 'تحديث',
+      'checkinQR': 'مسح QR Code',
+      'startTrip': 'بدء الرحلة',
+      'endTrip': 'إنهاء الرحلة',
+      'assignedDriver': 'السائق المخصص',
+      'distributedPassengers': 'الركاب الموزعين',
+      'enterBookingId': 'أدخل رقم الحجز',
+      'checked_in': 'تم الصعود',
     },
     'en': {
       'title': 'My Trips',
@@ -59,6 +66,13 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       'rejected': 'Rejected',
       'none': 'No reservations yet',
       'refresh': 'Refresh',
+      'checkinQR': 'Scan QR Code',
+      'startTrip': 'Start Trip',
+      'endTrip': 'End Trip',
+      'assignedDriver': 'Assigned Driver',
+      'distributedPassengers': 'Distributed Passengers',
+      'enterBookingId': 'Enter Booking ID',
+      'checked_in': 'Checked In',
     },
   };
 
@@ -166,6 +180,241 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     });
   }
 
+  Future<void> _checkInReservation(String bookingId) async {
+    try {
+      final result = await ApiService.checkInReservation(bookingId);
+      if (mounted) {
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']?.toString() ?? t('checkin')),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Reload reservations
+          for (final tripId in _reservations.keys) {
+            _loadReservations(tripId);
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']?.toString() ?? 'Error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showCheckInDialog(String tripId) async {
+    final controller = TextEditingController();
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E3A5F),
+        title: Text(
+          t('checkin'),
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: TextField(
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            labelText: t('enterBookingId'),
+            labelStyle: const TextStyle(color: Colors.white70),
+            hintText: 'Booking ID',
+            hintStyle: const TextStyle(color: Colors.white54),
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.1),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.white54),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.white54),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.white),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              _isArabic ? 'إلغاء' : 'Cancel',
+              style: const TextStyle(color: Colors.white70),
+            ),
+          ),
+          FilledButton(
+            onPressed: () {
+              final bookingId = controller.text.trim();
+              if (bookingId.isNotEmpty) {
+                Navigator.pop(context);
+                _checkInReservation(bookingId);
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(t('checkin')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _startTrip(String tripId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E3A5F),
+        title: Text(
+          t('startTrip'),
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          _isArabic
+              ? 'هل أنت متأكد من بدء هذه الرحلة؟'
+              : 'Are you sure you want to start this trip?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              _isArabic ? 'إلغاء' : 'Cancel',
+              style: const TextStyle(color: Colors.white70),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(t('startTrip')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final result = await ApiService.startTrip(tripId);
+      if (mounted) {
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']?.toString() ?? t('startTrip')),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _loadTrips();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']?.toString() ?? 'Error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _endTrip(String tripId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E3A5F),
+        title: Text(
+          t('endTrip'),
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          _isArabic
+              ? 'هل أنت متأكد من إنهاء هذه الرحلة؟'
+              : 'Are you sure you want to end this trip?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              _isArabic ? 'إلغاء' : 'Cancel',
+              style: const TextStyle(color: Colors.white70),
+            ),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(t('endTrip')),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final result = await ApiService.endTrip(tripId);
+      if (mounted) {
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']?.toString() ?? t('endTrip')),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _loadTrips();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']?.toString() ?? 'Error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
@@ -175,8 +424,11 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       child: Scaffold(
         backgroundColor: const Color(0xFF060A1A),
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0B132B),
+          backgroundColor: const Color(0xFF1E3A5F), // خلفية فاتحة أكثر
           foregroundColor: Colors.white,
+          elevation: 2,
+          iconTheme: const IconThemeData(color: Colors.white),
+          actionsIconTheme: const IconThemeData(color: Colors.white),
           title: Text(
             t('title'),
             style: const TextStyle(
@@ -228,7 +480,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70),
+                style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
               ),
               const SizedBox(height: 16),
               FilledButton.tonal(
@@ -245,7 +497,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       return Center(
         child: Text(
           t('noTrips'),
-          style: const TextStyle(color: Colors.white70),
+          style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
         ),
       );
     }
@@ -259,7 +511,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
           Text(
             t('subtitle'),
             style: const TextStyle(
-              color: Colors.white70,
+              color: Colors.white, // نص أبيض على خلفية غامقة
               fontSize: 14,
             ),
           ),
@@ -289,7 +541,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             _loadReservations(tripId);
           }
         },
-        collapsedIconColor: Colors.white70,
+        collapsedIconColor: Colors.white,
         iconColor: Colors.orange,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,18 +557,82 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             const SizedBox(height: 4),
             Text(
               '${t('departure')}: $departureTime',
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              style: const TextStyle(color: Colors.white, fontSize: 12), // نص أبيض على خلفية غامقة
             ),
             const SizedBox(height: 2),
             Text(
               '${t('status')}: $status',
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
+              style: const TextStyle(color: Colors.white, fontSize: 12), // نص أبيض على خلفية غامقة
             ),
           ],
         ),
         childrenPadding: const EdgeInsets.all(16),
         children: [
           _buildTripStatsRow(trip),
+          // Assigned Driver Info
+          if (trip['assigned_driverid'] != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.person, color: Colors.blue, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    t('assignedDriver'),
+                    style: const TextStyle(color: Colors.white, fontSize: 14), // نص أبيض على خلفية غامقة
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          // Trip Actions
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showCheckInDialog(tripId),
+                  icon: const Icon(Icons.qr_code_scanner),
+                  label: Text(t('checkinQR')),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.green),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (status == 'open' || status == 'scheduled')
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => _startTrip(tripId),
+                    icon: const Icon(Icons.play_arrow),
+                    label: Text(t('startTrip')),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              if (status == 'in_progress')
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => _endTrip(tripId),
+                    icon: const Icon(Icons.stop),
+                    label: Text(t('endTrip')),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: 16),
           _buildReservationsSection(tripId),
         ],
@@ -343,7 +659,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               Text(
                 label,
                 style: const TextStyle(
-                  color: Colors.white70,
+                  color: Colors.white, // نص أبيض على خلفية غامقة
                   fontSize: 12,
                 ),
               ),
@@ -399,12 +715,12 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
         if (reservations == null)
           Text(
             t('none'),
-            style: const TextStyle(color: Colors.white54),
+            style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
           )
         else if (reservations.isEmpty)
           Text(
             t('none'),
-            style: const TextStyle(color: Colors.white54),
+            style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
           )
         else
           Column(
@@ -444,6 +760,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
         driverStatusColor = Colors.orangeAccent;
     }
 
+    final isCheckedIn = status == 'checked_in';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -481,7 +799,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                     ),
                     Text(
                       '${t('seat')}: $seat',
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: const TextStyle(color: Colors.white, fontSize: 12), // نص أبيض على خلفية غامقة
                     ),
                   ],
                 ),
@@ -489,7 +807,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               Text(
                 status,
                 style: const TextStyle(
-                  color: Colors.white54,
+                  color: Colors.white, // نص أبيض على خلفية غامقة
                   fontSize: 12,
                 ),
               ),
@@ -548,7 +866,19 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                 FilledButton.tonal(
                   onPressed: isMutating
                       ? null
-                      : () => _updateReservationStatus(tripId, bookingId, 'checkin'),
+                      : () {
+                          setState(() {
+                            _mutatingReservations.add(bookingId);
+                          });
+                          _checkInReservation(bookingId).then((_) {
+                            if (mounted) {
+                              setState(() {
+                                _mutatingReservations.remove(bookingId);
+                              });
+                              _loadReservations(tripId);
+                            }
+                          });
+                        },
                   child: isMutating
                       ? const SizedBox(
                           height: 16,
@@ -556,6 +886,25 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : Text(t('checkin')),
+                ),
+              if (isCheckedIn)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        t('checked_in'),
+                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),

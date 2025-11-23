@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import 'qr_scanner_page.dart';
 
 class DriverTripsPage extends StatefulWidget {
   const DriverTripsPage({super.key});
@@ -547,7 +548,9 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              line['linename']?.toString() ?? '---',
+              _isArabic
+                  ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '---')
+                  : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '---'),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
@@ -597,7 +600,14 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _showCheckInDialog(tripId),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => QRScannerPage(tripId: tripId),
+                      ),
+                    ).then((_) => _loadReservations(tripId));
+                  },
                   icon: const Icon(Icons.qr_code_scanner),
                   label: Text(t('checkinQR')),
                   style: OutlinedButton.styleFrom(

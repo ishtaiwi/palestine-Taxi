@@ -373,7 +373,9 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
           ),
           const SizedBox(height: 8),
           Text(
-            line['linename']?.toString() ?? '---',
+            _isArabic
+                ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '---')
+                : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '---'),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 20,

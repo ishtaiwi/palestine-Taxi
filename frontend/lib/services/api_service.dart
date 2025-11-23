@@ -741,6 +741,33 @@ class ApiService {
     };
   }
 
+  /// Get driver profile
+  static Future<Map<String, dynamic>> getDriverProfile() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/drivers/profile'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else {
+        throw Exception('Failed to load driver profile');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> fetchDriverVehicles() async {
     final token = await getToken();
     if (token == null) return [];
@@ -1025,7 +1052,7 @@ class ApiService {
       final queryParams = <String, String>{};
       if (status != null && status.isNotEmpty) queryParams['status'] = status;
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/reservations/passenger')
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/reservations/my-reservations')
           .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       final response = await http.get(
@@ -1268,7 +1295,7 @@ class ApiService {
   }
 
   /// Check-in a passenger (via QR code or booking ID)
-  static Future<Map<String, dynamic>> checkInReservation(String bookingId) async {
+  static Future<Map<String, dynamic>> checkInReservation(String? bookingId, {String? qrData}) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -1278,6 +1305,10 @@ class ApiService {
         };
       }
 
+      final body = <String, dynamic>{};
+      if (bookingId != null) body['bookingid'] = bookingId;
+      if (qrData != null) body['qrData'] = qrData;
+
       final response = await http.post(
         Uri.parse('${AppConfig.apiBaseUrl}/reservations/check-in'),
         headers: {
@@ -1285,7 +1316,7 @@ class ApiService {
           'Accept': 'application/json; charset=utf-8',
           'Authorization': 'Bearer $token',
         },
-        body: utf8.encode(jsonEncode({'bookingid': bookingId})),
+        body: utf8.encode(jsonEncode(body)),
       ).timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
@@ -1302,6 +1333,48 @@ class ApiService {
         'message': decoded is Map && decoded['message'] is String
             ? decoded['message']
             : 'Failed to check-in',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  /// Get QR Code for a reservation
+  static Future<Map<String, dynamic>> getReservationQRCode(String bookingId) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/reservations/$bookingId/qrcode'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          ...decoded,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to get QR code',
       };
     } catch (exception) {
       return {
@@ -1686,7 +1759,9 @@ class ApiService {
 
   /// Create line (admin)
   static Future<Map<String, dynamic>> createLine({
-    required String linename,
+    String? nameAr,
+    String? nameEn,
+    String? linename, // For backward compatibility
     required double baseprice,
     double? additionalprice,
     int? estduration,
@@ -1699,6 +1774,27 @@ class ApiService {
         return {'success': false, 'message': 'Not authenticated'};
       }
 
+      final body = <String, dynamic>{
+        'baseprice': baseprice,
+        'additionalprice': additionalprice ?? 0,
+        'active': active,
+      };
+
+      // Support both new (name_ar, name_en) and old (linename) format
+      if (nameAr != null && nameAr.isNotEmpty) {
+        body['name_ar'] = nameAr;
+      }
+      if (nameEn != null && nameEn.isNotEmpty) {
+        body['name_en'] = nameEn;
+      }
+      // Fallback to linename for backward compatibility
+      if ((nameAr == null || nameAr.isEmpty) && linename != null && linename.isNotEmpty) {
+        body['linename'] = linename;
+      }
+
+      if (estduration != null) body['estduration'] = estduration;
+      if (distance != null) body['distance'] = distance;
+
       final response = await http.post(
         Uri.parse('${AppConfig.apiBaseUrl}/lines'),
         headers: {
@@ -1706,14 +1802,7 @@ class ApiService {
           'Accept': 'application/json; charset=utf-8',
           'Authorization': 'Bearer $token',
         },
-        body: utf8.encode(jsonEncode({
-          'linename': linename,
-          'baseprice': baseprice,
-          'additionalprice': additionalprice ?? 0,
-          'estduration': estduration,
-          'distance': distance,
-          'active': active,
-        })),
+        body: utf8.encode(jsonEncode(body)),
       ).timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
@@ -1730,7 +1819,9 @@ class ApiService {
   /// Update line (admin)
   static Future<Map<String, dynamic>> updateLine(
     String lineid, {
-    String? linename,
+    String? nameAr,
+    String? nameEn,
+    String? linename, // For backward compatibility
     double? baseprice,
     double? additionalprice,
     int? estduration,
@@ -1744,7 +1835,16 @@ class ApiService {
       }
 
       final body = <String, dynamic>{};
-      if (linename != null) body['linename'] = linename;
+      // Support both new (name_ar, name_en) and old (linename) format
+      if (nameAr != null && nameAr.isNotEmpty) {
+        body['name_ar'] = nameAr;
+      }
+      if (nameEn != null && nameEn.isNotEmpty) {
+        body['name_en'] = nameEn;
+      }
+      if (linename != null && linename.isNotEmpty) {
+        body['linename'] = linename;
+      }
       if (baseprice != null) body['baseprice'] = baseprice;
       if (additionalprice != null) body['additionalprice'] = additionalprice;
       if (estduration != null) body['estduration'] = estduration;
@@ -1820,7 +1920,12 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-        if (decoded is Map && decoded['users'] is List) {
+        // Backend returns array directly or wrapped in object
+        if (decoded is List) {
+          return decoded
+              .map((u) => Map<String, dynamic>.from(u))
+              .toList();
+        } else if (decoded is Map && decoded['users'] is List) {
           return (decoded['users'] as List)
               .map((u) => Map<String, dynamic>.from(u))
               .toList();
@@ -1831,6 +1936,47 @@ class ApiService {
       }
     } catch (exception) {
       throw Exception(exception.toString());
+    }
+  }
+
+  /// Update user (admin)
+  static Future<Map<String, dynamic>> updateUser({
+    required String userid,
+    String? fullname,
+    String? email,
+    String? phone,
+    String? role,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final body = <String, dynamic>{};
+      if (fullname != null) body['fullname'] = fullname;
+      if (email != null) body['email'] = email;
+      if (phone != null) body['phone'] = phone;
+      if (role != null) body['role'] = role;
+
+      final response = await http.put(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/users/$userid'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode(body)),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'message': decoded['message'] ?? (response.statusCode == 200 ? 'User updated' : 'Failed'),
+        'user': decoded['user'],
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
     }
   }
 
@@ -1924,6 +2070,164 @@ class ApiService {
         throw Exception('Unexpected response format');
       } else {
         throw Exception('Failed to load trips');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  // ============================================
+  // RATINGS API
+  // ============================================
+
+  /// Submit a rating for a completed trip
+  static Future<Map<String, dynamic>> submitRating({
+    required String bookingid,
+    required int rating,
+    String? comment,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/ratings'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode({
+          'bookingid': bookingid,
+          'rating': rating,
+          if (comment != null && comment.isNotEmpty) 'comment': comment,
+        })),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 201,
+        'message': decoded['message'] ?? (response.statusCode == 201 ? 'Rating submitted' : 'Failed'),
+        'rating': decoded['rating'],
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
+  /// Update an existing rating
+  static Future<Map<String, dynamic>> updateRating({
+    required String ratingid,
+    int? rating,
+    String? comment,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final body = <String, dynamic>{};
+      if (rating != null) body['rating'] = rating;
+      if (comment != null) body['comment'] = comment;
+
+      final response = await http.put(
+        Uri.parse('${AppConfig.apiBaseUrl}/ratings/$ratingid'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode(body)),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'message': decoded['message'] ?? (response.statusCode == 200 ? 'Rating updated' : 'Failed'),
+        'rating': decoded['rating'],
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
+  /// Get rating by booking ID
+  static Future<Map<String, dynamic>?> getRatingByBookingId(String bookingid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return null;
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/ratings/booking/$bookingid'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else if (response.statusCode == 404) {
+        return null;
+      }
+      throw Exception('Failed to load rating');
+    } catch (exception) {
+      return null;
+    }
+  }
+
+  /// Get all ratings for a trip (public)
+  static Future<Map<String, dynamic>> getTripRatings(String tripid) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/ratings/trip/$tripid'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'ratings': decoded['ratings'] ?? [],
+        'average': decoded['average'] ?? 0.0,
+        'count': decoded['count'] ?? 0,
+      };
+    } catch (exception) {
+      return {'success': false, 'ratings': [], 'average': 0.0, 'count': 0};
+    }
+  }
+
+  /// Get my ratings
+  static Future<List<Map<String, dynamic>>> getMyRatings() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/ratings/my-ratings'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is List) {
+          return decoded.map((r) => Map<String, dynamic>.from(r)).toList();
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        throw Exception('Failed to load ratings');
       }
     } catch (exception) {
       throw Exception(exception.toString());

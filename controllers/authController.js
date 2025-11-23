@@ -182,26 +182,32 @@ export const register = async (req, res, next) => {
         seatNumType: typeof seatNum,
       });
 
-      // Validate and normalize plate number - optional field (can be added later)
-      let plateNo = null;
-      if (vehiclePlate && vehiclePlate.trim()) {
-        const trimmedPlate = vehiclePlate.trim();
-        const plateRegex = /^\d-\d{4}-[A-Za-z]$/;
-        if (plateRegex.test(trimmedPlate)) {
-          plateNo = trimmedPlate;
-          logger.info('Plate number validated', { plateNo });
-        } else {
-          logger.warn('Invalid plate format - will create vehicle without plate (can be added later)', { 
-            providedPlate: trimmedPlate,
-            userid: user.userid,
-            driverid: roleRecord.driverid,
-          });
-          // Don't fail registration - plate can be added later
-          plateNo = null;
-        }
-      } else {
-        logger.info('No plate number provided - vehicle will be created without plate (can be added later)');
+      // Validate and normalize plate number - REQUIRED field
+      if (!vehiclePlate || !vehiclePlate.trim()) {
+        return res.status(400).json({
+          message: req.t('vehicle.plate_required') || 'Vehicle plate number is required',
+        });
       }
+      
+      const trimmedPlate = vehiclePlate.trim();
+      const plateRegex = /^\d-\d{4}-[A-Za-z]$/;
+      if (!plateRegex.test(trimmedPlate)) {
+        return res.status(400).json({
+          message: req.t('vehicle.plate_invalid') || 'Plate number must be in format: number-4digits-letter (e.g., 3-1234-A)',
+        });
+      }
+      
+      // Check if plate number already exists (must be unique)
+      const Vehicle = (await import('../models/Vehicle.js')).default;
+      const existingVehicle = await Vehicle.findByPlateNumber(trimmedPlate);
+      if (existingVehicle) {
+        return res.status(409).json({
+          message: req.t('vehicle.plate_exists') || 'This plate number is already registered',
+        });
+      }
+      
+      const plateNo = trimmedPlate;
+      logger.info('Plate number validated', { plateNo });
 
       // Create vehicle data - links to Driver and Line
       const baseVehicleData = {
@@ -210,7 +216,7 @@ export const register = async (req, res, next) => {
         lineid: lineid.trim(), // Link to Line
         seatnum: parseInt(seatNum, 10), // Ensure it's an integer
         seatlayout: String(normalizedLayout), // Ensure it's a string
-        plateno: plateNo || null, // Can be null, but ensure it's not empty string
+        plateno: plateNo, // REQUIRED - validated above
         status: 'active',
       };
 

@@ -211,6 +211,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         label: t('firstName'),
                         hint: t('enterFirstName'),
                         keyboardType: TextInputType.name,
+                        icon: Icons.person_outline,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return t('enterFirstName');
@@ -229,6 +230,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         label: t('lastName'),
                         hint: t('enterLastName'),
                         keyboardType: TextInputType.name,
+                        icon: Icons.badge_outlined,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return t('enterLastName');
@@ -247,6 +249,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         label: t('phone'),
                         hint: t('enterPhone'),
                         keyboardType: TextInputType.phone,
+                        icon: Icons.phone_outlined,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return t('enterPhone');
@@ -271,6 +274,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         label: t('email'),
                         hint: t('enterEmail'),
                         keyboardType: TextInputType.emailAddress,
+                        icon: Icons.email_outlined,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return t('enterEmail');
@@ -292,6 +296,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         label: t('password'),
                         hint: t('enterPassword'),
                         obscure: _obscurePassword,
+                        icon: Icons.lock_outline,
                         toggle: () => setState(() {
                           _obscurePassword = !_obscurePassword;
                         }),
@@ -318,6 +323,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         label: t('confirmPassword'),
                         hint: t('confirmPasswordHint'),
                         obscure: _obscureConfirmPassword,
+                        icon: Icons.lock_outline,
                         toggle: () => setState(() {
                           _obscureConfirmPassword = !_obscureConfirmPassword;
                         }),
@@ -411,6 +417,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String hint,
     TextInputType? keyboardType,
     TextCapitalization textCapitalization = TextCapitalization.none,
+    IconData? icon,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
@@ -422,7 +429,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         fontSize: 16,
         fontWeight: FontWeight.w500,
       ),
-      decoration: _inputDecoration(label, hint),
+      decoration: _inputDecoration(label, hint, prefixIcon: icon != null ? Icon(icon, color: Colors.white70) : null),
       validator: validator,
       enableInteractiveSelection: true,
       autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -435,6 +442,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String hint,
     required bool obscure,
     required VoidCallback toggle,
+    IconData? icon,
     String? Function(String?)? validator,
     VoidCallback? onChanged,
   }) {
@@ -449,6 +457,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       decoration: _inputDecoration(
         label,
         hint,
+        prefixIcon: icon != null ? Icon(icon, color: Colors.white70) : null,
         suffixIcon: IconButton(
           icon: Icon(
             obscure ? Icons.visibility_off : Icons.visibility,
@@ -466,6 +475,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   InputDecoration _inputDecoration(
     String label,
     String hint, {
+    Widget? prefixIcon,
     Widget? suffixIcon,
   }) {
     final baseBorder = OutlineInputBorder(
@@ -487,6 +497,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       focusedBorder: baseBorder.copyWith(
         borderSide: const BorderSide(color: Color(0xFFF57C00), width: 2),
       ),
+      prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
     );
   }

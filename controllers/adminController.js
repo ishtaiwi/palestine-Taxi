@@ -7,6 +7,7 @@ import Reservation from '../models/Reservation.js';
 import Line from '../models/Line.js';
 import Vehicle from '../models/Vehicle.js';
 import Payment from '../models/Payment.js';
+import { TRIP_STATUS, RESERVATION_STATUS, VEHICLE_STATUS, USER_ROLES, PAYMENT_STATUS } from '../utils/constants.js';
 
 
 export const getDashboardStats = async (req, res, next) => {
@@ -19,15 +20,15 @@ export const getDashboardStats = async (req, res, next) => {
     
     const stats = {
       totalTrips: trips.length,
-      completedTrips: trips.filter(t => t.status === 'completed').length,
-      cancelledTrips: trips.filter(t => t.status === 'cancelled').length,
+      completedTrips: trips.filter(t => t.status === TRIP_STATUS.COMPLETED).length,
+      cancelledTrips: trips.filter(t => t.status === TRIP_STATUS.CANCELLED).length,
       totalReservations: reservations.length,
-      confirmedReservations: reservations.filter(r => r.status === 'confirmed').length,
+      confirmedReservations: reservations.filter(r => r.status === RESERVATION_STATUS.CONFIRMED).length,
       totalLines: lines.filter(l => l.active).length,
-      totalVehicles: vehicles.filter(v => v.status === 'active').length,
+      totalVehicles: vehicles.filter(v => v.status === VEHICLE_STATUS.ACTIVE).length,
       totalUsers: users.length,
-      totalDrivers: users.filter(u => u.role === 'driver').length,
-      totalPassengers: users.filter(u => u.role === 'passenger').length,
+      totalDrivers: users.filter(u => u.role === USER_ROLES.DRIVER).length,
+      totalPassengers: users.filter(u => u.role === USER_ROLES.PASSENGER).length,
     };
     
     res.json(stats);
@@ -102,7 +103,8 @@ export const getRevenueAnalytics = async (req, res, next) => {
   try {
     const { startDate, endDate, lineid } = req.query;
     
-    let payments = await Payment.findAll({ status: 'completed' });
+    const { PAYMENT_STATUS } = await import('../utils/constants.js');
+    let payments = await Payment.findAll({ status: PAYMENT_STATUS.COMPLETED });
     
     if (startDate) {
       payments = payments.filter(p => new Date(p.time) >= new Date(startDate));

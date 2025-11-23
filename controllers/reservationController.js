@@ -4,7 +4,7 @@ import Payment from '../models/Payment.js';
 import Wallet from '../models/Wallet.js';
 import { v4 as uuidv4 } from 'uuid';
 import { generateQRCode } from '../utils/qrcode.js';
-import { BOOKING_TYPE } from '../utils/constants.js';
+import { BOOKING_TYPE, PAYMENT_STATUS, PAYMENT_METHOD, RESERVATION_STATUS } from '../utils/constants.js';
 import { validateReservationData } from '../utils/validation.js';
 import { distributeInstantBookings } from '../services/matchingService.js';
 
@@ -48,10 +48,17 @@ export const getPassengerReservations = async (req, res, next) => {
     const { status } = req.query;
     const filters = status ? { status } : {};
     
-    const reservations = await Reservation.findByPassengerId(
-      req.user.passengerid || req.user.userid,
-      filters
-    );
+    // Get passenger ID from authenticated user - ensure security
+    const passengerid = req.user.passengerid || req.user.userid;
+    
+    if (!passengerid) {
+      return res.status(401).json({
+        message: req.t('auth.unauthorized') || 'Unauthorized - No passenger ID found',
+      });
+    }
+    
+    // Only return reservations belonging to this passenger (security check)
+    const reservations = await Reservation.findByPassengerId(passengerid, filters);
     
     res.json(reservations);
   } catch (error) {
@@ -71,7 +78,7 @@ export const createReservation = async (req, res, next) => {
 
   try {
     const passengerid = req.user.passengerid || req.user.userid;
-    const paymentMethod = (req.body.paymentmethod || 'wallet').toLowerCase();
+    const paymentMethod = (req.body.paymentmethod || PAYMENT_METHOD.WALLET).toLowerCase();
     
     // Determine booking type (default: instant)
     const bookingType = booking_type || BOOKING_TYPE.INSTANT;
@@ -183,24 +190,24 @@ export const createReservation = async (req, res, next) => {
       paymentid: uuidv4(),
       amount: bookingPrice,
       method: paymentMethod,
-      status: 'pending',
+      status: PAYMENT_STATUS.PENDING,
       type: 'reservation',
     });
     
     
-    if (paymentMethod === 'wallet') {
+    if (paymentMethod === PAYMENT_METHOD.WALLET) {
       const wallets = await Wallet.findByUserId(req.user.userid, 'main');
       const wallet = wallets?.[0];
       
       if (!wallet) {
-        await Payment.update(paymentRecord.paymentid, { status: 'failed' });
+        await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.FAILED });
         return res.status(400).json({ 
           message: req.t('payment.wallet_not_found') || 'Wallet not found' 
         });
       }
       
       if ((wallet.balance || 0) < bookingPrice) {
-        await Payment.update(paymentRecord.paymentid, { status: 'failed' });
+        await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.FAILED });
         return res.status(400).json({ 
           message: req.t('payment.insufficient_balance') || 'Insufficient balance' 
         });
@@ -211,20 +218,20 @@ export const createReservation = async (req, res, next) => {
       walletChargeAmount = bookingPrice;
       
       await Payment.update(paymentRecord.paymentid, { 
-        status: 'completed',
+        status: PAYMENT_STATUS.COMPLETED,
         fromwalletid: wallet.walletid,
       });
-    } else if (['cash', 'card', 'palpay', 'jawwal_pay'].includes(paymentMethod)) {
-      await Payment.update(paymentRecord.paymentid, { status: 'pending' });
+    } else if ([PAYMENT_METHOD.CASH, PAYMENT_METHOD.CARD, PAYMENT_METHOD.PALPAY, PAYMENT_METHOD.JAWWAL_PAY].includes(paymentMethod)) {
+      await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.PENDING });
     } else {
       await Payment.update(paymentRecord.paymentid, { 
-        status: 'pending',
+        status: PAYMENT_STATUS.PENDING,
         method: 'other',
       });
     }
     
     
-    const reservationStatus = paymentMethod === 'wallet' ? 'confirmed' : 'pending_payment';
+    const reservationStatus = paymentMethod === PAYMENT_METHOD.WALLET ? RESERVATION_STATUS.CONFIRMED : RESERVATION_STATUS.PENDING;
     const reservationData = {
       bookingid: uuidv4(),
       passengerid,
@@ -271,7 +278,7 @@ export const createReservation = async (req, res, next) => {
     const qrCode = await generateQRCode(JSON.stringify({
       bookingid: reservation.bookingid,
       passengerid,
-      tripid,
+      tripid: reservation.tripid || tripid || null,
     }));
     
     const paymentDetails = await Payment.findById(paymentRecord.paymentid);
@@ -287,7 +294,7 @@ export const createReservation = async (req, res, next) => {
       await Wallet.updateBalance(walletUsed, walletChargeAmount, 'add').catch(() => {});
     }
     if (paymentRecord) {
-      await Payment.update(paymentRecord.paymentid, { status: 'failed' }).catch(() => {});
+      await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.FAILED }).catch(() => {});
     }
     if (seatsUpdated) {
       await Trip.findById(req.body.tripid)
@@ -339,7 +346,7 @@ export const cancelReservation = async (req, res, next) => {
     }
     
     // Check if reservation can be cancelled
-    if (reservation.status === 'cancelled' || reservation.status === 'no_show') {
+    if (reservation.status === RESERVATION_STATUS.CANCELLED || reservation.status === RESERVATION_STATUS.NO_SHOW) {
       return res.status(400).json({
         message: req.t('reservation.already_cancelled') || 'Reservation is already cancelled or marked as no-show',
       });
@@ -383,7 +390,7 @@ export const cancelReservation = async (req, res, next) => {
     // Refund to wallet if payment was completed
     if (refundAmount > 0 && reservation.paymentid) {
       const payment = await Payment.findById(reservation.paymentid);
-      if (payment && payment.status === 'completed') {
+      if (payment && payment.status === PAYMENT_STATUS.COMPLETED) {
         const wallets = await Wallet.findByUserId(req.user.userid, 'main');
         if (wallets.length > 0) {
           await Wallet.updateBalance(wallets[0].walletid, refundAmount, 'add');
@@ -393,7 +400,7 @@ export const cancelReservation = async (req, res, next) => {
             paymentid: uuidv4(),
             amount: refundAmount,
             method: 'refund',
-            status: 'completed',
+            status: PAYMENT_STATUS.REFUNDED,
             type: 'refund',
             fromwalletid: wallets[0].walletid,
             towalletid: wallets[0].walletid,
@@ -403,10 +410,10 @@ export const cancelReservation = async (req, res, next) => {
     }
     
     // Update reservation status to cancelled
-    await Reservation.update(bookingid, { status: 'cancelled' });
+    await Reservation.update(bookingid, { status: RESERVATION_STATUS.CANCELLED });
     
     // Update trip available seats if trip exists and reservation was confirmed
-    if (reservation.tripid && trip && (reservation.status === 'confirmed' || reservation.status === 'checked_in')) {
+    if (reservation.tripid && trip && (reservation.status === RESERVATION_STATUS.CONFIRMED || reservation.status === RESERVATION_STATUS.CHECKED_IN)) {
       await Trip.updateAvailableSeats(reservation.tripid, trip.availableseats + 1);
     }
     
@@ -422,7 +429,68 @@ export const cancelReservation = async (req, res, next) => {
 
 export const checkInReservation = async (req, res, next) => {
   try {
-    const { bookingid } = req.body;
+    const { bookingid, qrData } = req.body;
+    const driverid = req.user.driverid;
+    
+    let finalBookingId = bookingid;
+    
+    // If QR code data is provided, parse it to get bookingid
+    if (qrData && !bookingid) {
+      try {
+        const qrInfo = JSON.parse(qrData);
+        finalBookingId = qrInfo.bookingid;
+      } catch (parseError) {
+        return res.status(400).json({
+          message: req.t('reservation.invalid_qr_code') || 'Invalid QR code data',
+        });
+      }
+    }
+    
+    if (!finalBookingId) {
+      return res.status(400).json({
+        message: req.t('reservation.bookingid_required') || 'Booking ID or QR code is required',
+      });
+    }
+    
+    const reservation = await Reservation.findById(finalBookingId);
+    if (!reservation) {
+      return res.status(404).json({ 
+        message: req.t('reservation.not_found') || 'Reservation not found' 
+      });
+    }
+    
+    // Verify driver owns the trip (if reservation is assigned to a trip)
+    if (reservation.tripid) {
+      const Trip = (await import('../models/Trip.js')).default;
+      const trip = await Trip.findById(reservation.tripid);
+      
+      if (trip && trip.assigned_driverid !== driverid) {
+        return res.status(403).json({
+          message: req.t('driver.trip_forbidden') || 'Driver not authorized for this trip',
+        });
+      }
+    }
+    
+    await Reservation.update(finalBookingId, { status: RESERVATION_STATUS.CHECKED_IN });
+    
+    const updatedReservation = await Reservation.findById(finalBookingId);
+    
+    res.json({
+      message: req.t('reservation.checked_in') || 'Passenger checked in successfully',
+      reservation: updatedReservation,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get QR Code for a reservation
+ */
+export const getReservationQRCode = async (req, res, next) => {
+  try {
+    const { bookingid } = req.params;
+    const passengerid = req.user.passengerid || req.user.userid;
     
     const reservation = await Reservation.findById(bookingid);
     if (!reservation) {
@@ -431,10 +499,30 @@ export const checkInReservation = async (req, res, next) => {
       });
     }
     
-    await Reservation.update(bookingid, { status: 'checked_in' });
+    // Verify reservation belongs to the passenger
+    if (reservation.passengerid !== passengerid) {
+      return res.status(403).json({
+        message: req.t('auth.unauthorized') || 'Unauthorized access to this reservation',
+      });
+    }
+    
+    // Generate QR Code with booking information
+    const qrData = JSON.stringify({
+      bookingid: reservation.bookingid,
+      passengerid: reservation.passengerid,
+      tripid: reservation.tripid || null,
+    });
+    
+    const qrCode = await generateQRCode(qrData);
     
     res.json({
-      message: req.t('reservation.checked_in') || 'Passenger checked in successfully',
+      qrCode,
+      qrData,
+      reservation: {
+        bookingid: reservation.bookingid,
+        tripid: reservation.tripid,
+        status: reservation.status,
+      },
     });
   } catch (error) {
     next(error);

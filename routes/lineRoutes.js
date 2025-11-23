@@ -9,6 +9,7 @@ import {
 } from '../controllers/lineController.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/authorization.js';
+import { validateLine } from '../middleware/validation.js';
 
 const router = express.Router();
 
@@ -18,8 +19,8 @@ router.get('/active', getActiveLines);
 router.get('/:lineid', getLineById);
 
 
-router.post('/', authenticate, requireAdmin, createLine);
-router.put('/:lineid', authenticate, requireAdmin, updateLine);
+router.post('/', authenticate, requireAdmin, validateLine, createLine);
+router.put('/:lineid', authenticate, requireAdmin, validateLine, updateLine);
 router.delete('/:lineid', authenticate, requireAdmin, deleteLine);
 
 export default router;

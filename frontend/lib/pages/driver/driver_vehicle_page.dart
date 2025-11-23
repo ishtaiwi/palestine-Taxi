@@ -445,7 +445,9 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
           const SizedBox(height: 8),
           _buildInfoRow(Icons.event_seat, t('seats'), vehicle['seatnum']?.toString() ?? '--'),
           const SizedBox(height: 8),
-          _buildInfoRow(Icons.alt_route, t('line'), vehicle['line']?['linename'] ?? t('unknown')),
+          _buildInfoRow(Icons.alt_route, t('line'), _isArabic
+              ? (vehicle['line']?['name_ar']?.toString() ?? vehicle['line']?['linename']?.toString() ?? vehicle['line']?['name_en']?.toString() ?? t('unknown'))
+              : (vehicle['line']?['name_en']?.toString() ?? vehicle['line']?['linename']?.toString() ?? vehicle['line']?['name_ar']?.toString() ?? t('unknown'))),
           if (_upcomingTrip != null) ...[
             const SizedBox(height: 12),
             Text(

@@ -4,6 +4,7 @@ import '../../screens/auth/login_page.dart';
 import 'driver_queue_page.dart';
 import 'driver_trips_page.dart';
 import 'driver_vehicle_page.dart';
+import 'driver_profile_page.dart';
 
 class DriverHomePage extends StatefulWidget {
   const DriverHomePage({super.key});
@@ -253,7 +254,14 @@ class _DriverHomePageState extends State<DriverHomePage> {
                               icon: Icons.person,
                               title: t('profile'),
                               color: Colors.purple,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const DriverProfilePage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],

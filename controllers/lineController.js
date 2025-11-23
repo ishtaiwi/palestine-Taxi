@@ -49,16 +49,28 @@ export const getLineById = async (req, res, next) => {
 
 export const createLine = async (req, res, next) => {
   try {
-    const { linename, baseprice, additionalprice, estduration, distance } = req.body;
+    const { name_ar, name_en, linename, baseprice, additionalprice, estduration, distance, active } = req.body;
+    
+    // Support both old (linename) and new (name_ar, name_en) format for backward compatibility
+    const finalNameAr = name_ar || linename || '';
+    const finalNameEn = name_en || '';
+    
+    if (!finalNameAr) {
+      return res.status(400).json({
+        message: req.t('line.name_ar_required') || 'Arabic name (name_ar) is required',
+      });
+    }
     
     const lineData = {
       lineid: uuidv4(),
-      linename,
+      name_ar: finalNameAr,
+      name_en: finalNameEn || null,
+      linename: finalNameAr, // Keep for backward compatibility
       baseprice,
       additionalprice: additionalprice || 0,
       estduration,
       distance,
-      active: true,
+      active: active !== undefined ? active : true,
     };
     
     const line = await Line.create(lineData);
@@ -75,7 +87,29 @@ export const createLine = async (req, res, next) => {
 export const updateLine = async (req, res, next) => {
   try {
     const { lineid } = req.params;
-    const updates = req.body;
+    const { name_ar, name_en, linename, ...otherUpdates } = req.body;
+    
+    const updates = { ...otherUpdates };
+    
+    // Handle name updates - support both old and new format
+    if (name_ar !== undefined) {
+      updates.name_ar = name_ar;
+      // Update linename for backward compatibility
+      if (!linename) {
+        updates.linename = name_ar;
+      }
+    }
+    if (name_en !== undefined) {
+      updates.name_en = name_en || null;
+    }
+    // Support old format (linename) for backward compatibility
+    if (linename !== undefined && !name_ar) {
+      updates.linename = linename;
+      // If name_ar is not provided but linename is, update name_ar too
+      if (!name_ar) {
+        updates.name_ar = linename;
+      }
+    }
     
     const line = await Line.update(lineid, updates);
     res.json({

@@ -26,10 +26,22 @@ class Vehicle {
       }
     });
     
-    // Ensure plateno is either a valid string or null (not empty string)
-    if (cleanData.plateno === '' || cleanData.plateno === undefined) {
-      // Set to null explicitly - column is now nullable after migration
-      cleanData.plateno = null;
+    // Ensure plateno is a valid non-empty string (REQUIRED)
+    if (!cleanData.plateno || typeof cleanData.plateno !== 'string' || cleanData.plateno.trim() === '') {
+      throw new Error('Vehicle plate number (plateno) is required and cannot be empty');
+    }
+    
+    // Trim and validate format
+    cleanData.plateno = cleanData.plateno.trim();
+    const plateRegex = /^\d-\d{4}-[A-Za-z]$/;
+    if (!plateRegex.test(cleanData.plateno)) {
+      throw new Error('Invalid plate number format. Must be: number-4digits-letter (e.g., 3-1234-A)');
+    }
+    
+    // Check if plate number already exists (must be unique)
+    const existingVehicle = await Vehicle.findByPlateNumber(cleanData.plateno);
+    if (existingVehicle) {
+      throw new Error(`Plate number ${cleanData.plateno} is already registered`);
     }
     
     // Ensure seatnum is a number
@@ -135,6 +147,17 @@ class Vehicle {
       .eq('lineid', lineid);
     
     if (error) throw error;
+    return data;
+  }
+
+  static async findByPlateNumber(plateno) {
+    const { data, error } = await supabase
+      .from('vehicle')
+      .select('*, driver(*, user(*)), line(*)')
+      .eq('plateno', plateno)
+      .maybeSingle();
+    
+    if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "No rows found"
     return data;
   }
 

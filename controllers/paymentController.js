@@ -1,6 +1,7 @@
 import Payment from '../models/Payment.js';
 import Wallet from '../models/Wallet.js';
 import { v4 as uuidv4 } from 'uuid';
+import { PAYMENT_STATUS } from '../utils/constants.js';
 
 
 export const getAllPayments = async (req, res, next) => {
@@ -65,22 +66,22 @@ export const createPayment = async (req, res, next) => {
       amount,
       method,
       type: type || 'transfer',
-      status: 'pending',
+      status: PAYMENT_STATUS.PENDING,
     };
     
     const payment = await Payment.create(paymentData);
     
     
-    if (method === 'wallet' && fromwalletid) {
+    if (method === PAYMENT_METHOD.WALLET && fromwalletid) {
       const wallet = await Wallet.findById(fromwalletid);
       if (wallet.balance >= amount) {
         await Wallet.updateBalance(fromwalletid, amount, 'subtract');
         if (towalletid) {
           await Wallet.updateBalance(towalletid, amount, 'add');
         }
-        await Payment.update(payment.paymentid, { status: 'completed' });
+        await Payment.update(payment.paymentid, { status: PAYMENT_STATUS.COMPLETED });
       } else {
-        await Payment.update(payment.paymentid, { status: 'failed' });
+        await Payment.update(payment.paymentid, { status: PAYMENT_STATUS.FAILED });
         return res.status(400).json({ 
           message: req.t('payment.insufficient_balance') || 'Insufficient balance' 
         });

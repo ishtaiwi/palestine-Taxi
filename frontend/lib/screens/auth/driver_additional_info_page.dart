@@ -573,8 +573,10 @@ class _DriverAdditionalInfoScreenState
 
     for (final line in _lines) {
       final id = line['lineid']?.toString();
-      final name = line['linename']?.toString();
-      if (_selectedLineId == id || _selectedLineId == name) {
+      final nameAr = line['name_ar']?.toString();
+      final nameEn = line['name_en']?.toString();
+      final nameOld = line['linename']?.toString();
+      if (_selectedLineId == id || _selectedLineId == nameAr || _selectedLineId == nameEn || _selectedLineId == nameOld) {
         return id;
       }
     }
@@ -697,7 +699,9 @@ class _DriverAdditionalInfoScreenState
             (line) => DropdownMenuItem<String>(
               value: line['lineid']?.toString(),
               child: Text(
-                line['linename']?.toString() ?? '',
+                _isArabic
+                    ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '')
+                    : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? ''),
                 style: const TextStyle(color: Colors.white),
               ),
             ),

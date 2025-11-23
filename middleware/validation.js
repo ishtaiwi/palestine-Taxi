@@ -139,12 +139,30 @@ export const validatePasswordReset = [
 ];
 
 export const validateLine = [
-  body('linename')
+  // Support both old (linename) and new (name_ar, name_en) format
+  body('name_ar')
+    .optional()
     .trim()
-    .notEmpty()
-    .withMessage('Line name is required')
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Arabic name must be between 2 and 100 characters'),
+  body('name_en')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('English name must be between 2 and 100 characters'),
+  body('linename')
+    .optional()
+    .trim()
     .isLength({ min: 2, max: 100 })
     .withMessage('Line name must be between 2 and 100 characters'),
+  // At least one name must be provided
+  body()
+    .custom((value) => {
+      if (!value.name_ar && !value.linename) {
+        throw new Error('Either name_ar or linename is required');
+      }
+      return true;
+    }),
   body('baseprice')
     .notEmpty()
     .withMessage('Base price is required')
@@ -162,6 +180,39 @@ export const validateLine = [
     .optional()
     .isInt({ min: 0 })
     .withMessage('Estimated duration must be a positive integer'),
+  validate,
+];
+
+export const validateRating = [
+  body('bookingid')
+    .trim()
+    .notEmpty()
+    .withMessage('Booking ID is required')
+    .isUUID()
+    .withMessage('Booking ID must be a valid UUID'),
+  body('rating')
+    .notEmpty()
+    .withMessage('Rating is required')
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Rating must be an integer between 1 and 5'),
+  body('comment')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Comment must not exceed 500 characters'),
+  validate,
+];
+
+export const validateRatingUpdate = [
+  body('rating')
+    .optional()
+    .isInt({ min: 1, max: 5 })
+    .withMessage('Rating must be an integer between 1 and 5'),
+  body('comment')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Comment must not exceed 500 characters'),
   validate,
 ];
 
@@ -241,8 +292,8 @@ export const validateVehicle = [
     .trim()
     .notEmpty()
     .withMessage('Plate number is required')
-    .isLength({ min: 2, max: 20 })
-    .withMessage('Plate number must be between 2 and 20 characters'),
+    .matches(/^\d-\d{4}-[A-Za-z]$/)
+    .withMessage('Plate number must be in format: number-4digits-letter (e.g., 3-1234-A)'),
   body('seatlayout')
     .optional()
     .isIn(['2+3', '3+3+2', '2+2', '1+1'])

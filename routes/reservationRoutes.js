@@ -7,6 +7,7 @@ import {
   updateReservation,
   cancelReservation,
   checkInReservation,
+  getReservationQRCode,
 } from '../controllers/reservationController.js';
 import { authenticate } from '../middleware/auth.js';
 import { requirePassenger, requireDriver, requireAdmin } from '../middleware/authorization.js';
@@ -15,6 +16,7 @@ const router = express.Router();
 
 
 router.get('/my-reservations', authenticate, requirePassenger, getPassengerReservations);
+router.get('/:bookingid/qrcode', authenticate, requirePassenger, getReservationQRCode);
 router.post('/', authenticate, requirePassenger, createReservation);
 router.put('/:bookingid/cancel', authenticate, requirePassenger, cancelReservation);
 

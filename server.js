@@ -20,6 +20,7 @@ import walletRoutes from './routes/walletRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import driverRoutes from './routes/driverRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
+import ratingRoutes from './routes/ratingRoutes.js';
 
 // Background Jobs
 import { startTripOpeningJob } from './jobs/tripOpeningJob.js';
@@ -93,6 +94,7 @@ app.use('/api/wallets', walletRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/ratings', ratingRoutes);
 
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

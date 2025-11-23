@@ -3,7 +3,9 @@ import Line from '../models/Line.js';
 import Vehicle from '../models/Vehicle.js';
 import Reservation from '../models/Reservation.js';
 import { buildSeatRows, normalizeSeatId } from '../utils/seatLayout.js';
+import { calculateAvailablePassengerSeats, getTotalPassengerSeats } from '../utils/seatCalculation.js';
 import { v4 as uuidv4 } from 'uuid';
+import { TRIP_STATUS } from '../utils/constants.js';
 
 
 export const getAllTrips = async (req, res, next) => {
@@ -25,11 +27,12 @@ export const getAllTrips = async (req, res, next) => {
 
 export const getUpcomingTrips = async (req, res, next) => {
   try {
-    const { lineid, status } = req.query;
+    const { lineid, status, date } = req.query;
     const filters = {};
     
     if (lineid) filters.lineid = lineid;
     if (status) filters.status = status;
+    if (date) filters.date = date;
     
     const trips = await Trip.findUpcoming(filters);
     res.json(trips);
@@ -87,13 +90,19 @@ export const createTrip = async (req, res, next) => {
     const deptimeDate = new Date(deptime);
     const openingTime = new Date(deptimeDate.getTime() - 45 * 60 * 1000);
     
+    // Calculate available passenger seats (excluding driver seat only)
+    // Note: broken seats are NOT subtracted - they are handled in seat selection UI
+    const initialAvailableSeats = availableseats !== undefined 
+      ? availableseats 
+      : calculateAvailablePassengerSeats(vehicle.seatnum, 0, 0);
+    
     const tripData = {
       tripid: uuidv4(),
       lineid,
       vehicleid,
       deptime,
       status: 'scheduled',
-      availableseats: availableseats || vehicle.seatnum,
+      availableseats: initialAvailableSeats,
       totalbookings: 0,
       trip_opening_time: openingTime.toISOString(),
       auto_departure_enabled: true,
@@ -152,7 +161,7 @@ export const endTrip = async (req, res, next) => {
     const { tripid } = req.params;
     
     const trip = await Trip.update(tripid, {
-      status: 'completed',
+      status: TRIP_STATUS.COMPLETED,
       arrivaltime: new Date().toISOString(),
     });
     

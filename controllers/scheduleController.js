@@ -1,0 +1,205 @@
+import ScheduleTemplate from '../models/ScheduleTemplate.js';
+import { createTripsForTemplate, createDailyTrips } from '../services/dailyTripService.js';
+import logger from '../utils/logger.js';
+
+/**
+ * Get all schedule templates
+ */
+export const getAllSchedules = async (req, res, next) => {
+  try {
+    const { lineid, active } = req.query;
+    
+    const filters = {};
+    if (lineid) filters.lineid = lineid;
+    if (active !== undefined) filters.active = active === 'true';
+    
+    const schedules = await ScheduleTemplate.findAll(filters);
+    
+    res.json({
+      message: req.t('schedule.list') || 'Schedules retrieved successfully',
+      schedules,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get schedule template by ID
+ */
+export const getScheduleById = async (req, res, next) => {
+  try {
+    const { templateid } = req.params;
+    const schedule = await ScheduleTemplate.findById(templateid);
+    
+    if (!schedule) {
+      return res.status(404).json({
+        message: req.t('schedule.not_found') || 'Schedule template not found',
+      });
+    }
+    
+    res.json({
+      message: req.t('schedule.found') || 'Schedule template found',
+      schedule,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Create a new schedule template
+ */
+export const createSchedule = async (req, res, next) => {
+  try {
+    const { lineid, start_hour, end_hour, interval_minutes, active } = req.body;
+    
+    // Validation
+    if (!lineid) {
+      return res.status(400).json({
+        message: req.t('schedule.lineid_required') || 'lineid is required',
+      });
+    }
+    
+    if (start_hour === undefined || start_hour < 0 || start_hour > 23) {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_start_hour') || 'start_hour must be between 0 and 23',
+      });
+    }
+    
+    if (end_hour === undefined || end_hour < 0 || end_hour > 23) {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_end_hour') || 'end_hour must be between 0 and 23',
+      });
+    }
+    
+    if (end_hour < start_hour) {
+      return res.status(400).json({
+        message: req.t('schedule.end_before_start') || 'end_hour must be >= start_hour',
+      });
+    }
+    
+    if (interval_minutes === undefined || interval_minutes <= 0) {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_interval') || 'interval_minutes must be > 0',
+      });
+    }
+    
+    const scheduleData = {
+      lineid,
+      start_hour: parseInt(start_hour, 10),
+      end_hour: parseInt(end_hour, 10),
+      interval_minutes: parseInt(interval_minutes, 10),
+      active: active !== undefined ? active : true,
+    };
+    
+    const schedule = await ScheduleTemplate.create(scheduleData);
+    
+    res.status(201).json({
+      message: req.t('schedule.created') || 'Schedule template created successfully',
+      schedule,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update schedule template
+ */
+export const updateSchedule = async (req, res, next) => {
+  try {
+    const { templateid } = req.params;
+    const updates = req.body;
+    
+    // Validate updates if provided
+    if (updates.start_hour !== undefined && (updates.start_hour < 0 || updates.start_hour > 23)) {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_start_hour') || 'start_hour must be between 0 and 23',
+      });
+    }
+    
+    if (updates.end_hour !== undefined && (updates.end_hour < 0 || updates.end_hour > 23)) {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_end_hour') || 'end_hour must be between 0 and 23',
+      });
+    }
+    
+    if (updates.start_hour !== undefined && updates.end_hour !== undefined) {
+      if (updates.end_hour < updates.start_hour) {
+        return res.status(400).json({
+          message: req.t('schedule.end_before_start') || 'end_hour must be >= start_hour',
+        });
+      }
+    }
+    
+    if (updates.interval_minutes !== undefined && updates.interval_minutes <= 0) {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_interval') || 'interval_minutes must be > 0',
+      });
+    }
+    
+    const schedule = await ScheduleTemplate.update(templateid, updates);
+    
+    res.json({
+      message: req.t('schedule.updated') || 'Schedule template updated successfully',
+      schedule,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Delete schedule template
+ */
+export const deleteSchedule = async (req, res, next) => {
+  try {
+    const { templateid } = req.params;
+    await ScheduleTemplate.delete(templateid);
+    
+    res.json({
+      message: req.t('schedule.deleted') || 'Schedule template deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Manually trigger trip creation for a schedule template
+ */
+export const createTripsForSchedule = async (req, res, next) => {
+  try {
+    const { templateid } = req.params;
+    const { target_date } = req.body;
+    
+    const targetDate = target_date ? new Date(target_date) : new Date();
+    
+    const result = await createTripsForTemplate(templateid, targetDate);
+    
+    res.json({
+      message: req.t('schedule.trips_created') || 'Trips created successfully',
+      result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Manually trigger daily trip creation for all active schedules
+ */
+export const triggerDailyTripCreation = async (req, res, next) => {
+  try {
+    const result = await createDailyTrips();
+    
+    res.json({
+      message: req.t('schedule.daily_trips_created') || 'Daily trips creation completed',
+      result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

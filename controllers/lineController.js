@@ -51,7 +51,7 @@ export const createLine = async (req, res, next) => {
   try {
     const { name_ar, name_en, linename, baseprice, additionalprice, estduration, distance, active } = req.body;
     
-    // Support both old (linename) and new (name_ar, name_en) format for backward compatibility
+    
     const finalNameAr = name_ar || linename || '';
     const finalNameEn = name_en || '';
     
@@ -65,7 +65,7 @@ export const createLine = async (req, res, next) => {
       lineid: uuidv4(),
       name_ar: finalNameAr,
       name_en: finalNameEn || null,
-      linename: finalNameAr, // Keep for backward compatibility
+      linename: finalNameAr, 
       baseprice,
       additionalprice: additionalprice || 0,
       estduration,
@@ -91,10 +91,10 @@ export const updateLine = async (req, res, next) => {
     
     const updates = { ...otherUpdates };
     
-    // Handle name updates - support both old and new format
+    
     if (name_ar !== undefined) {
       updates.name_ar = name_ar;
-      // Update linename for backward compatibility
+      
       if (!linename) {
         updates.linename = name_ar;
       }
@@ -102,10 +102,10 @@ export const updateLine = async (req, res, next) => {
     if (name_en !== undefined) {
       updates.name_en = name_en || null;
     }
-    // Support old format (linename) for backward compatibility
+    
     if (linename !== undefined && !name_ar) {
       updates.linename = linename;
-      // If name_ar is not provided but linename is, update name_ar too
+      
       if (!name_ar) {
         updates.name_ar = linename;
       }

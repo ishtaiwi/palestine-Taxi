@@ -80,16 +80,16 @@ export const addBalance = async (req, res, next) => {
 };
 
 
-// Get current user's main wallet with transactions
+
 export const getMyWallet = async (req, res, next) => {
   try {
     const userid = req.user.userid;
     
-    // Find main wallet for user
+    
     const wallets = await Wallet.findByUserId(userid, 'main');
     
     if (!wallets || wallets.length === 0) {
-      // If wallet doesn't exist, create one automatically
+      
       const wallet = await Wallet.create({
         walletid: uuidv4(),
         userid,
@@ -97,7 +97,7 @@ export const getMyWallet = async (req, res, next) => {
         balance: 0,
       });
       
-      // Get transactions (payments) related to wallet
+      
       const payments = await Payment.findByWalletId(wallet.walletid);
       
       return res.json({
@@ -110,7 +110,7 @@ export const getMyWallet = async (req, res, next) => {
     
     const wallet = wallets[0];
     
-    // Get transactions (payments) related to wallet
+    
     const payments = await Payment.findByWalletId(wallet.walletid);
     
     res.json({
@@ -125,7 +125,7 @@ export const getMyWallet = async (req, res, next) => {
 };
 
 
-// Add balance to current user's main wallet
+
 export const addBalanceToMyWallet = async (req, res, next) => {
   try {
     const userid = req.user.userid;
@@ -137,12 +137,12 @@ export const addBalanceToMyWallet = async (req, res, next) => {
       });
     }
     
-    // Find main wallet
+    
     const wallets = await Wallet.findByUserId(userid, 'main');
     
     let wallet;
     if (!wallets || wallets.length === 0) {
-      // Create wallet if it doesn't exist
+      
       const newWallet = await Wallet.create({
         walletid: uuidv4(),
         userid,
@@ -156,7 +156,7 @@ export const addBalanceToMyWallet = async (req, res, next) => {
       wallet = await Wallet.updateBalance(wallet.walletid, amount, 'add');
     }
     
-    // Create payment record to track deposit
+    
     await Payment.create({
       paymentid: uuidv4(),
       fromwalletid: null,

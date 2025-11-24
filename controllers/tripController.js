@@ -86,12 +86,12 @@ export const createTrip = async (req, res, next) => {
       });
     }
     
-    // Calculate trip_opening_time (45 minutes before departure)
+    
     const deptimeDate = new Date(deptime);
     const openingTime = new Date(deptimeDate.getTime() - 45 * 60 * 1000);
     
-    // Calculate available passenger seats (excluding driver seat only)
-    // Note: broken seats are NOT subtracted - they are handled in seat selection UI
+    
+    
     const initialAvailableSeats = availableseats !== undefined 
       ? availableseats 
       : calculateAvailablePassengerSeats(vehicle.seatnum, 0, 0);

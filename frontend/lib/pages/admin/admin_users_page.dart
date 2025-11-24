@@ -10,8 +10,10 @@ class AdminUsersPage extends StatefulWidget {
 
 class _AdminUsersPageState extends State<AdminUsersPage> {
   List<Map<String, dynamic>> _users = [];
+  List<Map<String, dynamic>> _filteredUsers = [];
   bool _isLoading = true;
   bool _isArabic = true;
+  String? _selectedRoleFilter; // null = all, 'admin', 'passenger', 'driver'
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -38,6 +40,11 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       'emailInvalid': 'البريد الإلكتروني غير صحيح',
       'userUpdated': 'تم تحديث المستخدم بنجاح',
       'updateFailed': 'فشل تحديث المستخدم',
+      'filterAll': 'الكل',
+      'filterAdmin': 'مدراء',
+      'filterDriver': 'سائقون',
+      'filterPassenger': 'ركاب',
+      'filterByRole': 'فلترة حسب الدور',
     },
     'en': {
       'title': 'Users Management',
@@ -63,6 +70,11 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       'emailInvalid': 'Invalid email address',
       'userUpdated': 'User updated successfully',
       'updateFailed': 'Failed to update user',
+      'filterAll': 'All',
+      'filterAdmin': 'Admins',
+      'filterDriver': 'Drivers',
+      'filterPassenger': 'Passengers',
+      'filterByRole': 'Filter by Role',
     },
   };
 
@@ -91,6 +103,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       final users = await ApiService.getAllUsers();
       setState(() {
         _users = users;
+        _applyFilter();
         _isLoading = false;
       });
     } catch (e) {
@@ -106,6 +119,314 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         );
       }
     }
+  }
+
+  void _applyFilter() {
+    if (_selectedRoleFilter == null) {
+      _filteredUsers = List.from(_users);
+    } else {
+      _filteredUsers = _users.where((user) {
+        final userRole = user['role']?.toString().toLowerCase();
+        return userRole == _selectedRoleFilter?.toLowerCase();
+      }).toList();
+    }
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [color.withOpacity(0.2), color.withOpacity(0.1)],
+                )
+              : null,
+          color: isSelected ? null : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey.shade300,
+            width: isSelected ? 2 : 1.5,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? color : Colors.grey.shade600,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? color : const Color(0xFF1E3A5F),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getRoleColor(String? role) {
+    switch (role?.toLowerCase()) {
+      case 'admin':
+        return Colors.blue;
+      case 'driver':
+        return Colors.green;
+      case 'passenger':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getRoleIcon(String? role) {
+    switch (role?.toLowerCase()) {
+      case 'admin':
+        return Icons.admin_panel_settings;
+      case 'driver':
+        return Icons.local_taxi;
+      case 'passenger':
+        return Icons.person;
+      default:
+        return Icons.person_outline;
+    }
+  }
+
+  Widget _buildUserCard(Map<String, dynamic> user) {
+    final role = user['role']?.toString();
+    final roleColor = _getRoleColor(role);
+    final roleIcon = _getRoleIcon(role);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Color(0xFFF8F9FA)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+        border: Border.all(
+          color: roleColor.withOpacity(0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {},
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Avatar with role color
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        roleColor,
+                        roleColor.withOpacity(0.7),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: roleColor.withOpacity(0.4),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    roleIcon,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // User info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user['fullname'] ?? '',
+                        style: const TextStyle(
+                          color: Color(0xFF1E3A5F),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.email,
+                            size: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              user['email'] ?? '',
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 13,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: roleColor.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: roleColor.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  roleIcon,
+                                  size: 14,
+                                  color: roleColor,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  role?.toUpperCase() ?? '',
+                                  style: TextStyle(
+                                    color: roleColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (user['phone'] != null) ...[
+                            const SizedBox(width: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.phone,
+                                  size: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  user['phone']?.toString() ?? '',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Action buttons
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFF57C00), Color(0xFFE65100)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.orange.withOpacity(0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.white, size: 20),
+                        onPressed: () => _handleEdit(user),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.red.shade400, Colors.red.shade600],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withOpacity(0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.white, size: 20),
+                        onPressed: () => _handleDelete(user['userid']),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _handleEdit(Map<String, dynamic> user) async {
@@ -338,91 +659,236 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFF060A1A),
+        backgroundColor: const Color(0xFFF5F7FA),
         appBar: AppBar(
-          title: Text(
-            t('title'),
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1E3A5F), Color(0xFF2C4A6B)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.people, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  t('title'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
           ),
-          backgroundColor: const Color(0xFF1E3A5F),
-          elevation: 2,
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1E3A5F),
+                  Color(0xFF2C4A6B),
+                  Color(0xFF1E3A5F),
+                ],
+              ),
+            ),
+          ),
+          elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
-            IconButton(
-              icon: Icon(
-                _isArabic ? Icons.language : Icons.translate,
-                color: Colors.white,
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
               ),
-              onPressed: () {
-                setState(() {
-                  _isArabic = !_isArabic;
-                  ApiService.saveLanguagePreference(_isArabic);
-                });
-              },
+              child: IconButton(
+                icon: Icon(
+                  _isArabic ? Icons.language : Icons.translate,
+                  color: Colors.white,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isArabic = !_isArabic;
+                    ApiService.saveLanguagePreference(_isArabic);
+                  });
+                },
+              ),
             ),
           ],
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : _users.isEmpty
-                ? Center(
-                    child: Text(
-                      t('noUsers'),
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _users.length,
-                    itemBuilder: (context, index) {
-                      final user = _users[index];
-                      return Card(
-                        color: Colors.white.withOpacity(0.05),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: ListTile(
-                          title: Text(
-                            user['fullname'] ?? '',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${t('email')}: ${user['email'] ?? ''}',
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                              Text(
-                                '${t('role')}: ${user['role'] ?? ''}',
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                              if (user['phone'] != null)
-                                Text(
-                                  '${t('phone')}: ${user['phone']}',
-                                  style: const TextStyle(color: Colors.white70),
-                                ),
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit, color: Colors.orange),
-                                onPressed: () => _handleEdit(user),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => _handleDelete(user['userid']),
-                              ),
-                            ],
-                          ),
+            : Column(
+                children: [
+                  // Filter Section
+                  Container(
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white,
+                          Color(0xFFF8F9FA),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5),
                         ),
-                      );
-                    },
+                      ],
+                      border: Border.all(
+                        color: Colors.grey.shade200,
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFF57C00), Color(0xFFE65100)],
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.filter_list,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              t('filterByRole'),
+                              style: const TextStyle(
+                                color: Color(0xFF1E3A5F),
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _buildFilterChip(
+                              label: t('filterAll'),
+                              icon: Icons.all_inclusive,
+                              isSelected: _selectedRoleFilter == null,
+                              color: Colors.grey,
+                              onTap: () {
+                                setState(() {
+                                  _selectedRoleFilter = null;
+                                  _applyFilter();
+                                });
+                              },
+                            ),
+                            _buildFilterChip(
+                              label: t('filterAdmin'),
+                              icon: Icons.admin_panel_settings,
+                              isSelected: _selectedRoleFilter == 'admin',
+                              color: Colors.blue,
+                              onTap: () {
+                                setState(() {
+                                  _selectedRoleFilter = _selectedRoleFilter == 'admin' ? null : 'admin';
+                                  _applyFilter();
+                                });
+                              },
+                            ),
+                            _buildFilterChip(
+                              label: t('filterDriver'),
+                              icon: Icons.local_taxi,
+                              isSelected: _selectedRoleFilter == 'driver',
+                              color: Colors.green,
+                              onTap: () {
+                                setState(() {
+                                  _selectedRoleFilter = _selectedRoleFilter == 'driver' ? null : 'driver';
+                                  _applyFilter();
+                                });
+                              },
+                            ),
+                            _buildFilterChip(
+                              label: t('filterPassenger'),
+                              icon: Icons.person,
+                              isSelected: _selectedRoleFilter == 'passenger',
+                              color: Colors.orange,
+                              onTap: () {
+                                setState(() {
+                                  _selectedRoleFilter = _selectedRoleFilter == 'passenger' ? null : 'passenger';
+                                  _applyFilter();
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
+                  // Users List
+                  Expanded(
+                    child: _filteredUsers.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.people_outline,
+                                    size: 64,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                Text(
+                                  t('noUsers'),
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: _filteredUsers.length,
+                            itemBuilder: (context, index) {
+                              final user = _filteredUsers[index];
+                              return _buildUserCard(user);
+                            },
+                          ),
+                  ),
+                ],
+              ),
       ),
     );
   }

@@ -48,7 +48,7 @@ export const getPassengerReservations = async (req, res, next) => {
     const { status } = req.query;
     const filters = status ? { status } : {};
     
-    // Get passenger ID from authenticated user - ensure security
+    
     const passengerid = req.user.passengerid || req.user.userid;
     
     if (!passengerid) {
@@ -57,7 +57,7 @@ export const getPassengerReservations = async (req, res, next) => {
       });
     }
     
-    // Only return reservations belonging to this passenger (security check)
+    
     const reservations = await Reservation.findByPassengerId(passengerid, filters);
     
     res.json(reservations);
@@ -80,10 +80,10 @@ export const createReservation = async (req, res, next) => {
     const passengerid = req.user.passengerid || req.user.userid;
     const paymentMethod = (req.body.paymentmethod || PAYMENT_METHOD.WALLET).toLowerCase();
     
-    // Determine booking type (default: instant)
+    
     const bookingType = booking_type || BOOKING_TYPE.INSTANT;
     
-    // Validate booking data
+    
     const validation = validateReservationData({
       booking_type: bookingType,
       scheduled_trip_time: scheduled_trip_time,
@@ -95,7 +95,7 @@ export const createReservation = async (req, res, next) => {
       });
     }
     
-    // For future bookings, scheduled_trip_time is required and must be in the future
+    
     if (bookingType === BOOKING_TYPE.FUTURE) {
       if (!scheduled_trip_time) {
         return res.status(400).json({
@@ -113,14 +113,14 @@ export const createReservation = async (req, res, next) => {
       }
     }
     
-    // For instant bookings, tripid is required
+    
     if (bookingType === BOOKING_TYPE.INSTANT && !tripid) {
       return res.status(400).json({
         message: req.t('reservation.tripid_required') || 'tripid is required for instant bookings',
       });
     }
     
-    // Get trip details (for instant bookings or future bookings with tripid)
+    
     if (tripid) {
       trip = await Trip.findById(tripid);
       if (!trip) {
@@ -129,7 +129,7 @@ export const createReservation = async (req, res, next) => {
         });
       }
       
-      // For instant bookings, check available seats
+      
       if (bookingType === BOOKING_TYPE.INSTANT) {
         if (trip.availableseats <= 0) {
           return res.status(400).json({ 
@@ -138,7 +138,7 @@ export const createReservation = async (req, res, next) => {
         }
       }
       
-      // For future bookings with tripid, scheduled_trip_time should match trip departure time
+      
       if (bookingType === BOOKING_TYPE.FUTURE && scheduled_trip_time) {
         const tripDeptime = new Date(trip.deptime);
         const scheduledTime = new Date(scheduled_trip_time);
@@ -150,7 +150,7 @@ export const createReservation = async (req, res, next) => {
       }
     }
     
-    // Check seat availability (only for instant bookings with tripid)
+    
     if (seatlocation && tripid && bookingType === BOOKING_TYPE.INSTANT) {
       const existingReservation = await Reservation.getBySeatLocation(tripid, seatlocation);
       if (existingReservation.length > 0) {
@@ -160,12 +160,12 @@ export const createReservation = async (req, res, next) => {
       }
     }
     
-    // Get line info (from trip if exists, or from request for future bookings)
+    
     let line = null;
     if (trip && trip.line) {
       line = trip.line;
     } else if (bookingType === BOOKING_TYPE.FUTURE) {
-      // For future bookings, lineid is required in request
+      
       if (!req.body.lineid) {
         return res.status(400).json({
           message: req.t('reservation.lineid_required') || 'lineid is required for future bookings',
@@ -236,7 +236,7 @@ export const createReservation = async (req, res, next) => {
       bookingid: uuidv4(),
       passengerid,
       paymentid: paymentRecord.paymentid,
-      tripid: bookingType === BOOKING_TYPE.INSTANT ? tripid : null, // Future bookings don't have tripid initially
+      tripid: bookingType === BOOKING_TYPE.INSTANT ? tripid : null, 
       seatlocation: seatlocation || null,
       bookingprice: bookingPrice,
       dropoffpoint: dropoffpoint || null,
@@ -249,7 +249,7 @@ export const createReservation = async (req, res, next) => {
     
     const reservation = await Reservation.create(reservationData);
     
-    // Update trip seats only for instant bookings (future bookings will be assigned when trip opens)
+    
     if (bookingType === BOOKING_TYPE.INSTANT && tripid) {
       await Trip.updateAvailableSeats(tripid, trip.availableseats - 1);
       seatsUpdated = true;
@@ -257,20 +257,20 @@ export const createReservation = async (req, res, next) => {
       bookingsIncremented = true;
     }
     
-    // Call Matching Engine for instant bookings (if trip is open)
+    
     if (bookingType === BOOKING_TYPE.INSTANT && tripid) {
       try {
-        // Check if trip is open (trip_opening_time has passed)
+        
         const now = new Date();
         const tripOpeningTime = trip.trip_opening_time ? new Date(trip.trip_opening_time) : null;
         
         if (tripOpeningTime && tripOpeningTime <= now) {
-          // Trip is open, distribute immediately
+          
           await distributeInstantBookings(trip.lineid, trip.deptime);
         }
       } catch (error) {
         console.error('[ReservationController] Error in matching engine:', error);
-        // Don't fail reservation creation if matching fails
+        
       }
     }
     
@@ -345,14 +345,14 @@ export const cancelReservation = async (req, res, next) => {
       });
     }
     
-    // Check if reservation can be cancelled
+    
     if (reservation.status === RESERVATION_STATUS.CANCELLED || reservation.status === RESERVATION_STATUS.NO_SHOW) {
       return res.status(400).json({
         message: req.t('reservation.already_cancelled') || 'Reservation is already cancelled or marked as no-show',
       });
     }
     
-    // Get trip details (if exists)
+    
     let trip = null;
     let deptime = null;
     
@@ -362,7 +362,7 @@ export const cancelReservation = async (req, res, next) => {
         deptime = new Date(trip.deptime);
       }
     } else if (reservation.scheduled_trip_time) {
-      // For future bookings without trip assigned yet
+      
       deptime = new Date(reservation.scheduled_trip_time);
     }
     
@@ -376,7 +376,7 @@ export const cancelReservation = async (req, res, next) => {
     const minutesUntilDeparture = (deptime - now) / (1000 * 60);
     const hoursUntilDeparture = minutesUntilDeparture / 60;
     
-    // Updated cancellation policy: 60 minutes (no charge), less than 60 minutes (25% charge)
+    
     const { CANCELLATION_POLICY } = await import('../utils/constants.js');
     const { calculateRefund } = await import('../utils/helpers.js');
     
@@ -387,7 +387,7 @@ export const cancelReservation = async (req, res, next) => {
     );
     
     
-    // Refund to wallet if payment was completed
+    
     if (refundAmount > 0 && reservation.paymentid) {
       const payment = await Payment.findById(reservation.paymentid);
       if (payment && payment.status === PAYMENT_STATUS.COMPLETED) {
@@ -395,7 +395,7 @@ export const cancelReservation = async (req, res, next) => {
         if (wallets.length > 0) {
           await Wallet.updateBalance(wallets[0].walletid, refundAmount, 'add');
           
-          // Create refund payment record
+          
           await Payment.create({
             paymentid: uuidv4(),
             amount: refundAmount,
@@ -409,10 +409,10 @@ export const cancelReservation = async (req, res, next) => {
       }
     }
     
-    // Update reservation status to cancelled
+    
     await Reservation.update(bookingid, { status: RESERVATION_STATUS.CANCELLED });
     
-    // Update trip available seats if trip exists and reservation was confirmed
+    
     if (reservation.tripid && trip && (reservation.status === RESERVATION_STATUS.CONFIRMED || reservation.status === RESERVATION_STATUS.CHECKED_IN)) {
       await Trip.updateAvailableSeats(reservation.tripid, trip.availableseats + 1);
     }
@@ -434,7 +434,7 @@ export const checkInReservation = async (req, res, next) => {
     
     let finalBookingId = bookingid;
     
-    // If QR code data is provided, parse it to get bookingid
+    
     if (qrData && !bookingid) {
       try {
         const qrInfo = JSON.parse(qrData);
@@ -459,7 +459,7 @@ export const checkInReservation = async (req, res, next) => {
       });
     }
     
-    // Verify driver owns the trip (if reservation is assigned to a trip)
+    
     if (reservation.tripid) {
       const Trip = (await import('../models/Trip.js')).default;
       const trip = await Trip.findById(reservation.tripid);
@@ -484,9 +484,7 @@ export const checkInReservation = async (req, res, next) => {
   }
 };
 
-/**
- * Get QR Code for a reservation
- */
+
 export const getReservationQRCode = async (req, res, next) => {
   try {
     const { bookingid } = req.params;
@@ -499,14 +497,14 @@ export const getReservationQRCode = async (req, res, next) => {
       });
     }
     
-    // Verify reservation belongs to the passenger
+    
     if (reservation.passengerid !== passengerid) {
       return res.status(403).json({
         message: req.t('auth.unauthorized') || 'Unauthorized access to this reservation',
       });
     }
     
-    // Generate QR Code with booking information
+    
     const qrData = JSON.stringify({
       bookingid: reservation.bookingid,
       passengerid: reservation.passengerid,

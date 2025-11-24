@@ -62,7 +62,7 @@ export const createVehicle = async (req, res, next) => {
   try {
     const { driverid, lineid, seatnum, seatlayout, plateno, brokenSeats } = req.body;
     
-    // Validate plate number is required
+    
     if (!plateno || !plateno.trim()) {
       return res.status(400).json({
         message: req.t('vehicle.plate_required') || 'Vehicle plate number is required',
@@ -77,7 +77,7 @@ export const createVehicle = async (req, res, next) => {
       });
     }
     
-    // Check if plate number already exists (must be unique)
+    
     const existingVehicle = await Vehicle.findByPlateNumber(trimmedPlate);
     if (existingVehicle) {
       return res.status(409).json({
@@ -119,7 +119,7 @@ export const createVehicle = async (req, res, next) => {
       lineid: resolvedLineId,
       seatnum,
       seatlayout: seatlayout || '2+3',
-      plateno: trimmedPlate, // Use trimmed and validated plate
+      plateno: trimmedPlate, 
       status: 'active',
       broken_seats: Array.isArray(brokenSeats) ? brokenSeats : [],
     };
@@ -130,7 +130,7 @@ export const createVehicle = async (req, res, next) => {
       vehicle,
     });
   } catch (error) {
-    // Handle unique constraint violation
+    
     if (error.code === '23505' || (error.message && error.message.includes('unique'))) {
       return res.status(409).json({
         message: req.t('vehicle.plate_exists') || 'This plate number is already registered',
@@ -146,7 +146,7 @@ export const updateVehicle = async (req, res, next) => {
     const { vehicleid } = req.params;
     const updates = req.body;
     
-    // If plateno is being updated, validate it
+    
     if (updates.plateno !== undefined) {
       if (!updates.plateno || !updates.plateno.trim()) {
         return res.status(400).json({
@@ -162,7 +162,7 @@ export const updateVehicle = async (req, res, next) => {
         });
       }
       
-      // Check if plate number already exists for another vehicle (must be unique)
+      
       const existingVehicle = await Vehicle.findByPlateNumber(trimmedPlate);
       if (existingVehicle && existingVehicle.vehicleid !== vehicleid) {
         return res.status(409).json({
@@ -179,7 +179,7 @@ export const updateVehicle = async (req, res, next) => {
       vehicle,
     });
   } catch (error) {
-    // Handle unique constraint violation
+    
     if (error.code === '23505' || (error.message && error.message.includes('unique'))) {
       return res.status(409).json({
         message: req.t('vehicle.plate_exists') || 'This plate number is already registered',
@@ -432,7 +432,7 @@ export const createMyVehicle = async (req, res, next) => {
       });
     }
 
-    // Check if plate number already exists (must be unique)
+    
     const existingVehicle = await Vehicle.findByPlateNumber(trimmedPlate);
     if (existingVehicle) {
       return res.status(409).json({
@@ -462,12 +462,12 @@ export const createMyVehicle = async (req, res, next) => {
       lineid: driver.lineid,
       seatnum: seatNum,
       seatlayout: normalizedLayout,
-      plateno: trimmedPlate, // Use trimmed and validated plate
+      plateno: trimmedPlate, 
       status: 'active',
     };
 
     try {
-      // Try with broken_seats first
+      
       const vehicleData = {
         ...baseVehicleData,
         broken_seats: [],
@@ -478,14 +478,14 @@ export const createMyVehicle = async (req, res, next) => {
         vehicle,
       });
     } catch (createError) {
-      // Handle unique constraint violation
+      
       if (createError.code === '23505' || (createError.message && createError.message.includes('unique')) || (createError.message && createError.message.includes('already registered'))) {
         return res.status(409).json({
           message: req.t('vehicle.plate_exists') || 'This plate number is already registered',
         });
       }
       
-      // If broken_seats column doesn't exist (error code 42703), try without it
+      
       if (createError.code === '42703' || (createError.message && createError.message.includes('broken_seats'))) {
         try {
           const vehicle = await Vehicle.create(baseVehicleData);
@@ -494,7 +494,7 @@ export const createMyVehicle = async (req, res, next) => {
             vehicle,
           });
         } catch (retryError) {
-          // Handle unique constraint violation in retry
+          
           if (retryError.code === '23505' || (retryError.message && retryError.message.includes('unique')) || (retryError.message && retryError.message.includes('already registered'))) {
             return res.status(409).json({
               message: req.t('vehicle.plate_exists') || 'This plate number is already registered',

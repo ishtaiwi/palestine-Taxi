@@ -78,11 +78,11 @@ export const register = async (req, res, next) => {
 
     
     let roleRecord;
-    let createdVehicle = null; // Store vehicle for response
+    let createdVehicle = null; 
     if (normalizedRole === 'DRIVER') {
-      // Extract all driver-related data from request
-      // Note: vehiclePlate and vehicleSeatLayout are optional
-      // Vehicle will be created automatically with default values if not provided
+      
+      
+      
       const { 
         licenseid, 
         lineid, 
@@ -90,7 +90,7 @@ export const register = async (req, res, next) => {
         vehicleSeatLayout 
       } = req.body;
       
-      // Log all received data for debugging
+      
       logger.info('Driver registration - vehicle will be created automatically', {
         email: user.email,
         userid: user.userid,
@@ -101,7 +101,7 @@ export const register = async (req, res, next) => {
         note: 'Vehicle will be created automatically even if vehiclePlate or vehicleSeatLayout are missing',
       });
 
-      // Validate required fields
+      
       if (!licenseid || !licenseid.trim()) {
         return res.status(400).json({
           message: req.t('driver.license_required') || 'License ID is required for drivers',
@@ -114,10 +114,10 @@ export const register = async (req, res, next) => {
         });
       }
 
-      // Note: Vehicle will be created automatically even if vehiclePlate or vehicleSeatLayout are not provided
-      // Default values: seatlayout = '4+1', plateno = null (can be added later)
+      
+      
 
-      // Verify line exists
+      
       const line = await Line.findById(lineid);
       if (!line) {
         return res.status(404).json({
@@ -125,12 +125,12 @@ export const register = async (req, res, next) => {
         });
       }
 
-      // Create Driver record - links to User via userid
+      
       const driverData = {
         driverid: uuidv4(),
-        userid: user.userid, // Link to User
+        userid: user.userid, 
         licenseid: licenseid.trim(),
-        lineid: lineid.trim(), // Link to Line
+        lineid: lineid.trim(), 
       };
 
       logger.info('Creating driver record', {
@@ -147,7 +147,7 @@ export const register = async (req, res, next) => {
         userid: roleRecord.userid,
       });
 
-      // Create vehicle automatically for driver - links to Driver via driverid
+      
       logger.info('Preparing to create vehicle automatically for driver', {
         driverid: roleRecord.driverid,
         vehiclePlate: vehiclePlate || 'not provided (will be created without plate)',
@@ -155,21 +155,21 @@ export const register = async (req, res, next) => {
         lineid: lineid,
       });
 
-      // Normalize seat layout - default to 4+1 if not provided
+      
       const seatLayout = (vehicleSeatLayout || '').trim();
-      let normalizedLayout = '4+1'; // Default layout
-      let seatNum = 5; // Default seat count
+      let normalizedLayout = '4+1'; 
+      let seatNum = 5; 
       
       if (seatLayout === '4+1' || seatLayout === '7+1') {
         normalizedLayout = seatLayout;
         seatNum = seatLayout === '7+1' ? 8 : 5;
       } else if (seatLayout) {
-        // Try to parse if it's a number or other format
+        
         logger.warn('Unexpected seat layout format, defaulting to 4+1', {
           provided: seatLayout,
         });
       } else {
-        // No seat layout provided - use default
+        
         logger.info('No seat layout provided - using default 4+1', {
           driverid: roleRecord.driverid,
         });
@@ -182,7 +182,7 @@ export const register = async (req, res, next) => {
         seatNumType: typeof seatNum,
       });
 
-      // Validate and normalize plate number - REQUIRED field
+      
       if (!vehiclePlate || !vehiclePlate.trim()) {
         return res.status(400).json({
           message: req.t('vehicle.plate_required') || 'Vehicle plate number is required',
@@ -197,7 +197,7 @@ export const register = async (req, res, next) => {
         });
       }
       
-      // Check if plate number already exists (must be unique)
+      
       const Vehicle = (await import('../models/Vehicle.js')).default;
       const existingVehicle = await Vehicle.findByPlateNumber(trimmedPlate);
       if (existingVehicle) {
@@ -209,14 +209,14 @@ export const register = async (req, res, next) => {
       const plateNo = trimmedPlate;
       logger.info('Plate number validated', { plateNo });
 
-      // Create vehicle data - links to Driver and Line
+      
       const baseVehicleData = {
         vehicleid: uuidv4(),
-        driverid: roleRecord.driverid, // Link to Driver
-        lineid: lineid.trim(), // Link to Line
-        seatnum: parseInt(seatNum, 10), // Ensure it's an integer
-        seatlayout: String(normalizedLayout), // Ensure it's a string
-        plateno: plateNo, // REQUIRED - validated above
+        driverid: roleRecord.driverid, 
+        lineid: lineid.trim(), 
+        seatnum: parseInt(seatNum, 10), 
+        seatlayout: String(normalizedLayout), 
+        plateno: plateNo, 
         status: 'active',
       };
 
@@ -229,11 +229,11 @@ export const register = async (req, res, next) => {
         plateno: baseVehicleData.plateno,
       });
 
-      // Create vehicle automatically - MUST succeed or registration fails
-      // Vehicle is created with default values if not provided
+      
+      
       let createdVehicle = null;
       try {
-        // Try with broken_seats if column exists
+        
         const vehicleData = {
           ...baseVehicleData,
           broken_seats: [],
@@ -260,7 +260,7 @@ export const register = async (req, res, next) => {
           status: createdVehicle.status,
         });
       } catch (vehicleError) {
-        // If broken_seats column doesn't exist, create without it
+        
         if (vehicleError.code === '42703' || (vehicleError.message && vehicleError.message.includes('broken_seats'))) {
           logger.info('Retrying vehicle creation without broken_seats column', {
             error: vehicleError.message,
@@ -288,7 +288,7 @@ export const register = async (req, res, next) => {
               vehicleData: baseVehicleData,
             });
             
-            // Create a more user-friendly error message
+            
             const userFriendlyError = new Error(
               retryError.message || 'Failed to create vehicle automatically. Please contact support.'
             );
@@ -308,7 +308,7 @@ export const register = async (req, res, next) => {
             fullError: vehicleError,
           });
           
-          // Create a more user-friendly error message
+          
           const userFriendlyError = new Error(
             vehicleError.message || 'Failed to create vehicle automatically. Please contact support.'
           );
@@ -332,7 +332,7 @@ export const register = async (req, res, next) => {
         note: 'Vehicle can be updated later with plate number and other details',
       });
 
-      // Verify all links are correct
+      
       logger.info('✅ Driver registration complete - verifying data integrity', {
         userid: user.userid,
         driverid: roleRecord.driverid,
@@ -344,7 +344,7 @@ export const register = async (req, res, next) => {
         },
       });
     } else if (normalizedRole === 'PASSENGER') {
-      // All passengers are app users - type field removed from database
+      
       logger.info('Creating passenger record', {
         userid: user.userid,
       });
@@ -352,7 +352,7 @@ export const register = async (req, res, next) => {
       roleRecord = await Passenger.create({
         passengerid: uuidv4(),
         userid: user.userid,
-        // No type field - removed from database
+        
       });
       
       logger.info('✅ Passenger record created successfully', {
@@ -377,14 +377,14 @@ export const register = async (req, res, next) => {
         permissions: roleRecord.permissions,
       });
     } else {
-      // Unknown role - this should not happen, but handle it gracefully
+      
       logger.error('❌ Unknown role during registration', {
         userid: user.userid,
         providedRole: role,
         normalizedRole: normalizedRole,
       });
       
-      // Try to delete the user that was created
+      
       try {
         await User.delete(user.userid);
         logger.info('User deleted due to unknown role', { userid: user.userid });
@@ -400,14 +400,14 @@ export const register = async (req, res, next) => {
       });
     }
 
-    // Verify that roleRecord was created successfully
+    
     if (!roleRecord) {
       logger.error('❌ Role record was not created', {
         userid: user.userid,
         role: normalizedRole,
       });
       
-      // Try to delete the user that was created
+      
       try {
         await User.delete(user.userid);
         logger.info('User deleted due to missing role record', { userid: user.userid });
@@ -430,7 +430,7 @@ export const register = async (req, res, next) => {
     });
 
     
-    // Create wallet for user
+    
     try {
       logger.info('Creating wallet for user', { userid: user.userid });
       
@@ -449,8 +449,8 @@ export const register = async (req, res, next) => {
         code: walletError.code,
       });
       
-      // Don't fail registration if wallet creation fails - wallet can be created later
-      // But log it as a warning
+      
+      
       logger.warn('Registration will continue despite wallet creation failure', {
         userid: user.userid,
       });
@@ -462,7 +462,7 @@ export const register = async (req, res, next) => {
       role: user.role,
     });
 
-    // Build response with all related data
+    
     const responseData = {
       success: true,
       message: req.t('auth.register_success') || 'Registration successful',
@@ -473,7 +473,7 @@ export const register = async (req, res, next) => {
       },
     };
 
-    // For drivers, include vehicle information in response
+    
     if (normalizedRole === 'DRIVER' && createdVehicle) {
       responseData.vehicle = {
         vehicleid: createdVehicle.vehicleid,
@@ -489,7 +489,7 @@ export const register = async (req, res, next) => {
       });
     }
 
-    // Final verification - ensure all records exist
+    
     logger.info('✅ Registration complete - final verification', {
       userid: user.userid,
       role: user.role,
@@ -500,12 +500,12 @@ export const register = async (req, res, next) => {
       roleRecordId: roleRecord?.driverid || roleRecord?.passengerid || roleRecord?.id,
     });
 
-    // Verify data integrity
+    
     const verificationChecks = {
       userCreated: !!user && !!user.userid,
       roleRecordCreated: !!roleRecord,
       roleRecordLinked: roleRecord?.userid === user.userid,
-      walletWillBeCreated: true, // Wallet creation happens before this point
+      walletWillBeCreated: true, 
     };
 
     if (normalizedRole === 'DRIVER') {
@@ -515,7 +515,7 @@ export const register = async (req, res, next) => {
 
     logger.info('Registration verification checks', verificationChecks);
 
-    // If any critical check fails, log error but don't fail (data already committed)
+    
     const criticalFailures = Object.entries(verificationChecks)
       .filter(([key, value]) => !value && !key.includes('WillBe'))
       .map(([key]) => key);

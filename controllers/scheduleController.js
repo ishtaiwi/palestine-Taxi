@@ -2,9 +2,7 @@ import ScheduleTemplate from '../models/ScheduleTemplate.js';
 import { createTripsForTemplate, createDailyTrips } from '../services/dailyTripService.js';
 import logger from '../utils/logger.js';
 
-/**
- * Get all schedule templates
- */
+
 export const getAllSchedules = async (req, res, next) => {
   try {
     const { lineid, active } = req.query;
@@ -24,9 +22,7 @@ export const getAllSchedules = async (req, res, next) => {
   }
 };
 
-/**
- * Get schedule template by ID
- */
+
 export const getScheduleById = async (req, res, next) => {
   try {
     const { templateid } = req.params;
@@ -47,14 +43,12 @@ export const getScheduleById = async (req, res, next) => {
   }
 };
 
-/**
- * Create a new schedule template
- */
+
 export const createSchedule = async (req, res, next) => {
   try {
     const { lineid, start_hour, end_hour, interval_minutes, active } = req.body;
     
-    // Validation
+    
     if (!lineid) {
       return res.status(400).json({
         message: req.t('schedule.lineid_required') || 'lineid is required',
@@ -104,15 +98,13 @@ export const createSchedule = async (req, res, next) => {
   }
 };
 
-/**
- * Update schedule template
- */
+
 export const updateSchedule = async (req, res, next) => {
   try {
     const { templateid } = req.params;
     const updates = req.body;
     
-    // Validate updates if provided
+    
     if (updates.start_hour !== undefined && (updates.start_hour < 0 || updates.start_hour > 23)) {
       return res.status(400).json({
         message: req.t('schedule.invalid_start_hour') || 'start_hour must be between 0 and 23',
@@ -150,9 +142,7 @@ export const updateSchedule = async (req, res, next) => {
   }
 };
 
-/**
- * Delete schedule template
- */
+
 export const deleteSchedule = async (req, res, next) => {
   try {
     const { templateid } = req.params;
@@ -166,9 +156,7 @@ export const deleteSchedule = async (req, res, next) => {
   }
 };
 
-/**
- * Manually trigger trip creation for a schedule template
- */
+
 export const createTripsForSchedule = async (req, res, next) => {
   try {
     const { templateid } = req.params;
@@ -187,9 +175,7 @@ export const createTripsForSchedule = async (req, res, next) => {
   }
 };
 
-/**
- * Manually trigger daily trip creation for all active schedules
- */
+
 export const triggerDailyTripCreation = async (req, res, next) => {
   try {
     const result = await createDailyTrips();

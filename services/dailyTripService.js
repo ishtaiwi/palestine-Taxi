@@ -19,15 +19,15 @@ function generateTripTimes(startHour, endHour, intervalMinutes, targetDate) {
   const tripTimes = [];
   const date = new Date(targetDate);
   date.setHours(startHour, 0, 0, 0); // Start at startHour:00:00
-  
+
   const endTime = new Date(targetDate);
   endTime.setHours(endHour, 0, 0, 0); // End at endHour:00:00
-  
+
   while (date <= endTime) {
     tripTimes.push(new Date(date));
     date.setMinutes(date.getMinutes() + intervalMinutes);
   }
-  
+
   return tripTimes;
 }
 
@@ -45,16 +45,16 @@ async function getVehicleForLine(lineid) {
       .eq('lineid', lineid)
       .eq('status', 'active')
       .limit(1);
-    
+
     if (error) {
       logger.warn('Error finding vehicle for line', { lineid, error });
       return null;
     }
-    
+
     if (vehicles && vehicles.length > 0) {
       return vehicles[0];
     }
-    
+
     // If no vehicle found, return null (trip will be created without vehicle assignment)
     logger.warn('No vehicle found for line', { lineid });
     return null;
@@ -72,29 +72,29 @@ async function getVehicleForLine(lineid) {
  */
 async function createTripsForDate(template, targetDate) {
   const { templateid, lineid, start_hour, end_hour, interval_minutes } = template;
-  
+
   try {
     // Generate trip times for the target date
     const tripTimes = generateTripTimes(start_hour, end_hour, interval_minutes, targetDate);
-    
+
     if (tripTimes.length === 0) {
       logger.warn('No trip times generated', { templateid, targetDate });
       return { created: 0, errors: [] };
     }
-    
+
     // Get line info
     const line = await Line.findById(lineid);
     if (!line) {
       logger.error('Line not found', { lineid });
       return { created: 0, errors: ['Line not found'] };
     }
-    
+
     // Get vehicle for this line (or use null if none available)
     const vehicle = await getVehicleForLine(lineid);
-    
+
     const createdTrips = [];
     const errors = [];
-    
+
     // Create trips for each time
     for (const deptime of tripTimes) {
       try {
@@ -102,7 +102,7 @@ async function createTripsForDate(template, targetDate) {
         // Use a time window of ±5 minutes to avoid duplicates
         const timeWindowStart = new Date(deptime.getTime() - 5 * 60 * 1000);
         const timeWindowEnd = new Date(deptime.getTime() + 5 * 60 * 1000);
-        
+
         const { data: existingTrips, error: checkError } = await supabase
           .from('trip')
           .select('tripid')
@@ -110,13 +110,13 @@ async function createTripsForDate(template, targetDate) {
           .gte('deptime', timeWindowStart.toISOString())
           .lte('deptime', timeWindowEnd.toISOString())
           .limit(1);
-        
+
         if (checkError) {
           logger.warn('Error checking existing trips', { lineid, error: checkError });
         }
-        
+
         const tripExists = existingTrips && existingTrips.length > 0;
-        
+
         if (tripExists) {
           logger.debug('Trip already exists, skipping', {
             lineid,
@@ -124,7 +124,7 @@ async function createTripsForDate(template, targetDate) {
           });
           continue;
         }
-        
+
         // Use vehicle if available, otherwise skip this trip (vehicle is required)
         if (!vehicle) {
           logger.warn('No vehicle available for line, skipping trip creation', {
@@ -137,10 +137,10 @@ async function createTripsForDate(template, targetDate) {
           });
           continue;
         }
-        
+
         // Calculate trip_opening_time (45 minutes before departure)
         const openingTime = new Date(deptime.getTime() - 45 * 60 * 1000);
-        
+
         // Calculate available passenger seats (excluding driver seat only)
         // Note: broken seats are NOT subtracted - they are handled in seat selection UI
         const tripData = {
@@ -157,10 +157,10 @@ async function createTripsForDate(template, targetDate) {
           scheduled_departure_enforced: true,
           templateid: templateid, // Link trip to schedule template
         };
-        
+
         const trip = await Trip.create(tripData);
         createdTrips.push(trip);
-        
+
         logger.info('Trip created from schedule', {
           tripid: trip.tripid,
           lineid,
@@ -179,7 +179,7 @@ async function createTripsForDate(template, targetDate) {
         });
       }
     }
-    
+
     return {
       created: createdTrips.length,
       trips: createdTrips,
@@ -205,10 +205,10 @@ async function createTripsForDate(template, targetDate) {
 export async function createDailyTrips() {
   try {
     logger.info('Starting daily trip creation job');
-    
+
     // Get all active schedule templates
     const templates = await ScheduleTemplate.getActiveTemplates();
-    
+
     if (templates.length === 0) {
       logger.info('No active schedule templates found');
       return {
@@ -218,21 +218,23 @@ export async function createDailyTrips() {
         results: [],
       };
     }
-    
+
     // Target date: tomorrow
     const tomorrow = new Date();
+    ///////////////////////////////////////////////////////////////////////////////////
     tomorrow.setDate(tomorrow.getDate() + 1);
+    ///////////////////////////////////////////////////////////////////////////////////
     tomorrow.setHours(0, 0, 0, 0);
-    
+
     const results = [];
     let totalCreated = 0;
-    
+
     // Process each template
     for (const template of templates) {
       try {
         const result = await createTripsForDate(template, tomorrow);
         totalCreated += result.created;
-        
+
         results.push({
           templateid: template.templateid,
           lineid: template.lineid,
@@ -240,7 +242,7 @@ export async function createDailyTrips() {
           created: result.created,
           errors: result.errors,
         });
-        
+
         logger.info('Template processed', {
           templateid: template.templateid,
           lineid: template.lineid,
@@ -259,12 +261,12 @@ export async function createDailyTrips() {
         });
       }
     }
-    
+
     logger.info('Daily trip creation job completed', {
       templatesProcessed: templates.length,
       totalTripsCreated: totalCreated,
     });
-    
+
     return {
       success: true,
       templatesProcessed: templates.length,
@@ -295,10 +297,10 @@ export async function createTripsForTemplate(templateid, targetDate) {
     if (!template) {
       throw new Error('Schedule template not found');
     }
-    
+
     const date = targetDate ? new Date(targetDate) : new Date();
     date.setHours(0, 0, 0, 0);
-    
+
     return await createTripsForDate(template, date);
   } catch (error) {
     logger.error('Error in createTripsForTemplate', {

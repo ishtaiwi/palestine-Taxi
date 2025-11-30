@@ -7,6 +7,7 @@ import 'admin_users_page.dart';
 import 'admin_vehicles_page.dart';
 import 'admin_trips_page.dart';
 import 'admin_payments_page.dart';
+import 'admin_predictions_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -19,6 +20,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   bool _isArabic = true;
+  Map<String, dynamic>? _predictionInsights;
+  bool _insightsLoading = true;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -30,7 +33,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'lines': 'الخطوط',
       'vehicles': 'المركبات',
       'trips': 'الرحلات',
-      'schedules': 'الجداول اليومية',
+      'schedules': 'الجداول ',
       'payments': 'المدفوعات',
       'reports': 'التقارير',
       'generalStats': 'الإحصائيات العامة',
@@ -51,7 +54,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'lines': 'Lines',
       'vehicles': 'Vehicles',
       'trips': 'Trips',
-      'schedules': 'Daily Schedules',
+      'schedules': 'Schedules',
       'payments': 'Payments',
       'reports': 'Reports',
       'generalStats': 'General Statistics',
@@ -71,6 +74,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   void initState() {
     super.initState();
     _loadUserData();
+    _loadPredictionInsights();
   }
 
   Future<void> _loadUserData() async {
@@ -81,6 +85,48 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _isLoading = false;
       _isArabic = isArabic;
     });
+  }
+
+  Future<void> _loadPredictionInsights() async {
+    setState(() {
+      _insightsLoading = true;
+    });
+
+    try {
+      final insights = await ApiService.getPredictionInsightsAdmin(limit: 3);
+
+      debugPrint('[AdminDashboard] getPredictionInsightsAdmin => $insights');
+
+      if (insights['success'] == true) {
+        setState(() {
+          _predictionInsights = insights['data'] ?? insights;
+          _insightsLoading = false;
+        });
+      } else {
+        // Normalize a predictable structure so UI can show an empty state + error
+        setState(() {
+          _predictionInsights = {
+            'topLines': [],
+            'model': null,
+            'errorMessage': insights['message'] ?? 'Failed to load insights'
+          };
+          _insightsLoading = false;
+        });
+
+        debugPrint(
+            '[AdminDashboard] prediction insights failed: ${insights['message']}');
+      }
+    } catch (error, stack) {
+      debugPrint('[AdminDashboard] exception loading insights: $error\n$stack');
+      setState(() {
+        _predictionInsights = {
+          'topLines': [],
+          'model': null,
+          'errorMessage': error.toString()
+        };
+        _insightsLoading = false;
+      });
+    }
   }
 
   Future<void> _switchLanguage(bool arabic) async {
@@ -193,7 +239,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         ),
                       ),
                       const SizedBox(height: 24),
-
                       Text(
                         t('systemManagement'),
                         style: const TextStyle(
@@ -214,7 +259,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const AdminUsersPage(),
+                                    builder: (context) =>
+                                        const AdminUsersPage(),
                                   ),
                                 );
                               },
@@ -230,7 +276,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const AdminLinesPage(),
+                                    builder: (context) =>
+                                        const AdminLinesPage(),
                                   ),
                                 );
                               },
@@ -250,7 +297,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const AdminVehiclesPage(),
+                                    builder: (context) =>
+                                        const AdminVehiclesPage(),
                                   ),
                                 );
                               },
@@ -266,7 +314,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const AdminTripsPage(),
+                                    builder: (context) =>
+                                        const AdminTripsPage(),
                                   ),
                                 );
                               },
@@ -286,7 +335,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const AdminSchedulesPage(),
+                                    builder: (context) =>
+                                        const AdminSchedulesPage(),
                                   ),
                                 );
                               },
@@ -302,7 +352,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const AdminPaymentsPage(),
+                                    builder: (context) =>
+                                        const AdminPaymentsPage(),
                                   ),
                                 );
                               },
@@ -319,15 +370,37 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildActionCard(
+                              icon: Icons.trending_up,
+                              title: _isArabic
+                                  ? 'توقعات الذكاء الاصطناعي'
+                                  : 'AI Predictions',
+                              color: Colors.deepOrange,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const AdminPredictionsPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 24),
-
                       Container(
                         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white24),
-        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white24),
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -346,7 +419,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               physics: const NeverScrollableScrollPhysics(),
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 12,
-                              childAspectRatio: 2.5,
+                              childAspectRatio: 2,
                               children: [
                                 _buildStatCard(
                                   t('users'),
@@ -378,14 +451,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
-
+                      _buildPredictionSummaryCard(),
+                      const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white24),
-        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white24),
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -456,7 +530,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -496,6 +571,86 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  Widget _buildPredictionSummaryCard() {
+    final model = _predictionInsights?['model'] as Map<String, dynamic>?;
+    final topLines = (_predictionInsights?['topLines'] as List<dynamic>?) ?? [];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _isArabic ? 'تحليلات الطلب' : 'AI Demand Insights',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_insightsLoading)
+            const Center(
+              child: CircularProgressIndicator(),
+            )
+          else if (topLines.isEmpty)
+            Text(
+              _isArabic
+                  ? 'لا توجد بيانات كافية بعد لتوليد التوقعات'
+                  : 'No demand signals yet. Predictions will appear after bookings accumulate.',
+              style: const TextStyle(color: Colors.white70),
+            )
+          else
+            Column(
+              children: topLines.take(3).map((line) {
+                final data = line as Map<String, dynamic>;
+                final utilization =
+                    ((data['avgUtilization'] ?? 0) as num).toStringAsFixed(2);
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.directions_transit,
+                      color: Colors.lightBlueAccent),
+                  title: Text(
+                    ((data['buckets'] as List?)?.isNotEmpty == true)
+                        ? (data['buckets'][0]['line']?['linename'] ?? 'Line')
+                        : 'Line',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${_isArabic ? 'نسبة الإشغال' : 'Avg utilization'} $utilization',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                );
+              }).toList(),
+            ),
+          const SizedBox(height: 12),
+          if (!_insightsLoading && model != null)
+            Text(
+              '${_isArabic ? 'آخر تدريب' : 'Last trained'}: ${_formatTimestamp(model['lastTrainedAt'])}',
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTimestamp(dynamic value) {
+    if (value == null) return '-';
+    final parsed = DateTime.tryParse(value.toString());
+    if (parsed == null) return value.toString();
+    return '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')} '
+        '${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
+  }
+
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
@@ -527,4 +682,3 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 }
-

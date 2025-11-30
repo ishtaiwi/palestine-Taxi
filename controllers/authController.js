@@ -32,39 +32,39 @@ export const register = async (req, res, next) => {
     const normalizedRole = role?.toUpperCase();
     const roleKey = role?.toLowerCase() || normalizedRole?.toLowerCase();
 
-    
+
     logger.info('Registration attempt', {
       email,
       role: normalizedRole,
       fullnameLength: fullname?.length || 0,
     });
 
-    
+
     const existingUser = await User.findByEmail(email);
     if (existingUser) {
-      return res.status(400).json({ 
-        message: req.t('auth.email_exists') || 'Email already exists' 
+      return res.status(400).json({
+        message: req.t('auth.email_exists') || 'Email already exists'
       });
     }
 
-    
+
     const hashedPassword = await hashPassword(password);
 
-    
+
     const userData = {
       userid: uuidv4(),
-      fullname: fullname.trim(), 
+      fullname: fullname.trim(),
       email: email.trim().toLowerCase(),
       phone: phone.trim(),
       role: normalizedRole,
-      password: hashedPassword, 
+      password: hashedPassword,
     };
 
     logger.info('Creating user', {
       userid: userData.userid,
       email: userData.email,
       role: userData.role,
-      fullname: userData.fullname.substring(0, 20) + '...', 
+      fullname: userData.fullname.substring(0, 20) + '...',
     });
 
     const user = await User.create(userData);
@@ -76,21 +76,21 @@ export const register = async (req, res, next) => {
       role: user.role,
     });
 
-    
+
     let roleRecord;
-    let createdVehicle = null; 
+    let createdVehicle = null;
     if (normalizedRole === 'DRIVER') {
-      
-      
-      
-      const { 
-        licenseid, 
-        lineid, 
-        vehiclePlate, 
-        vehicleSeatLayout 
+
+
+
+      const {
+        licenseid,
+        lineid,
+        vehiclePlate,
+        vehicleSeatLayout
       } = req.body;
-      
-      
+
+
       logger.info('Driver registration - vehicle will be created automatically', {
         email: user.email,
         userid: user.userid,
@@ -101,7 +101,7 @@ export const register = async (req, res, next) => {
         note: 'Vehicle will be created automatically even if vehiclePlate or vehicleSeatLayout are missing',
       });
 
-      
+
       if (!licenseid || !licenseid.trim()) {
         return res.status(400).json({
           message: req.t('driver.license_required') || 'License ID is required for drivers',
@@ -114,10 +114,10 @@ export const register = async (req, res, next) => {
         });
       }
 
-      
-      
 
-      
+
+
+
       const line = await Line.findById(lineid);
       if (!line) {
         return res.status(404).json({
@@ -125,12 +125,12 @@ export const register = async (req, res, next) => {
         });
       }
 
-      
+
       const driverData = {
         driverid: uuidv4(),
-        userid: user.userid, 
+        userid: user.userid,
         licenseid: licenseid.trim(),
-        lineid: lineid.trim(), 
+        lineid: lineid.trim(),
       };
 
       logger.info('Creating driver record', {
@@ -141,13 +141,13 @@ export const register = async (req, res, next) => {
       });
 
       roleRecord = await Driver.create(driverData);
-      
+
       logger.info('Driver record created successfully', {
         driverid: roleRecord.driverid,
         userid: roleRecord.userid,
       });
 
-      
+
       logger.info('Preparing to create vehicle automatically for driver', {
         driverid: roleRecord.driverid,
         vehiclePlate: vehiclePlate || 'not provided (will be created without plate)',
@@ -155,21 +155,21 @@ export const register = async (req, res, next) => {
         lineid: lineid,
       });
 
-      
+
       const seatLayout = (vehicleSeatLayout || '').trim();
-      let normalizedLayout = '4+1'; 
-      let seatNum = 5; 
-      
+      let normalizedLayout = '4+1';
+      let seatNum = 5;
+
       if (seatLayout === '4+1' || seatLayout === '7+1') {
         normalizedLayout = seatLayout;
         seatNum = seatLayout === '7+1' ? 8 : 5;
       } else if (seatLayout) {
-        
+
         logger.warn('Unexpected seat layout format, defaulting to 4+1', {
           provided: seatLayout,
         });
       } else {
-        
+
         logger.info('No seat layout provided - using default 4+1', {
           driverid: roleRecord.driverid,
         });
@@ -182,13 +182,13 @@ export const register = async (req, res, next) => {
         seatNumType: typeof seatNum,
       });
 
-      
+
       if (!vehiclePlate || !vehiclePlate.trim()) {
         return res.status(400).json({
           message: req.t('vehicle.plate_required') || 'Vehicle plate number is required',
         });
       }
-      
+
       const trimmedPlate = vehiclePlate.trim();
       const plateRegex = /^\d-\d{4}-[A-Za-z]$/;
       if (!plateRegex.test(trimmedPlate)) {
@@ -196,8 +196,8 @@ export const register = async (req, res, next) => {
           message: req.t('vehicle.plate_invalid') || 'Plate number must be in format: number-4digits-letter (e.g., 3-1234-A)',
         });
       }
-      
-      
+
+
       const Vehicle = (await import('../models/Vehicle.js')).default;
       const existingVehicle = await Vehicle.findByPlateNumber(trimmedPlate);
       if (existingVehicle) {
@@ -205,18 +205,18 @@ export const register = async (req, res, next) => {
           message: req.t('vehicle.plate_exists') || 'This plate number is already registered',
         });
       }
-      
+
       const plateNo = trimmedPlate;
       logger.info('Plate number validated', { plateNo });
 
-      
+
       const baseVehicleData = {
         vehicleid: uuidv4(),
-        driverid: roleRecord.driverid, 
-        lineid: lineid.trim(), 
-        seatnum: parseInt(seatNum, 10), 
-        seatlayout: String(normalizedLayout), 
-        plateno: plateNo, 
+        driverid: roleRecord.driverid,
+        lineid: lineid.trim(),
+        seatnum: parseInt(seatNum, 10),
+        seatlayout: String(normalizedLayout),
+        plateno: plateNo,
         status: 'active',
       };
 
@@ -229,16 +229,16 @@ export const register = async (req, res, next) => {
         plateno: baseVehicleData.plateno,
       });
 
-      
-      
+
+
       let createdVehicle = null;
       try {
-        
+
         const vehicleData = {
           ...baseVehicleData,
           broken_seats: [],
         };
-        
+
         logger.info('Attempting to create vehicle automatically (with broken_seats)', {
           vehicleid: vehicleData.vehicleid,
           driverid: vehicleData.driverid,
@@ -247,9 +247,9 @@ export const register = async (req, res, next) => {
           seatnum: vehicleData.seatnum,
           plateno: vehicleData.plateno || 'null (can be added later)',
         });
-        
+
         createdVehicle = await Vehicle.create(vehicleData);
-        
+
         logger.info('✅ Vehicle created automatically with all data', {
           vehicleid: createdVehicle.vehicleid,
           driverid: createdVehicle.driverid,
@@ -260,15 +260,15 @@ export const register = async (req, res, next) => {
           status: createdVehicle.status,
         });
       } catch (vehicleError) {
-        
+
         if (vehicleError.code === '42703' || (vehicleError.message && vehicleError.message.includes('broken_seats'))) {
           logger.info('Retrying vehicle creation without broken_seats column', {
             error: vehicleError.message,
           });
-          
+
           try {
             createdVehicle = await Vehicle.create(baseVehicleData);
-            
+
             logger.info('✅ Vehicle created automatically (without broken_seats)', {
               vehicleid: createdVehicle.vehicleid,
               driverid: createdVehicle.driverid,
@@ -287,8 +287,8 @@ export const register = async (req, res, next) => {
               driverid: roleRecord.driverid,
               vehicleData: baseVehicleData,
             });
-            
-            
+
+
             const userFriendlyError = new Error(
               retryError.message || 'Failed to create vehicle automatically. Please contact support.'
             );
@@ -307,8 +307,8 @@ export const register = async (req, res, next) => {
             vehicleData: baseVehicleData,
             fullError: vehicleError,
           });
-          
-          
+
+
           const userFriendlyError = new Error(
             vehicleError.message || 'Failed to create vehicle automatically. Please contact support.'
           );
@@ -325,14 +325,14 @@ export const register = async (req, res, next) => {
         });
         throw new Error('Failed to create vehicle automatically for driver');
       }
-      
+
       logger.info('✅ Vehicle created automatically for driver', {
         vehicleid: createdVehicle.vehicleid,
         driverid: roleRecord.driverid,
         note: 'Vehicle can be updated later with plate number and other details',
       });
 
-      
+
       logger.info('✅ Driver registration complete - verifying data integrity', {
         userid: user.userid,
         driverid: roleRecord.driverid,
@@ -344,17 +344,17 @@ export const register = async (req, res, next) => {
         },
       });
     } else if (normalizedRole === 'PASSENGER') {
-      
+
       logger.info('Creating passenger record', {
         userid: user.userid,
       });
-      
+
       roleRecord = await Passenger.create({
         passengerid: uuidv4(),
         userid: user.userid,
-        
+
       });
-      
+
       logger.info('✅ Passenger record created successfully', {
         passengerid: roleRecord.passengerid,
         userid: roleRecord.userid,
@@ -364,27 +364,27 @@ export const register = async (req, res, next) => {
         userid: user.userid,
         permissions: req.body.permissions || [],
       });
-      
+
       roleRecord = await Admin.create({
         id: uuidv4(),
         userid: user.userid,
         permissions: req.body.permissions || [],
       });
-      
+
       logger.info('✅ Admin record created successfully', {
         adminid: roleRecord.id,
         userid: roleRecord.userid,
         permissions: roleRecord.permissions,
       });
     } else {
-      
+
       logger.error('❌ Unknown role during registration', {
         userid: user.userid,
         providedRole: role,
         normalizedRole: normalizedRole,
       });
-      
-      
+
+
       try {
         await User.delete(user.userid);
         logger.info('User deleted due to unknown role', { userid: user.userid });
@@ -394,20 +394,20 @@ export const register = async (req, res, next) => {
           error: deleteError.message,
         });
       }
-      
+
       return res.status(400).json({
         message: req.t('auth.invalid_role') || `Invalid role: ${role}. Must be DRIVER, PASSENGER, or ADMIN`,
       });
     }
 
-    
+
     if (!roleRecord) {
       logger.error('❌ Role record was not created', {
         userid: user.userid,
         role: normalizedRole,
       });
-      
-      
+
+
       try {
         await User.delete(user.userid);
         logger.info('User deleted due to missing role record', { userid: user.userid });
@@ -417,7 +417,7 @@ export const register = async (req, res, next) => {
           error: deleteError.message,
         });
       }
-      
+
       return res.status(500).json({
         message: req.t('auth.role_creation_failed') || 'Failed to create role record. Please try again.',
       });
@@ -429,11 +429,11 @@ export const register = async (req, res, next) => {
       roleRecordId: roleRecord.driverid || roleRecord.passengerid || roleRecord.id,
     });
 
-    
-    
+
+
     try {
       logger.info('Creating wallet for user', { userid: user.userid });
-      
+
       await Wallet.create({
         walletid: uuidv4(),
         userid: user.userid,
@@ -448,21 +448,21 @@ export const register = async (req, res, next) => {
         error: walletError.message,
         code: walletError.code,
       });
-      
-      
-      
+
+
+
       logger.warn('Registration will continue despite wallet creation failure', {
         userid: user.userid,
       });
     }
 
-    
+
     const token = generateToken({
       userid: user.userid,
       role: user.role,
     });
 
-    
+
     const responseData = {
       success: true,
       message: req.t('auth.register_success') || 'Registration successful',
@@ -473,7 +473,7 @@ export const register = async (req, res, next) => {
       },
     };
 
-    
+
     if (normalizedRole === 'DRIVER' && createdVehicle) {
       responseData.vehicle = {
         vehicleid: createdVehicle.vehicleid,
@@ -482,14 +482,14 @@ export const register = async (req, res, next) => {
         seatnum: createdVehicle.seatnum,
         status: createdVehicle.status,
       };
-      
+
       logger.info('Response includes vehicle data', {
         vehicleid: createdVehicle.vehicleid,
         driverid: roleRecord.driverid,
       });
     }
 
-    
+
     logger.info('✅ Registration complete - final verification', {
       userid: user.userid,
       role: user.role,
@@ -500,12 +500,12 @@ export const register = async (req, res, next) => {
       roleRecordId: roleRecord?.driverid || roleRecord?.passengerid || roleRecord?.id,
     });
 
-    
+
     const verificationChecks = {
       userCreated: !!user && !!user.userid,
       roleRecordCreated: !!roleRecord,
       roleRecordLinked: roleRecord?.userid === user.userid,
-      walletWillBeCreated: true, 
+      walletWillBeCreated: true,
     };
 
     if (normalizedRole === 'DRIVER') {
@@ -515,7 +515,7 @@ export const register = async (req, res, next) => {
 
     logger.info('Registration verification checks', verificationChecks);
 
-    
+
     const criticalFailures = Object.entries(verificationChecks)
       .filter(([key, value]) => !value && !key.includes('WillBe'))
       .map(([key]) => key);
@@ -539,35 +539,35 @@ export const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    
+
     const user = await User.findByEmail(email);
     if (!user) {
       logger.warn('Login attempt with non-existent email', { email });
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: req.t('auth.invalid_credentials') || 'Invalid credentials' 
+        message: req.t('auth.invalid_credentials') || 'Invalid credentials'
       });
     }
 
-    logger.info('Login attempt', { 
-      email, 
-      userid: user.userid, 
+    logger.info('Login attempt', {
+      email,
+      userid: user.userid,
       role: user.role,
       hasPassword: !!user.password,
       passwordLength: user.password ? user.password.length : 0
     });
 
-    
+
     if (!user.password) {
       logger.warn('Login attempt with no password set', { email, userid: user.userid });
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: req.t('auth.no_password_set') || 'Password not set. Please reset your password.' 
+        message: req.t('auth.no_password_set') || 'Password not set. Please reset your password.'
       });
     }
 
     let isValid = await comparePassword(password, user.password);
-    
+
     if (!isValid && user.password && !user.password.startsWith('$2')) {
       logger.warn('Password appears to be plain text, attempting direct comparison', {
         email,
@@ -575,7 +575,7 @@ export const login = async (req, res, next) => {
         storedPasswordLength: user.password.length,
         inputPasswordLength: password.length
       });
-      
+
       if (user.password === password) {
         logger.info('Plain text password matched, rehashing password');
         const newHashedPassword = await hashPassword(password);
@@ -583,24 +583,24 @@ export const login = async (req, res, next) => {
         isValid = true;
       }
     }
-    
-    logger.info('Password comparison result', { 
-      email, 
-      userid: user.userid, 
+
+    logger.info('Password comparison result', {
+      email,
+      userid: user.userid,
       isValid,
       role: user.role,
       passwordStartsWithHash: user.password?.startsWith('$2') || false
     });
-    
+
     if (!isValid) {
       logger.warn('Login attempt with invalid password', { email, userid: user.userid, role: user.role });
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: req.t('auth.invalid_credentials') || 'Invalid credentials' 
+        message: req.t('auth.invalid_credentials') || 'Invalid credentials'
       });
     }
 
-    
+
     const normalizedRole = user.role?.toUpperCase();
     let roleData = null;
     try {
@@ -625,11 +625,11 @@ export const login = async (req, res, next) => {
         }
       }
     } catch (roleError) {
-      logger.error('Error fetching role data', { 
-        error: roleError.message, 
-        userid: user.userid, 
+      logger.error('Error fetching role data', {
+        error: roleError.message,
+        userid: user.userid,
         role: user.role,
-        normalizedRole 
+        normalizedRole
       });
       if (normalizedRole === 'ADMIN') {
         try {
@@ -640,15 +640,15 @@ export const login = async (req, res, next) => {
           });
           logger.info(`Admin record created after error for user ${user.userid}`);
         } catch (createError) {
-          logger.error('Error creating admin record after error', { 
-            error: createError.message, 
-            userid: user.userid 
+          logger.error('Error creating admin record after error', {
+            error: createError.message,
+            userid: user.userid
           });
         }
       }
     }
 
-    
+
     const token = generateToken({
       userid: user.userid,
       role: normalizedRole || user.role,
@@ -656,18 +656,18 @@ export const login = async (req, res, next) => {
 
     const sanitizedUser = sanitizeUser(user);
 
-    logger.info('Login successful', { 
-      email, 
-      userid: user.userid, 
+    logger.info('Login successful', {
+      email,
+      userid: user.userid,
       role: normalizedRole || user.role,
-      hasRoleData: !!roleData 
+      hasRoleData: !!roleData
     });
 
     const responseUser = {
       ...sanitizedUser,
       role: normalizedRole || user.role,
     };
-    
+
     if (roleData) {
       const roleKey = (normalizedRole || user.role)?.toLowerCase() || 'roleData';
       responseUser[roleKey] = roleData;
@@ -689,12 +689,12 @@ export const login = async (req, res, next) => {
 export const getProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.userid);
-    
-    
+
+
     if (user.password) {
       delete user.password;
     }
-    
+
     let roleData = null;
     if (user.role === 'DRIVER') {
       roleData = await Driver.findByUserId(user.userid);
@@ -717,19 +717,19 @@ export const getProfile = async (req, res, next) => {
 export const updateProfile = async (req, res, next) => {
   try {
     const updates = { ...req.body };
-    
-    
+
+
     if (updates.password) {
       updates.password = await hashPassword(updates.password);
     }
-    
-    
+
+
     delete updates.email;
     delete updates.role;
-    
+
     const user = await User.update(req.user.userid, updates);
-    
-    
+
+
     delete user.password;
 
     res.json({
@@ -745,36 +745,36 @@ export const updateProfile = async (req, res, next) => {
 export const changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    
+
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ 
-        message: req.t('auth.password_required') || 'Current password and new password are required' 
+      return res.status(400).json({
+        message: req.t('auth.password_required') || 'Current password and new password are required'
       });
     }
-    
-    
+
+
     const user = await User.findById(req.user.userid, true);
-    
+
     if (!user.password) {
-      return res.status(400).json({ 
-        message: req.t('auth.no_password_set') || 'Password not set' 
+      return res.status(400).json({
+        message: req.t('auth.no_password_set') || 'Password not set'
       });
     }
-    
-    
+
+
     const isValid = await comparePassword(currentPassword, user.password);
     if (!isValid) {
-      return res.status(401).json({ 
-        message: req.t('auth.invalid_current_password') || 'Current password is incorrect' 
+      return res.status(401).json({
+        message: req.t('auth.invalid_current_password') || 'Current password is incorrect'
       });
     }
-    
-    
+
+
     const hashedPassword = await hashPassword(newPassword);
-    
-    
+
+
     await User.update(req.user.userid, { password: hashedPassword });
-    
+
     res.json({
       message: req.t('auth.password_changed') || 'Password changed successfully',
     });
@@ -789,17 +789,17 @@ export const requestPasswordReset = async (req, res, next) => {
     const { email } = req.body;
     const user = await User.findByEmail(email);
 
-    
+
     const successMessage = req.t('auth.reset_email_sent') || 'If an account exists, a verification code has been sent to your email.';
 
     if (!user) {
       return res.json({ message: successMessage });
     }
 
-    
+
     await PasswordResetToken.invalidateAllForUser(user.userid);
 
-    
+
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRATION_MINUTES * 60 * 1000).toISOString();
 
@@ -902,21 +902,21 @@ export const resetPassword = async (req, res, next) => {
 export const adminResetPassword = async (req, res, next) => {
   try {
     const { email, newPassword } = req.body;
-    
+
     if (!email || !newPassword) {
       return res.status(400).json({
         success: false,
         message: 'Email and new password are required'
       });
     }
-    
+
     if (newPassword.length < 6) {
       return res.status(400).json({
         success: false,
         message: 'Password must be at least 6 characters'
       });
     }
-    
+
     const user = await User.findByEmail(email);
     if (!user) {
       return res.status(404).json({
@@ -924,7 +924,7 @@ export const adminResetPassword = async (req, res, next) => {
         message: 'User not found'
       });
     }
-    
+
     const normalizedRole = user.role?.toUpperCase();
     if (normalizedRole !== 'ADMIN') {
       return res.status(403).json({
@@ -932,15 +932,15 @@ export const adminResetPassword = async (req, res, next) => {
         message: 'This endpoint is only for admin users'
       });
     }
-    
+
     const hashedPassword = await hashPassword(newPassword);
     await User.update(user.userid, { password: hashedPassword });
-    
+
     logger.info('Admin password reset directly', {
       email,
       userid: user.userid
     });
-    
+
     res.json({
       success: true,
       message: 'Password reset successfully'

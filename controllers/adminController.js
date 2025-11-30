@@ -8,6 +8,18 @@ import Line from '../models/Line.js';
 import Vehicle from '../models/Vehicle.js';
 import Payment from '../models/Payment.js';
 import { TRIP_STATUS, RESERVATION_STATUS, VEHICLE_STATUS, USER_ROLES, PAYMENT_STATUS } from '../utils/constants.js';
+import {
+  trainModelBulk as trainRushHourModel,
+  getRushHourPredictions as fetchRushHourPredictions,
+  getLineDemandSnapshot,
+  getTopDemandLines,
+  getModelSummary as getPredictionModelSummary,
+} from '../services/rushHourPredictionService.js';
+import {
+  generateScheduleRecommendations,
+  getDemandInsights,
+  applyRecommendation as applyScheduleRec,
+} from '../services/recommendationService.js';
 
 
 export const getDashboardStats = async (req, res, next) => {
@@ -150,6 +162,129 @@ export const updateAdminPermissions = async (req, res, next) => {
       message: req.t('admin.permissions_updated') || 'Permissions updated successfully',
       admin,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getRushHourPredictionsReport = async (req, res, next) => {
+  try {
+    const { lineid, daysAhead } = req.query;
+
+    if (!lineid) {
+      return res.status(400).json({
+        message: req.t('line.id_required') || 'lineid query parameter is required',
+      });
+    }
+
+    const days = daysAhead ? parseInt(daysAhead, 10) : undefined;
+    const result = await fetchRushHourPredictions({
+      lineid,
+      daysAhead: days,
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getLineDemandAnalysis = async (req, res, next) => {
+  try {
+    const { lineid, limit, startDate, endDate } = req.query;
+
+    if (lineid) {
+      const snapshot = await getLineDemandSnapshot(lineid, { startDate, endDate });
+      return res.json({
+        lineid,
+        snapshot,
+      });
+    }
+
+    const topLines = await getTopDemandLines({
+      limit: limit ? parseInt(limit, 10) : undefined,
+      startDate,
+      endDate,
+    });
+
+    res.json({
+      topLines,
+      model: getPredictionModelSummary(),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getScheduleRecommendations = async (req, res, next) => {
+  try {
+    const { lineids, daysAhead, utilizationStartDate, utilizationEndDate } = req.query;
+    const lineIds = lineids ? lineids.split(',').map((id) => id.trim()).filter(Boolean) : undefined;
+
+    const recommendations = await generateScheduleRecommendations({
+      lineIds,
+      daysAhead: daysAhead ? parseInt(daysAhead, 10) : undefined,
+      utilizationStartDate,
+      utilizationEndDate,
+    });
+
+    res.json({
+      recommendations,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const applyScheduleRecommendation = async (req, res, next) => {
+  try {
+    const { recommendation } = req.body;
+
+    if (!recommendation) {
+      return res.status(400).json({
+        message: req.t('recommendation.payload_required') || 'Recommendation payload is required',
+      });
+    }
+
+    const result = await applyScheduleRec(recommendation);
+    res.json({
+      message: req.t('recommendation.applied') || 'Recommendation applied successfully',
+      result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const triggerModelRetrain = async (req, res, next) => {
+  try {
+    const { lineid, startDate, endDate, booking_type } = req.body || {};
+
+    const summary = await trainRushHourModel({
+      lineid,
+      startDate,
+      endDate,
+      booking_type,
+    });
+
+    res.json({
+      message: req.t('prediction.retrained') || 'Prediction model retraining started',
+      summary,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPredictionInsights = async (req, res, next) => {
+  try {
+    const insights = await getDemandInsights({
+      limit: req.query.limit ? parseInt(req.query.limit, 10) : undefined,
+      utilizationStartDate: req.query.startDate,
+      utilizationEndDate: req.query.endDate,
+    });
+
+    res.json(insights);
   } catch (error) {
     next(error);
   }

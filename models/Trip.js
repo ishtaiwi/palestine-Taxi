@@ -271,7 +271,112 @@ class Trip {
     if (error) throw error;
     return data;
   }
+
+  static async getCapacityUtilizationByLineAndTime(lineid, options = {}) {
+    if (!lineid) {
+      throw new Error('lineid is required for getCapacityUtilizationByLineAndTime');
+    }
+
+    const { startDate, endDate, groupBy = 'hour' } = options;
+    let query = supabase
+      .from('trip')
+      .select('tripid, lineid, deptime, totalbookings, availableseats, vehicle(seatnum), line(lineid, linename)')
+      .eq('lineid', lineid);
+
+    if (startDate) {
+      const start = new Date(startDate);
+      if (Number.isNaN(start.getTime())) {
+        throw new Error('Invalid startDate supplied to getCapacityUtilizationByLineAndTime');
+      }
+      query = query.gte('deptime', start.toISOString());
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      if (Number.isNaN(end.getTime())) {
+        throw new Error('Invalid endDate supplied to getCapacityUtilizationByLineAndTime');
+      }
+      query = query.lte('deptime', end.toISOString());
+    }
+
+    const { data, error } = await query.order('deptime', { ascending: true });
+    if (error) throw error;
+
+    const buckets = {};
+    for (const trip of data || []) {
+      const bucketKey = buildUtilizationBucketKey(trip.deptime, groupBy);
+      if (!bucketKey) {
+        continue;
+      }
+
+      const capacity = Math.max((trip.vehicle?.seatnum ?? 0) - 1, 0);
+      const seatsRemaining = trip.availableseats ?? Math.max(capacity - (trip.totalbookings ?? 0), 0);
+      const bookedSeats = Math.max(capacity - seatsRemaining, 0);
+      const utilization = capacity > 0 ? bookedSeats / capacity : 0;
+
+      if (!buckets[bucketKey]) {
+        buckets[bucketKey] = {
+          lineid: trip.lineid,
+          line: trip.line,
+          bucket: bucketKey,
+          bucketLabel: buildUtilizationBucketLabel(trip.deptime, groupBy),
+          totalCapacity: 0,
+          totalBooked: 0,
+          totalTrips: 0,
+          avgUtilization: 0,
+          samples: [],
+        };
+      }
+
+      buckets[bucketKey].totalCapacity += capacity;
+      buckets[bucketKey].totalBooked += bookedSeats;
+      buckets[bucketKey].totalTrips += 1;
+      buckets[bucketKey].samples.push({
+        tripid: trip.tripid,
+        deptime: trip.deptime,
+        capacity,
+        bookedSeats,
+        utilization,
+      });
+    }
+
+    return Object.values(buckets).map((bucket) => ({
+      ...bucket,
+      avgUtilization: bucket.totalCapacity > 0 ? bucket.totalBooked / bucket.totalCapacity : 0,
+    }));
+  }
 }
 
 export default Trip;
+
+function buildUtilizationBucketKey(deptime, groupBy) {
+  if (!deptime) return null;
+  const date = new Date(deptime);
+  if (Number.isNaN(date.getTime())) return null;
+
+  switch (groupBy) {
+    case 'day':
+      return `${date.getUTCFullYear()}-${date.getUTCMonth()}-${date.getUTCDate()}`;
+    case 'hour':
+      return `${date.toISOString().slice(0, 13)}:00`;
+    case 'date':
+      return date.toISOString().slice(0, 10);
+    default:
+      return `${date.toISOString().slice(0, 13)}:00`;
+  }
+}
+
+function buildUtilizationBucketLabel(deptime, groupBy) {
+  const key = buildUtilizationBucketKey(deptime, groupBy);
+  if (!key) return 'Unknown';
+  switch (groupBy) {
+    case 'day':
+      return `Day ${key}`;
+    case 'date':
+      return key;
+    case 'hour':
+    default:
+      return key;
+  }
+}
 

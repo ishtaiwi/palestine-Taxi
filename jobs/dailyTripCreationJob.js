@@ -10,18 +10,18 @@ export function startDailyTripCreationJob() {
   // Run at 11:00 PM every day
   // Cron format: minute hour day month day-of-week
   // '0 23 * * *' = At 23:00 (11:00 PM) every day
-  const cronExpression = '32 23 * * *';
-  
+  const cronExpression = '53 20 * * *';
+
   logger.info('Starting daily trip creation job', {
     schedule: 'Every day at 11:00 PM',
     cronExpression,
   });
-  
+
   cron.schedule(cronExpression, async () => {
     try {
       logger.info('Daily trip creation job triggered');
       const result = await createDailyTrips();
-      
+
       if (result.success) {
         logger.info('Daily trip creation job completed successfully', {
           templatesProcessed: result.templatesProcessed,
@@ -39,7 +39,7 @@ export function startDailyTripCreationJob() {
       });
     }
   });
-  
+
   logger.info('Daily trip creation job scheduled');
 }
 

@@ -53,21 +53,24 @@ class ApiService {
         'email': email.trim(),
         'password': password,
       });
-      
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/auth/login'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-        },
-        body: utf8.encode(requestBody),
-      ).timeout(AppConfig.requestTimeout);
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/auth/login'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
+            body: utf8.encode(requestBody),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        final isSuccess = responseData['success'] == true || responseData['success'] == 'true';
-        
+        final isSuccess = responseData['success'] == true ||
+            responseData['success'] == 'true';
+
         if (isSuccess) {
           if (responseData['token'] != null) {
             await saveToken(responseData['token']);
@@ -96,9 +99,11 @@ class ApiService {
     } catch (exception) {
       String errorMessage = 'Connection error';
       if (exception.toString().contains('TimeoutException')) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
       } else if (exception.toString().contains('SocketException')) {
-        errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
+        errorMessage =
+            'Cannot connect to server. Please make sure the backend is running.';
       } else {
         errorMessage = 'Error: ${exception.toString()}';
       }
@@ -128,7 +133,7 @@ class ApiService {
         'password': password,
         'role': role.toLowerCase(),
       };
-      
+
       if (licenseId != null && licenseId.isNotEmpty) {
         requestBody['licenseid'] = licenseId.trim();
       }
@@ -144,7 +149,7 @@ class ApiService {
       if (vehicleSeatLayout != null && vehicleSeatLayout.isNotEmpty) {
         requestBody['vehicleSeatLayout'] = vehicleSeatLayout.trim();
       }
-      
+
       // Debug: Log what we're sending
       print('[ApiService.register] 📤 Sending registration data:');
       print('  - fullname: ${requestBody['fullname']}');
@@ -154,19 +159,22 @@ class ApiService {
       print('  - licenseid: ${requestBody['licenseid'] ?? 'null'}');
       print('  - lineid: ${requestBody['lineid'] ?? 'null'}');
       print('  - vehiclePlate: ${requestBody['vehiclePlate'] ?? 'null'}');
-      print('  - vehicleSeatLayout: ${requestBody['vehicleSeatLayout'] ?? 'null'}');
+      print(
+          '  - vehicleSeatLayout: ${requestBody['vehicleSeatLayout'] ?? 'null'}');
       print('  - All keys: ${requestBody.keys.toList()}');
-      
+
       final requestBodyJson = jsonEncode(requestBody);
-      
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/auth/register'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-        },
-        body: utf8.encode(requestBodyJson),
-      ).timeout(AppConfig.requestTimeout);
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/auth/register'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
+            body: utf8.encode(requestBodyJson),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final responseData = jsonDecode(response.body);
 
@@ -181,10 +189,10 @@ class ApiService {
       }
 
       // Check for success status (201 or 200) or explicit success field
-      final isSuccess = response.statusCode == 201 || 
-                       response.statusCode == 200 || 
-                       responseData['success'] == true ||
-                       responseData['success'] == 'true';
+      final isSuccess = response.statusCode == 201 ||
+          response.statusCode == 200 ||
+          responseData['success'] == true ||
+          responseData['success'] == 'true';
 
       if (isSuccess && responseData['token'] != null) {
         try {
@@ -195,11 +203,11 @@ class ApiService {
           if (responseData['user'] != null) {
             await saveUserData(responseData['user']);
           }
-          
+
           print('[ApiService.register] ✅ Registration successful');
           print('  - User saved: ${responseData['user'] != null}');
           print('  - Token saved: ${responseData['token'] != null}');
-          
+
           return {
             'success': true,
             'message': responseData['message'] ?? 'Registration successful',
@@ -219,23 +227,28 @@ class ApiService {
           };
         }
       } else {
-        String errorMessage = responseData['message'] ?? responseData['error'] ?? 'Registration failed';
-        
+        String errorMessage = responseData['message'] ??
+            responseData['error'] ??
+            'Registration failed';
+
         if (responseData['errors'] != null) {
-          if (responseData['errors'] is List && (responseData['errors'] as List).isNotEmpty) {
+          if (responseData['errors'] is List &&
+              (responseData['errors'] as List).isNotEmpty) {
             final validationErrors = responseData['errors'] as List;
             final firstValidationError = validationErrors.first;
-            if (firstValidationError is Map && firstValidationError['msg'] != null) {
+            if (firstValidationError is Map &&
+                firstValidationError['msg'] != null) {
               errorMessage = firstValidationError['msg'].toString();
             } else {
               errorMessage = firstValidationError.toString();
             }
-          } else if (responseData['errors'] is Map && (responseData['errors'] as Map).isNotEmpty) {
+          } else if (responseData['errors'] is Map &&
+              (responseData['errors'] as Map).isNotEmpty) {
             final errorsMap = responseData['errors'] as Map;
             errorMessage = errorsMap.values.first.toString();
           }
         }
-        
+
         return {
           'success': false,
           'message': errorMessage,
@@ -244,9 +257,11 @@ class ApiService {
     } catch (exception) {
       String errorMessage = 'Connection error';
       if (exception.toString().contains('TimeoutException')) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
       } else if (exception.toString().contains('SocketException')) {
-        errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
+        errorMessage =
+            'Cannot connect to server. Please make sure the backend is running.';
       } else {
         errorMessage = 'Error: ${exception.toString()}';
       }
@@ -259,14 +274,12 @@ class ApiService {
 
   static Future<List<Map<String, dynamic>>> fetchActiveLines() async {
     try {
-      final response = await http
-          .get(
-            Uri.parse('${AppConfig.apiBaseUrl}/lines/active'),
-            headers: {
-              'Accept': 'application/json; charset=utf-8',
-            },
-          )
-          .timeout(AppConfig.requestTimeout);
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/lines/active'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(utf8.decode(response.bodyBytes));
@@ -332,9 +345,11 @@ class ApiService {
     } catch (exception) {
       String errorMessage = 'Connection error';
       if (exception.toString().contains('TimeoutException')) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
       } else if (exception.toString().contains('SocketException')) {
-        errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
+        errorMessage =
+            'Cannot connect to server. Please make sure the backend is running.';
       } else {
         errorMessage = 'Error: ${exception.toString()}';
       }
@@ -353,28 +368,34 @@ class ApiService {
         'email': email.trim(),
       });
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset/request'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-        },
-        body: requestBody,
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset/request'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
+            body: requestBody,
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final responseData = jsonDecode(response.body);
 
       return {
-        'success': responseData['emailSent'] == true || responseData['message'] != null,
-        'message': responseData['message'] ?? 'Verification code sent to your email',
+        'success': responseData['emailSent'] == true ||
+            responseData['message'] != null,
+        'message':
+            responseData['message'] ?? 'Verification code sent to your email',
         'debugCode': responseData['debugCode'],
       };
     } catch (exception) {
       String errorMessage = 'Connection error';
       if (exception.toString().contains('TimeoutException')) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
       } else if (exception.toString().contains('SocketException')) {
-        errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
+        errorMessage =
+            'Cannot connect to server. Please make sure the backend is running.';
       } else {
         errorMessage = 'Error: ${exception.toString()}';
       }
@@ -395,14 +416,16 @@ class ApiService {
         'code': code.trim(),
       });
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset/verify'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-        },
-        body: utf8.encode(requestBody),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset/verify'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
+            body: utf8.encode(requestBody),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final responseData = jsonDecode(response.body);
 
@@ -413,13 +436,17 @@ class ApiService {
           'verified': true,
         };
       } else {
-        String errorMessage = responseData['message'] ?? responseData['error'] ?? 'Invalid verification code';
+        String errorMessage = responseData['message'] ??
+            responseData['error'] ??
+            'Invalid verification code';
 
         if (responseData['errors'] != null) {
-          if (responseData['errors'] is List && (responseData['errors'] as List).isNotEmpty) {
+          if (responseData['errors'] is List &&
+              (responseData['errors'] as List).isNotEmpty) {
             final validationErrors = responseData['errors'] as List;
             final firstValidationError = validationErrors.first;
-            if (firstValidationError is Map && firstValidationError['msg'] != null) {
+            if (firstValidationError is Map &&
+                firstValidationError['msg'] != null) {
               errorMessage = firstValidationError['msg'].toString();
             }
           }
@@ -434,9 +461,11 @@ class ApiService {
     } catch (exception) {
       String errorMessage = 'Connection error';
       if (exception.toString().contains('TimeoutException')) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
       } else if (exception.toString().contains('SocketException')) {
-        errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
+        errorMessage =
+            'Cannot connect to server. Please make sure the backend is running.';
       } else {
         errorMessage = 'Error: ${exception.toString()}';
       }
@@ -460,14 +489,16 @@ class ApiService {
         'newPassword': newPassword,
       });
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset/confirm'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-        },
-        body: utf8.encode(requestBody),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset/confirm'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
+            body: utf8.encode(requestBody),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final responseData = jsonDecode(response.body);
 
@@ -477,13 +508,17 @@ class ApiService {
           'message': responseData['message'] ?? 'Password reset successful',
         };
       } else {
-        String errorMessage = responseData['message'] ?? responseData['error'] ?? 'Password reset failed';
+        String errorMessage = responseData['message'] ??
+            responseData['error'] ??
+            'Password reset failed';
 
         if (responseData['errors'] != null) {
-          if (responseData['errors'] is List && (responseData['errors'] as List).isNotEmpty) {
+          if (responseData['errors'] is List &&
+              (responseData['errors'] as List).isNotEmpty) {
             final validationErrors = responseData['errors'] as List;
             final firstValidationError = validationErrors.first;
-            if (firstValidationError is Map && firstValidationError['msg'] != null) {
+            if (firstValidationError is Map &&
+                firstValidationError['msg'] != null) {
               errorMessage = firstValidationError['msg'].toString();
             }
           }
@@ -497,9 +532,11 @@ class ApiService {
     } catch (exception) {
       String errorMessage = 'Connection error';
       if (exception.toString().contains('TimeoutException')) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
       } else if (exception.toString().contains('SocketException')) {
-        errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
+        errorMessage =
+            'Cannot connect to server. Please make sure the backend is running.';
       } else {
         errorMessage = 'Error: ${exception.toString()}';
       }
@@ -520,16 +557,14 @@ class ApiService {
         };
       }
 
-      final response = await http
-          .get(
-            Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue'),
-            headers: {
-              'Content-Type': 'application/json; charset=utf-8',
-              'Accept': 'application/json; charset=utf-8',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(AppConfig.requestTimeout);
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
 
       final responseData = jsonDecode(utf8.decode(response.bodyBytes));
 
@@ -562,16 +597,14 @@ class ApiService {
         };
       }
 
-      final response = await http
-          .post(
-            Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue/join'),
-            headers: {
-              'Content-Type': 'application/json; charset=utf-8',
-              'Accept': 'application/json; charset=utf-8',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(AppConfig.requestTimeout);
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue/join'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
 
       final responseData = jsonDecode(utf8.decode(response.bodyBytes));
 
@@ -604,16 +637,14 @@ class ApiService {
         };
       }
 
-      final response = await http
-          .post(
-            Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue/leave'),
-            headers: {
-              'Content-Type': 'application/json; charset=utf-8',
-              'Accept': 'application/json; charset=utf-8',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(AppConfig.requestTimeout);
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue/leave'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
 
       final responseData = jsonDecode(utf8.decode(response.bodyBytes));
 
@@ -672,7 +703,8 @@ class ApiService {
     return [];
   }
 
-  static Future<Map<String, dynamic>> fetchDriverTripReservations(String tripId) async {
+  static Future<Map<String, dynamic>> fetchDriverTripReservations(
+      String tripId) async {
     final token = await getToken();
     if (token == null) {
       return {
@@ -700,7 +732,9 @@ class ApiService {
 
     return {
       'success': false,
-      'message': decoded is Map && decoded['message'] is String ? decoded['message'] : 'Failed to load reservations',
+      'message': decoded is Map && decoded['message'] is String
+          ? decoded['message']
+          : 'Failed to load reservations',
     };
   }
 
@@ -718,7 +752,8 @@ class ApiService {
     }
 
     final response = await http.patch(
-      Uri.parse('${AppConfig.apiBaseUrl}/drivers/trips/$tripId/reservations/$bookingId'),
+      Uri.parse(
+          '${AppConfig.apiBaseUrl}/drivers/trips/$tripId/reservations/$bookingId'),
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
         'Accept': 'application/json; charset=utf-8',
@@ -737,7 +772,9 @@ class ApiService {
 
     return {
       'success': false,
-      'message': decoded is Map && decoded['message'] is String ? decoded['message'] : 'Failed to update reservation',
+      'message': decoded is Map && decoded['message'] is String
+          ? decoded['message']
+          : 'Failed to update reservation',
     };
   }
 
@@ -803,21 +840,23 @@ class ApiService {
         };
       }
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/vehicles/driver/my-vehicle'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json; charset=utf-8',
-          'Content-Type': 'application/json; charset=utf-8',
-        },
-        body: jsonEncode({
-          'plateno': plateno.trim(),
-          'seatlayout': seatlayout,
-        }),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/vehicles/driver/my-vehicle'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json; charset=utf-8',
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode({
+              'plateno': plateno.trim(),
+              'seatlayout': seatlayout,
+            }),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-      
+
       if (response.statusCode == 201 && decoded is Map<String, dynamic>) {
         return {
           'success': true,
@@ -842,9 +881,11 @@ class ApiService {
     } catch (exception) {
       String errorMessage = 'Connection error';
       if (exception.toString().contains('TimeoutException')) {
-        errorMessage = 'Connection timeout. Please check your internet connection.';
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
       } else if (exception.toString().contains('SocketException')) {
-        errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
+        errorMessage =
+            'Cannot connect to server. Please make sure the backend is running.';
       } else {
         errorMessage = 'Error: ${exception.toString()}';
       }
@@ -855,7 +896,8 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> fetchVehicleSeatMap(String vehicleId) async {
+  static Future<Map<String, dynamic>> fetchVehicleSeatMap(
+      String vehicleId) async {
     final token = await getToken();
     if (token == null) {
       return {
@@ -882,7 +924,9 @@ class ApiService {
 
     return {
       'success': false,
-      'message': decoded is Map && decoded['message'] is String ? decoded['message'] : 'Failed to load seat map',
+      'message': decoded is Map && decoded['message'] is String
+          ? decoded['message']
+          : 'Failed to load seat map',
     };
   }
 
@@ -920,7 +964,9 @@ class ApiService {
 
     return {
       'success': false,
-      'message': decoded is Map && decoded['message'] is String ? decoded['message'] : 'Failed to update seat state',
+      'message': decoded is Map && decoded['message'] is String
+          ? decoded['message']
+          : 'Failed to update seat state',
     };
   }
 
@@ -936,8 +982,8 @@ class ApiService {
       if (lineid != null && lineid.isNotEmpty) queryParams['lineid'] = lineid;
       if (date != null && date.isNotEmpty) queryParams['date'] = date;
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/trips/upcoming')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/trips/upcoming').replace(
+          queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       final response = await http.get(
         uri,
@@ -1006,17 +1052,20 @@ class ApiService {
       if (aging != null) body['aging'] = aging;
       if (paymentmethod != null) body['paymentmethod'] = paymentmethod;
       if (booking_type != null) body['booking_type'] = booking_type;
-      if (scheduled_trip_time != null) body['scheduled_trip_time'] = scheduled_trip_time;
+      if (scheduled_trip_time != null)
+        body['scheduled_trip_time'] = scheduled_trip_time;
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/reservations'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: utf8.encode(jsonEncode(body)),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/reservations'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
 
@@ -1052,8 +1101,10 @@ class ApiService {
       final queryParams = <String, String>{};
       if (status != null && status.isNotEmpty) queryParams['status'] = status;
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/reservations/my-reservations')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri =
+          Uri.parse('${AppConfig.apiBaseUrl}/reservations/my-reservations')
+              .replace(
+                  queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       final response = await http.get(
         uri,
@@ -1077,7 +1128,8 @@ class ApiService {
   }
 
   /// Cancel a reservation
-  static Future<Map<String, dynamic>> cancelReservation(String bookingId) async {
+  static Future<Map<String, dynamic>> cancelReservation(
+      String bookingId) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -1173,15 +1225,17 @@ class ApiService {
         };
       }
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/wallets/add-balance'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: utf8.encode(jsonEncode({'amount': amount})),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/wallets/add-balance'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode({'amount': amount})),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
 
@@ -1295,7 +1349,8 @@ class ApiService {
   }
 
   /// Check-in a passenger (via QR code or booking ID)
-  static Future<Map<String, dynamic>> checkInReservation(String? bookingId, {String? qrData}) async {
+  static Future<Map<String, dynamic>> checkInReservation(String? bookingId,
+      {String? qrData}) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -1309,15 +1364,17 @@ class ApiService {
       if (bookingId != null) body['bookingid'] = bookingId;
       if (qrData != null) body['qrData'] = qrData;
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/reservations/check-in'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: utf8.encode(jsonEncode(body)),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/reservations/check-in'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
 
@@ -1343,7 +1400,8 @@ class ApiService {
   }
 
   /// Get QR Code for a reservation
-  static Future<Map<String, dynamic>> getReservationQRCode(String bookingId) async {
+  static Future<Map<String, dynamic>> getReservationQRCode(
+      String bookingId) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -1389,7 +1447,8 @@ class ApiService {
   // ============================================
 
   /// Fetch all schedule templates
-  static Future<List<Map<String, dynamic>>> fetchSchedules({String? lineid, bool? active}) async {
+  static Future<List<Map<String, dynamic>>> fetchSchedules(
+      {String? lineid, bool? active}) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -1494,21 +1553,23 @@ class ApiService {
         };
       }
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/schedules'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: utf8.encode(jsonEncode({
-          'lineid': lineid,
-          'start_hour': startHour,
-          'end_hour': endHour,
-          'interval_minutes': intervalMinutes,
-          'active': active,
-        })),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/schedules'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode({
+              'lineid': lineid,
+              'start_hour': startHour,
+              'end_hour': endHour,
+              'interval_minutes': intervalMinutes,
+              'active': active,
+            })),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
 
@@ -1559,15 +1620,17 @@ class ApiService {
       if (intervalMinutes != null) body['interval_minutes'] = intervalMinutes;
       if (active != null) body['active'] = active;
 
-      final response = await http.put(
-        Uri.parse('${AppConfig.apiBaseUrl}/schedules/$templateid'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: utf8.encode(jsonEncode(body)),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .put(
+            Uri.parse('${AppConfig.apiBaseUrl}/schedules/$templateid'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
 
@@ -1652,15 +1715,18 @@ class ApiService {
       final body = <String, dynamic>{};
       if (targetDate != null) body['target_date'] = targetDate;
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/schedules/$templateid/create-trips'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: utf8.encode(jsonEncode(body)),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse(
+                '${AppConfig.apiBaseUrl}/schedules/$templateid/create-trips'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
 
@@ -1730,6 +1796,232 @@ class ApiService {
   }
 
   // ============================================
+  // ADMIN - Prediction & Recommendation APIs
+  // ============================================
+
+  static Future<Map<String, dynamic>> getRushHourPredictionsAdmin({
+    required String lineId,
+    int? daysAhead,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'success': false, 'message': 'Not authenticated'};
+    }
+
+    final queryParams = <String, String>{'lineid': lineId};
+    if (daysAhead != null) queryParams['daysAhead'] = daysAhead.toString();
+
+    final uri =
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/predictions/rush-hours')
+            .replace(queryParameters: queryParams);
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Accept': 'application/json; charset=utf-8',
+        'Authorization': 'Bearer $token',
+      },
+    ).timeout(AppConfig.requestTimeout);
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    return {
+      'success': response.statusCode == 200,
+      'data': decoded,
+      'message': decoded is Map<String, dynamic> && decoded['message'] is String
+          ? decoded['message']
+          : null,
+    };
+  }
+
+  static Future<Map<String, dynamic>> getLineDemandAnalysisAdmin({
+    String? lineId,
+    int? limit,
+    String? startDate,
+    String? endDate,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'success': false, 'message': 'Not authenticated'};
+    }
+
+    final queryParams = <String, String>{};
+    if (lineId != null && lineId.isNotEmpty) queryParams['lineid'] = lineId;
+    if (limit != null) queryParams['limit'] = limit.toString();
+    if (startDate != null) queryParams['startDate'] = startDate;
+    if (endDate != null) queryParams['endDate'] = endDate;
+
+    final uri =
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/predictions/line-demand')
+            .replace(
+                queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Accept': 'application/json; charset=utf-8',
+        'Authorization': 'Bearer $token',
+      },
+    ).timeout(AppConfig.requestTimeout);
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    return {
+      'success': response.statusCode == 200,
+      'data': decoded,
+      'message': decoded is Map<String, dynamic> && decoded['message'] is String
+          ? decoded['message']
+          : null,
+    };
+  }
+
+  static Future<Map<String, dynamic>> getPredictionInsightsAdmin({
+    int? limit,
+    String? startDate,
+    String? endDate,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'success': false, 'message': 'Not authenticated'};
+    }
+
+    final queryParams = <String, String>{};
+    if (limit != null) queryParams['limit'] = limit.toString();
+    if (startDate != null) queryParams['startDate'] = startDate;
+    if (endDate != null) queryParams['endDate'] = endDate;
+
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/predictions/insights')
+        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Accept': 'application/json; charset=utf-8',
+        'Authorization': 'Bearer $token',
+      },
+    ).timeout(AppConfig.requestTimeout);
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    return {
+      'success': response.statusCode == 200,
+      'data': decoded,
+      'message': decoded is Map<String, dynamic> && decoded['message'] is String
+          ? decoded['message']
+          : null,
+    };
+  }
+
+  static Future<Map<String, dynamic>> triggerPredictionRetrain({
+    String? lineId,
+    String? startDate,
+    String? endDate,
+    String? bookingType,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'success': false, 'message': 'Not authenticated'};
+    }
+
+    final body = <String, dynamic>{};
+    if (lineId != null) body['lineid'] = lineId;
+    if (startDate != null) body['startDate'] = startDate;
+    if (endDate != null) body['endDate'] = endDate;
+    if (bookingType != null) body['booking_type'] = bookingType;
+
+    final response = await http
+        .post(
+          Uri.parse('${AppConfig.apiBaseUrl}/admin/predictions/retrain'),
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Accept': 'application/json; charset=utf-8',
+            'Authorization': 'Bearer $token',
+          },
+          body: utf8.encode(jsonEncode(body)),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    return {
+      'success': response.statusCode == 200,
+      'message': decoded['message'] ??
+          (response.statusCode == 200 ? 'Retrain triggered' : 'Failed'),
+      'summary': decoded['summary'],
+    };
+  }
+
+  static Future<List<Map<String, dynamic>>> getScheduleRecommendationsAdmin({
+    List<String>? lineIds,
+    int? daysAhead,
+    String? utilizationStartDate,
+    String? utilizationEndDate,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return [];
+    }
+
+    final queryParams = <String, String>{};
+    if (lineIds != null && lineIds.isNotEmpty)
+      queryParams['lineids'] = lineIds.join(',');
+    if (daysAhead != null) queryParams['daysAhead'] = daysAhead.toString();
+    if (utilizationStartDate != null)
+      queryParams['utilizationStartDate'] = utilizationStartDate;
+    if (utilizationEndDate != null)
+      queryParams['utilizationEndDate'] = utilizationEndDate;
+
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/recommendations')
+        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Accept': 'application/json; charset=utf-8',
+        'Authorization': 'Bearer $token',
+      },
+    ).timeout(AppConfig.requestTimeout);
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is Map<String, dynamic> &&
+          decoded['recommendations'] is List) {
+        return (decoded['recommendations'] as List)
+            .whereType<Map>()
+            .map((rec) => Map<String, dynamic>.from(rec))
+            .toList();
+      }
+    }
+
+    return [];
+  }
+
+  static Future<Map<String, dynamic>> applyScheduleRecommendationAdmin(
+    Map<String, dynamic> recommendation,
+  ) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'success': false, 'message': 'Not authenticated'};
+    }
+
+    final response = await http
+        .post(
+          Uri.parse('${AppConfig.apiBaseUrl}/admin/recommendations/apply'),
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Accept': 'application/json; charset=utf-8',
+            'Authorization': 'Bearer $token',
+          },
+          body: utf8.encode(jsonEncode({'recommendation': recommendation})),
+        )
+        .timeout(AppConfig.requestTimeout);
+
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    return {
+      'success': response.statusCode == 200,
+      'message': decoded['message'] ??
+          (response.statusCode == 200 ? 'Recommendation applied' : 'Failed'),
+      'result': decoded['result'],
+    };
+  }
+
+  // ============================================
   // ADMIN - LINES API
   // ============================================
 
@@ -1746,7 +2038,9 @@ class ApiService {
       if (response.statusCode == 200) {
         final decoded = jsonDecode(utf8.decode(response.bodyBytes));
         if (decoded is List) {
-          return decoded.map((line) => Map<String, dynamic>.from(line)).toList();
+          return decoded
+              .map((line) => Map<String, dynamic>.from(line))
+              .toList();
         }
         throw Exception('Unexpected response format');
       } else {
@@ -1788,27 +2082,32 @@ class ApiService {
         body['name_en'] = nameEn;
       }
       // Fallback to linename for backward compatibility
-      if ((nameAr == null || nameAr.isEmpty) && linename != null && linename.isNotEmpty) {
+      if ((nameAr == null || nameAr.isEmpty) &&
+          linename != null &&
+          linename.isNotEmpty) {
         body['linename'] = linename;
       }
 
       if (estduration != null) body['estduration'] = estduration;
       if (distance != null) body['distance'] = distance;
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/lines'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: utf8.encode(jsonEncode(body)),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/lines'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       return {
         'success': response.statusCode == 201,
-        'message': decoded['message'] ?? (response.statusCode == 201 ? 'Line created' : 'Failed'),
+        'message': decoded['message'] ??
+            (response.statusCode == 201 ? 'Line created' : 'Failed'),
         'line': decoded['line'],
       };
     } catch (exception) {
@@ -1851,20 +2150,23 @@ class ApiService {
       if (distance != null) body['distance'] = distance;
       if (active != null) body['active'] = active;
 
-      final response = await http.put(
-        Uri.parse('${AppConfig.apiBaseUrl}/lines/$lineid'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: utf8.encode(jsonEncode(body)),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .put(
+            Uri.parse('${AppConfig.apiBaseUrl}/lines/$lineid'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       return {
         'success': response.statusCode == 200,
-        'message': decoded['message'] ?? (response.statusCode == 200 ? 'Line updated' : 'Failed'),
+        'message': decoded['message'] ??
+            (response.statusCode == 200 ? 'Line updated' : 'Failed'),
         'line': decoded['line'],
       };
     } catch (exception) {
@@ -1891,7 +2193,8 @@ class ApiService {
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       return {
         'success': response.statusCode == 200,
-        'message': decoded['message'] ?? (response.statusCode == 200 ? 'Line deleted' : 'Failed'),
+        'message': decoded['message'] ??
+            (response.statusCode == 200 ? 'Line deleted' : 'Failed'),
       };
     } catch (exception) {
       return {'success': false, 'message': exception.toString()};
@@ -1922,9 +2225,7 @@ class ApiService {
         final decoded = jsonDecode(utf8.decode(response.bodyBytes));
         // Backend returns array directly or wrapped in object
         if (decoded is List) {
-          return decoded
-              .map((u) => Map<String, dynamic>.from(u))
-              .toList();
+          return decoded.map((u) => Map<String, dynamic>.from(u)).toList();
         } else if (decoded is Map && decoded['users'] is List) {
           return (decoded['users'] as List)
               .map((u) => Map<String, dynamic>.from(u))
@@ -1959,20 +2260,23 @@ class ApiService {
       if (phone != null) body['phone'] = phone;
       if (role != null) body['role'] = role;
 
-      final response = await http.put(
-        Uri.parse('${AppConfig.apiBaseUrl}/admin/users/$userid'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: utf8.encode(jsonEncode(body)),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .put(
+            Uri.parse('${AppConfig.apiBaseUrl}/admin/users/$userid'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       return {
         'success': response.statusCode == 200,
-        'message': decoded['message'] ?? (response.statusCode == 200 ? 'User updated' : 'Failed'),
+        'message': decoded['message'] ??
+            (response.statusCode == 200 ? 'User updated' : 'Failed'),
         'user': decoded['user'],
       };
     } catch (exception) {
@@ -1999,7 +2303,8 @@ class ApiService {
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       return {
         'success': response.statusCode == 200,
-        'message': decoded['message'] ?? (response.statusCode == 200 ? 'User deleted' : 'Failed'),
+        'message': decoded['message'] ??
+            (response.statusCode == 200 ? 'User deleted' : 'Failed'),
       };
     } catch (exception) {
       return {'success': false, 'message': exception.toString()};
@@ -2045,7 +2350,8 @@ class ApiService {
   // ============================================
 
   /// Get all trips (admin)
-  static Future<List<Map<String, dynamic>>> getAllTrips({String? lineid, String? status}) async {
+  static Future<List<Map<String, dynamic>>> getAllTrips(
+      {String? lineid, String? status}) async {
     try {
       String url = '${AppConfig.apiBaseUrl}/trips';
       final params = <String, String>{};
@@ -2092,24 +2398,27 @@ class ApiService {
         return {'success': false, 'message': 'Not authenticated'};
       }
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/ratings'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: utf8.encode(jsonEncode({
-          'bookingid': bookingid,
-          'rating': rating,
-          if (comment != null && comment.isNotEmpty) 'comment': comment,
-        })),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/ratings'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode({
+              'bookingid': bookingid,
+              'rating': rating,
+              if (comment != null && comment.isNotEmpty) 'comment': comment,
+            })),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       return {
         'success': response.statusCode == 201,
-        'message': decoded['message'] ?? (response.statusCode == 201 ? 'Rating submitted' : 'Failed'),
+        'message': decoded['message'] ??
+            (response.statusCode == 201 ? 'Rating submitted' : 'Failed'),
         'rating': decoded['rating'],
       };
     } catch (exception) {
@@ -2133,20 +2442,23 @@ class ApiService {
       if (rating != null) body['rating'] = rating;
       if (comment != null) body['comment'] = comment;
 
-      final response = await http.put(
-        Uri.parse('${AppConfig.apiBaseUrl}/ratings/$ratingid'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-        body: utf8.encode(jsonEncode(body)),
-      ).timeout(AppConfig.requestTimeout);
+      final response = await http
+          .put(
+            Uri.parse('${AppConfig.apiBaseUrl}/ratings/$ratingid'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       return {
         'success': response.statusCode == 200,
-        'message': decoded['message'] ?? (response.statusCode == 200 ? 'Rating updated' : 'Failed'),
+        'message': decoded['message'] ??
+            (response.statusCode == 200 ? 'Rating updated' : 'Failed'),
         'rating': decoded['rating'],
       };
     } catch (exception) {
@@ -2155,7 +2467,8 @@ class ApiService {
   }
 
   /// Get rating by booking ID
-  static Future<Map<String, dynamic>?> getRatingByBookingId(String bookingid) async {
+  static Future<Map<String, dynamic>?> getRatingByBookingId(
+      String bookingid) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -2270,4 +2583,3 @@ class ApiService {
     }
   }
 }
-

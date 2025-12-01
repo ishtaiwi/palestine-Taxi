@@ -21,7 +21,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import driverRoutes from './routes/driverRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
-import locationRoutes from './routes/locationRoutes.js';
+//import locationRoutes from './routes/locationRoutes.js';
 
 
 // Background Jobs
@@ -100,7 +100,7 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/schedules', scheduleRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/time', timeRoutes);
-app.use('/api/locations', locationRoutes);
+//app.use('/api/locations', locationRoutes);
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

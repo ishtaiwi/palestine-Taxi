@@ -2202,6 +2202,77 @@ class ApiService {
   }
 
   // ============================================
+  // ADMIN - DASHBOARD API
+  // ============================================
+
+  /// Get dashboard statistics (admin)
+  static Future<Map<String, dynamic>> getDashboardStats() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/dashboard/stats'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else {
+        throw Exception('Failed to load dashboard stats');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  /// Get revenue analytics (admin)
+  static Future<Map<String, dynamic>> getRevenueAnalytics({
+    String? startDate,
+    String? endDate,
+    String? lineid,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final queryParams = <String, String>{};
+      if (startDate != null) queryParams['startDate'] = startDate;
+      if (endDate != null) queryParams['endDate'] = endDate;
+      if (lineid != null) queryParams['lineid'] = lineid;
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/dashboard/revenue')
+          .replace(
+              queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else {
+        throw Exception('Failed to load revenue analytics');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  // ============================================
   // ADMIN - USERS API
   // ============================================
 

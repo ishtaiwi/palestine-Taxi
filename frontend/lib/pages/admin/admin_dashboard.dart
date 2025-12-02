@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../services/api_service.dart';
+import '../../services/supabase_realtime_service.dart';
 import '../../screens/auth/login_page.dart';
 import 'admin_schedules_page.dart';
 import 'admin_lines_page.dart';
@@ -24,6 +27,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _isArabic = true;
   Map<String, dynamic>? _predictionInsights;
   bool _insightsLoading = true;
+
+  // Map tracking state
+  List<Map<String, dynamic>> _vehicleLocations = [];
+  List<Map<String, dynamic>> _baseStations = [];
+  bool _mapLoading = false;
+  final MapController _mapController = MapController();
+
+  // Statistics state
+  Map<String, dynamic>? _dashboardStats;
+  Map<String, dynamic>? _revenueStats;
+  bool _statsLoading = false;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -77,6 +91,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     super.initState();
     _loadUserData();
     _loadPredictionInsights();
+    _loadMapData();
+    _subscribeToRealtimeUpdates();
+    _loadDashboardStats();
+  }
+
+  @override
+  void dispose() {
+    SupabaseRealtimeService.unsubscribe();
+    super.dispose();
   }
 
   Future<void> _loadUserData() async {
@@ -87,6 +110,89 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       _isLoading = false;
       _isArabic = isArabic;
     });
+  }
+
+  Future<void> _loadMapData() async {
+    setState(() {
+      _mapLoading = true;
+    });
+
+    try {
+      // Load vehicle locations
+      final locationsResult = await ApiService.getAllVehicleLocations();
+      if (locationsResult['success'] == true) {
+        final locationsList = locationsResult['locations'];
+        if (locationsList is List) {
+          setState(() {
+            _vehicleLocations = locationsList
+                .whereType<Map<String, dynamic>>()
+                .map((loc) => Map<String, dynamic>.from(loc))
+                .toList();
+          });
+        }
+      }
+
+      // Load base stations
+      final stationsResult =
+          await ApiService.getAllBaseStations(isActive: true);
+      if (stationsResult['success'] == true) {
+        final stationsList = stationsResult['stations'];
+        if (stationsList is List) {
+          setState(() {
+            _baseStations = stationsList
+                .whereType<Map<String, dynamic>>()
+                .map((station) => Map<String, dynamic>.from(station))
+                .toList();
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading map data: $e');
+    } finally {
+      setState(() {
+        _mapLoading = false;
+      });
+    }
+  }
+
+  void _subscribeToRealtimeUpdates() {
+    SupabaseRealtimeService.subscribeToVehicleLocations((update) {
+      if (mounted) {
+        setState(() {
+          final vehicleid = update['vehicleid'];
+          final index = _vehicleLocations.indexWhere(
+            (loc) => loc['vehicleid'] == vehicleid,
+          );
+          if (index >= 0) {
+            _vehicleLocations[index] = update;
+          } else {
+            _vehicleLocations.add(update);
+          }
+        });
+      }
+    });
+  }
+
+  Future<void> _loadDashboardStats() async {
+    setState(() {
+      _statsLoading = true;
+    });
+
+    try {
+      final stats = await ApiService.getDashboardStats();
+      final revenue = await ApiService.getRevenueAnalytics();
+
+      setState(() {
+        _dashboardStats = stats;
+        _revenueStats = revenue;
+        _statsLoading = false;
+      });
+    } catch (e) {
+      print('Error loading dashboard stats: $e');
+      setState(() {
+        _statsLoading = false;
+      });
+    }
   }
 
   Future<void> _loadPredictionInsights() async {
@@ -397,14 +503,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           Expanded(
                             child: _buildActionCard(
                               icon: Icons.map,
-                              title: _isArabic ? 'خريطة المركبات' : 'Vehicle Map',
+                              title:
+                                  _isArabic ? 'خريطة المركبات' : 'Vehicle Map',
                               color: Colors.cyan,
                               onTap: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AdminMapPage(),
+                                    builder: (context) => const AdminMapPage(),
                                   ),
                                 );
                               },
@@ -418,7 +524,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           Expanded(
                             child: _buildActionCard(
                               icon: Icons.location_city,
-                              title: _isArabic ? 'محطات القاعدة' : 'Base Stations',
+                              title:
+                                  _isArabic ? 'محطات القاعدة' : 'Base Stations',
                               color: Colors.brown,
                               onTap: () {
                                 Navigator.push(
@@ -463,25 +570,40 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               children: [
                                 _buildStatCard(
                                   t('users'),
-                                  '0',
+                                  _statsLoading
+                                      ? '-'
+                                      : (_dashboardStats?['totalUsers']
+                                              ?.toString() ??
+                                          '0'),
                                   Icons.people,
                                   Colors.blue,
                                 ),
                                 _buildStatCard(
                                   t('trips'),
-                                  '0',
+                                  _statsLoading
+                                      ? '-'
+                                      : (_dashboardStats?['totalTrips']
+                                              ?.toString() ??
+                                          '0'),
                                   Icons.directions_bus,
                                   Colors.green,
                                 ),
                                 _buildStatCard(
                                   t('reservations'),
-                                  '0',
+                                  _statsLoading
+                                      ? '-'
+                                      : (_dashboardStats?['totalReservations']
+                                              ?.toString() ??
+                                          '0'),
                                   Icons.book_online,
                                   Colors.orange,
                                 ),
                                 _buildStatCard(
                                   t('revenue'),
-                                  '0',
+                                  _statsLoading
+                                      ? '-'
+                                      : _formatRevenue(
+                                          _revenueStats?['totalRevenue']),
                                   Icons.attach_money,
                                   Colors.purple,
                                 ),
@@ -490,6 +612,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      _buildVehicleTrackingMap(),
                       const SizedBox(height: 16),
                       _buildPredictionSummaryCard(),
                       const SizedBox(height: 16),
@@ -691,6 +815,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         '${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
   }
 
+  String _formatRevenue(dynamic value) {
+    if (value == null) return '0';
+    final amount = (value is num) ? value : double.tryParse(value.toString());
+    if (amount == null) return '0';
+    if (amount >= 1000000) {
+      return '${(amount / 1000000).toStringAsFixed(1)}M';
+    } else if (amount >= 1000) {
+      return '${(amount / 1000).toStringAsFixed(1)}K';
+    }
+    return amount.toStringAsFixed(0);
+  }
+
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
@@ -716,6 +852,310 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVehicleTrackingMap() {
+    // Determine center point
+    LatLng center = _baseStations.isNotEmpty
+        ? LatLng(
+            _baseStations[0]['latitude']?.toDouble() ?? 31.9522,
+            _baseStations[0]['longitude']?.toDouble() ?? 35.2332,
+          )
+        : _vehicleLocations.isNotEmpty
+            ? LatLng(
+                _vehicleLocations[0]['latitude']?.toDouble() ?? 31.9522,
+                _vehicleLocations[0]['longitude']?.toDouble() ?? 35.2332,
+              )
+            : const LatLng(31.9522, 35.2332);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.08),
+            Colors.white.withValues(alpha: 0.03),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.15),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 10,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.cyan.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.map,
+                        color: Colors.cyan,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        _isArabic ? 'تتبع المركبات' : 'Vehicle Tracking',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(width: 6),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.open_in_full,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AdminMapPage(),
+                          ),
+                        );
+                      },
+                      tooltip: _isArabic ? 'عرض كامل' : 'Full View',
+                      padding: const EdgeInsets.all(8),
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            height: 320,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.2),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 15,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: _mapLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: center,
+                        initialZoom: 12.0,
+                        interactionOptions: const InteractionOptions(
+                          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                        ),
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName:
+                              'com.example.taxi_palestine_app',
+                        ),
+                        // Base station markers with better styling
+                        MarkerLayer(
+                          markers: _baseStations.map((station) {
+                            final lat = station['latitude']?.toDouble() ?? 0.0;
+                            final lng = station['longitude']?.toDouble() ?? 0.0;
+                            return Marker(
+                              point: LatLng(lat, lng),
+                              width: 45,
+                              height: 45,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withValues(alpha: 0.9),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.blue.withValues(alpha: 0.5),
+                                      blurRadius: 8,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.location_city,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        // Vehicle markers with better styling
+                        MarkerLayer(
+                          markers: _vehicleLocations.map((location) {
+                            final lat = location['latitude']?.toDouble() ?? 0.0;
+                            final lng =
+                                location['longitude']?.toDouble() ?? 0.0;
+                            final isAtStation =
+                                location['is_at_station'] == true;
+                            final markerColor =
+                                isAtStation ? Colors.green : Colors.red;
+                            return Marker(
+                              point: LatLng(lat, lng),
+                              width: 50,
+                              height: 50,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: markerColor.withValues(alpha: 0.9),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: markerColor.withValues(alpha: 0.6),
+                                      blurRadius: 10,
+                                      spreadRadius: 3,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Icons.local_taxi,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Improved legend
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildMapLegendItem(
+                  Icons.local_taxi,
+                  Colors.red,
+                  _isArabic ? 'في الطريق' : 'On Route',
+                ),
+                Container(
+                  width: 1,
+                  height: 20,
+                  color: Colors.white.withValues(alpha: 0.2),
+                ),
+                _buildMapLegendItem(
+                  Icons.local_taxi,
+                  Colors.green,
+                  _isArabic ? 'في المحطة' : 'At Station',
+                ),
+                Container(
+                  width: 1,
+                  height: 20,
+                  color: Colors.white.withValues(alpha: 0.2),
+                ),
+                _buildMapLegendItem(
+                  Icons.location_city,
+                  Colors.blue,
+                  _isArabic ? 'محطة' : 'Station',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapLegendItem(IconData icon, Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Icon(icon, color: color, size: 14),
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ),
       ],

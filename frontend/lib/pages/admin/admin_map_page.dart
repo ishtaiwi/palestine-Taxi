@@ -167,33 +167,38 @@ class _AdminMapPageState extends State<AdminMapPage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   color: Colors.grey[200],
-                  child: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Filter by Line: '),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: DropdownButton<String>(
-                          value: _selectedLineId,
-                          isExpanded: true,
-                          hint: const Text('All Lines'),
-                          items: [
-                            const DropdownMenuItem<String>(
-                              value: null,
-                              child: Text('All Lines'),
+                      Row(
+                        children: [
+                          const Text('Filter by Line: '),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: DropdownButton<String>(
+                              value: _selectedLineId,
+                              isExpanded: true,
+                              hint: const Text('All Lines'),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('All Lines'),
+                                ),
+                                ..._lines.map((line) => DropdownMenuItem<String>(
+                                      value: line['lineid'].toString(),
+                                      child: Text(line['linename'] ?? 'Unknown'),
+                                    )),
+                              ],
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedLineId = value;
+                                });
+                              },
                             ),
-                            ..._lines.map((line) => DropdownMenuItem<String>(
-                                  value: line['lineid'].toString(),
-                                  child: Text(line['linename'] ?? 'Unknown'),
-                                )),
-                          ],
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedLineId = value;
-                            });
-                          },
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           const Text('Show Geofence: '),
@@ -324,28 +329,34 @@ class _AdminMapPageState extends State<AdminMapPage> {
 
                 // Stats bar
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                   color: Colors.grey[200],
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildStatItem(
-                        'Active Vehicles',
-                        _filteredVehicleLocations.length.toString(),
-                        Colors.blue,
+                      Flexible(
+                        child: _buildStatItem(
+                          'Active Vehicles',
+                          _filteredVehicleLocations.length.toString(),
+                          Colors.blue,
+                        ),
                       ),
-                      _buildStatItem(
-                        'At Base Station',
-                        _filteredVehicleLocations
-                            .where((loc) => loc['is_at_station'] == true)
-                            .length
-                            .toString(),
-                        Colors.green,
+                      Flexible(
+                        child: _buildStatItem(
+                          'At Base Station',
+                          _filteredVehicleLocations
+                              .where((loc) => loc['is_at_station'] == true)
+                              .length
+                              .toString(),
+                          Colors.green,
+                        ),
                       ),
-                      _buildStatItem(
-                        'Base Stations',
-                        _baseStations.length.toString(),
-                        Colors.orange,
+                      Flexible(
+                        child: _buildStatItem(
+                          'Base Stations',
+                          _baseStations.length.toString(),
+                          Colors.orange,
+                        ),
                       ),
                     ],
                   ),
@@ -357,6 +368,7 @@ class _AdminMapPageState extends State<AdminMapPage> {
 
   Widget _buildStatItem(String label, String value, Color color) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           value,
@@ -365,10 +377,15 @@ class _AdminMapPageState extends State<AdminMapPage> {
             fontWeight: FontWeight.bold,
             color: color,
           ),
+          overflow: TextOverflow.ellipsis,
         ),
+        const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(fontSize: 12),
+          style: const TextStyle(fontSize: 11),
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 2,
         ),
       ],
     );

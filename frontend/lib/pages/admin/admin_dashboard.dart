@@ -8,6 +8,8 @@ import 'admin_vehicles_page.dart';
 import 'admin_trips_page.dart';
 import 'admin_payments_page.dart';
 import 'admin_predictions_page.dart';
+import 'admin_map_page.dart';
+import 'admin_base_station_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -386,6 +388,44 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                   MaterialPageRoute(
                                     builder: (context) =>
                                         const AdminPredictionsPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildActionCard(
+                              icon: Icons.map,
+                              title: _isArabic ? 'خريطة المركبات' : 'Vehicle Map',
+                              color: Colors.cyan,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const AdminMapPage(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildActionCard(
+                              icon: Icons.location_city,
+                              title: _isArabic ? 'محطات القاعدة' : 'Base Stations',
+                              color: Colors.brown,
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const AdminBaseStationPage(),
                                   ),
                                 );
                               },

@@ -2582,4 +2582,632 @@ class ApiService {
       throw Exception(exception.toString());
     }
   }
+
+  // ============================================
+  // LOCATION TRACKING API
+  // ============================================
+
+  /// Update driver's current location
+  static Future<Map<String, dynamic>> updateDriverLocation({
+    required double latitude,
+    required double longitude,
+    double? heading,
+    double? speed,
+    double? accuracy,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/locations/update'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json; charset=utf-8',
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode({
+              'latitude': latitude,
+              'longitude': longitude,
+              if (heading != null) 'heading': heading,
+              if (speed != null) 'speed': speed,
+              if (accuracy != null) 'accuracy': accuracy,
+            }),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Location updated successfully',
+          'location': decoded['location'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to update location',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Get driver's current location
+  static Future<Map<String, dynamic>> getMyLocation() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/locations/driver/my-location'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'location': decoded['location'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Location not found',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Get all vehicle locations (admin)
+  static Future<Map<String, dynamic>> getAllVehicleLocations({
+    int? maxAgeMinutes,
+    String? lineid,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final queryParams = <String, String>{};
+      if (maxAgeMinutes != null) {
+        queryParams['maxAgeMinutes'] = maxAgeMinutes.toString();
+      }
+      if (lineid != null) {
+        queryParams['lineid'] = lineid;
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/locations/admin/vehicles')
+          .replace(
+              queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'locations': decoded['locations'] ?? [],
+          'count': decoded['count'] ?? 0,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': 'Failed to load vehicle locations',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Get drivers at base station (admin)
+  static Future<Map<String, dynamic>> getDriversAtBaseStation({
+    String? stationid,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final queryParams = <String, String>{};
+      if (stationid != null) {
+        queryParams['stationid'] = stationid;
+      }
+
+      final uri = Uri.parse(
+              '${AppConfig.apiBaseUrl}/locations/admin/base-station/drivers')
+          .replace(
+              queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'drivers': decoded['drivers'] ?? [],
+          'count': decoded['count'] ?? 0,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': 'Failed to load drivers at base station',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  // ============================================
+  // BASE STATION API
+  // ============================================
+
+  /// Get all base stations (admin)
+  static Future<Map<String, dynamic>> getAllBaseStations({
+    bool? isActive,
+    String? lineid,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final queryParams = <String, String>{};
+      if (isActive != null) {
+        queryParams['is_active'] = isActive.toString();
+      }
+      if (lineid != null) {
+        queryParams['lineid'] = lineid;
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/base-station')
+          .replace(
+              queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'stations': decoded['stations'] ?? [],
+          'count': decoded['count'] ?? 0,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': 'Failed to load base stations',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Get base station by ID (admin)
+  static Future<Map<String, dynamic>> getBaseStationById(
+      String stationid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/base-station/$stationid'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'station': decoded['station'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to load base station',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Create base station (admin)
+  static Future<Map<String, dynamic>> createBaseStation({
+    required String name,
+    required double latitude,
+    required double longitude,
+    int? geofenceRadiusMeters,
+    String? lineid,
+    bool? isActive,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/admin/base-station'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json; charset=utf-8',
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode({
+              'name': name,
+              'latitude': latitude,
+              'longitude': longitude,
+              if (geofenceRadiusMeters != null)
+                'geofence_radius_meters': geofenceRadiusMeters,
+              if (lineid != null) 'lineid': lineid,
+              if (isActive != null) 'is_active': isActive,
+            }),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 201 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Base station created successfully',
+          'station': decoded['station'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to create base station',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Update base station (admin)
+  static Future<Map<String, dynamic>> updateBaseStation({
+    required String stationid,
+    String? name,
+    double? latitude,
+    double? longitude,
+    int? geofenceRadiusMeters,
+    String? lineid,
+    bool? isActive,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http
+          .put(
+            Uri.parse('${AppConfig.apiBaseUrl}/admin/base-station/$stationid'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json; charset=utf-8',
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode({
+              if (name != null) 'name': name,
+              if (latitude != null) 'latitude': latitude,
+              if (longitude != null) 'longitude': longitude,
+              if (geofenceRadiusMeters != null)
+                'geofence_radius_meters': geofenceRadiusMeters,
+              if (lineid != null) 'lineid': lineid,
+              if (isActive != null) 'is_active': isActive,
+            }),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Base station updated successfully',
+          'station': decoded['station'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to update base station',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Delete base station (admin)
+  static Future<Map<String, dynamic>> deleteBaseStation(
+      String stationid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.delete(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/base-station/$stationid'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Base station deleted successfully',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to delete base station',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  // ============================================
+  // LINE PATH API
+  // ============================================
+
+  /// Get line path
+  static Future<Map<String, dynamic>> getLinePath(String lineid) async {
+    try {
+      final token = await getToken();
+      final headers = <String, String>{
+        'Accept': 'application/json; charset=utf-8',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final response = await http
+          .get(
+            Uri.parse('${AppConfig.apiBaseUrl}/lines/$lineid/path'),
+            headers: headers,
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'path': decoded['path'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Path not found',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Create or update line path (admin)
+  static Future<Map<String, dynamic>> createOrUpdateLinePath({
+    required String lineid,
+    required List<Map<String, dynamic>> waypoints,
+    String? polyline,
+    double? distanceMeters,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/admin/lines/$lineid/path'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Accept': 'application/json; charset=utf-8',
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: jsonEncode({
+              'waypoints': waypoints,
+              if (polyline != null) 'polyline': polyline,
+              if (distanceMeters != null) 'distance_meters': distanceMeters,
+            }),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Line path saved successfully',
+          'path': decoded['path'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to save line path',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Delete line path (admin)
+  static Future<Map<String, dynamic>> deleteLinePath(String lineid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.delete(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/lines/$lineid/path'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Line path deleted successfully',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to delete line path',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
 }

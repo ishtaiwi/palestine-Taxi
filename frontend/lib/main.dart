@@ -5,4 +5,5 @@ import 'utils/server_time_sync.dart';
 void main() {
   runApp(const TaxiPalestineApp());
   TimeSyncService.sync();
+  print("app started");
 }

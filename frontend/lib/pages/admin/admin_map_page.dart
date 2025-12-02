@@ -1,0 +1,407 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../../services/api_service.dart';
+import '../../services/supabase_realtime_service.dart';
+
+class AdminMapPage extends StatefulWidget {
+  const AdminMapPage({super.key});
+
+  @override
+  State<AdminMapPage> createState() => _AdminMapPageState();
+}
+
+class _AdminMapPageState extends State<AdminMapPage> {
+  final MapController _mapController = MapController();
+  List<Map<String, dynamic>> _vehicleLocations = [];
+  List<Map<String, dynamic>> _baseStations = [];
+  List<Map<String, dynamic>> _lines = [];
+  List<Map<String, dynamic>> _linePaths = [];
+  String? _selectedLineId;
+  bool _isLoading = true;
+  bool _showBaseStationGeofence = true;
+  LatLng? _center;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+    _subscribeToRealtimeUpdates();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Load vehicle locations
+      final locationsResult = await ApiService.getAllVehicleLocations();
+      if (locationsResult['success'] == true) {
+        setState(() {
+          _vehicleLocations = locationsResult['locations'] ?? [];
+        });
+      }
+
+      // Load base stations
+      final stationsResult =
+          await ApiService.getAllBaseStations(isActive: true);
+      if (stationsResult['success'] == true) {
+        setState(() {
+          _baseStations = stationsResult['stations'] ?? [];
+          if (_baseStations.isNotEmpty && _center == null) {
+            _center = LatLng(
+              _baseStations[0]['latitude']?.toDouble() ?? 31.9522,
+              _baseStations[0]['longitude']?.toDouble() ?? 35.2332,
+            );
+          }
+        });
+      }
+
+      // Load lines
+      final linesResult = await ApiService.fetchActiveLines();
+      setState(() {
+        _lines = linesResult;
+      });
+
+      // Load line paths
+      await _loadLinePaths();
+
+      // Set center to first vehicle if no base station
+      if (_center == null && _vehicleLocations.isNotEmpty) {
+        final loc = _vehicleLocations[0];
+        _center = LatLng(
+          loc['latitude']?.toDouble() ?? 31.9522,
+          loc['longitude']?.toDouble() ?? 35.2332,
+        );
+      }
+
+      if (_center == null) {
+        _center = const LatLng(31.9522, 35.2332); // Default to Palestine center
+      }
+    } catch (e) {
+      print('Error loading map data: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadLinePaths() async {
+    final paths = <Map<String, dynamic>>[];
+    for (final line in _lines) {
+      try {
+        final pathResult =
+            await ApiService.getLinePath(line['lineid'].toString());
+        if (pathResult['success'] == true && pathResult['path'] != null) {
+          paths.add({
+            'lineid': line['lineid'],
+            'path': pathResult['path'],
+          });
+        }
+      } catch (e) {
+        // Ignore errors for lines without paths
+      }
+    }
+    setState(() {
+      _linePaths = paths;
+    });
+  }
+
+  void _subscribeToRealtimeUpdates() {
+    // Subscribe to vehicle location updates via Supabase Realtime
+    SupabaseRealtimeService.subscribeToVehicleLocations((update) {
+      if (mounted) {
+        setState(() {
+          // Update or add vehicle location
+          final vehicleid = update['vehicleid'];
+          final index = _vehicleLocations.indexWhere(
+            (loc) => loc['vehicleid'] == vehicleid,
+          );
+          if (index >= 0) {
+            _vehicleLocations[index] = update;
+          } else {
+            _vehicleLocations.add(update);
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    SupabaseRealtimeService.unsubscribe();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _filteredVehicleLocations {
+    if (_selectedLineId == null) {
+      return _vehicleLocations;
+    }
+    return _vehicleLocations.where((loc) {
+      return loc['vehicle']?['lineid'] == _selectedLineId;
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Vehicle Tracking Map'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadData,
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                // Filter bar
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: Colors.grey[200],
+                  child: Row(
+                    children: [
+                      const Text('Filter by Line: '),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButton<String>(
+                          value: _selectedLineId,
+                          isExpanded: true,
+                          hint: const Text('All Lines'),
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('All Lines'),
+                            ),
+                            ..._lines.map((line) => DropdownMenuItem<String>(
+                                  value: line['lineid'].toString(),
+                                  child: Text(line['linename'] ?? 'Unknown'),
+                                )),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedLineId = value;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Row(
+                        children: [
+                          const Text('Show Geofence: '),
+                          Switch(
+                            value: _showBaseStationGeofence,
+                            onChanged: (value) {
+                              setState(() {
+                                _showBaseStationGeofence = value;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Map
+                Expanded(
+                  child: FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: _center ?? const LatLng(31.9522, 35.2332),
+                      initialZoom: 13.0,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.taxi_palestine_app',
+                      ),
+                      // Base station markers and geofence circles
+                      ..._baseStations.map((station) {
+                        final lat = station['latitude']?.toDouble() ?? 0.0;
+                        final lng = station['longitude']?.toDouble() ?? 0.0;
+
+                        return MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: LatLng(lat, lng),
+                              width: 40,
+                              height: 40,
+                              child: const Icon(
+                                Icons.location_city,
+                                color: Colors.blue,
+                                size: 40,
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
+                      // Geofence circles
+                      if (_showBaseStationGeofence)
+                        ..._baseStations.map((station) {
+                          final lat = station['latitude']?.toDouble() ?? 0.0;
+                          final lng = station['longitude']?.toDouble() ?? 0.0;
+                          final radius =
+                              station['geofence_radius_meters']?.toInt() ?? 100;
+
+                          return CircleLayer(
+                            circles: [
+                              CircleMarker(
+                                point: LatLng(lat, lng),
+                                radius: radius.toDouble(),
+                                color: Colors.blue.withOpacity(0.2),
+                                borderColor: Colors.blue,
+                                useRadiusInMeter: true,
+                              ),
+                            ],
+                          );
+                        }),
+                      // Line paths
+                      ..._linePaths.map((linePath) {
+                        final path = linePath['path'] as Map<String, dynamic>;
+                        final waypoints = path['waypoints'] as List?;
+                        if (waypoints == null || waypoints.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+
+                        final points = waypoints
+                            .map((wp) => LatLng(
+                                  wp['lat']?.toDouble() ??
+                                      wp['latitude']?.toDouble() ??
+                                      0.0,
+                                  wp['lng']?.toDouble() ??
+                                      wp['longitude']?.toDouble() ??
+                                      0.0,
+                                ))
+                            .toList();
+
+                        return PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: points,
+                              strokeWidth: 3,
+                              color: Colors.orange,
+                            ),
+                          ],
+                        );
+                      }),
+                      // Vehicle markers
+                      MarkerLayer(
+                        markers: _filteredVehicleLocations.map((location) {
+                          final lat = location['latitude']?.toDouble() ?? 0.0;
+                          final lng = location['longitude']?.toDouble() ?? 0.0;
+                          final isAtStation = location['is_at_station'] == true;
+
+                          return Marker(
+                            point: LatLng(lat, lng),
+                            width: 50,
+                            height: 50,
+                            child: GestureDetector(
+                              onTap: () {
+                                _showVehicleInfo(context, location);
+                              },
+                              child: Icon(
+                                Icons.local_taxi,
+                                color: isAtStation ? Colors.green : Colors.red,
+                                size: 40,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Stats bar
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  color: Colors.grey[200],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildStatItem(
+                        'Active Vehicles',
+                        _filteredVehicleLocations.length.toString(),
+                        Colors.blue,
+                      ),
+                      _buildStatItem(
+                        'At Base Station',
+                        _filteredVehicleLocations
+                            .where((loc) => loc['is_at_station'] == true)
+                            .length
+                            .toString(),
+                        Colors.green,
+                      ),
+                      _buildStatItem(
+                        'Base Stations',
+                        _baseStations.length.toString(),
+                        Colors.orange,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  void _showVehicleInfo(BuildContext context, Map<String, dynamic> location) {
+    final vehicle = location['vehicle'];
+    final driver = location['driver'];
+    final isAtStation = location['is_at_station'] == true;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(vehicle?['plateno'] ?? 'Unknown Vehicle'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Driver: ${driver?['user']?['fullname'] ?? 'Unknown'}'),
+            Text('Phone: ${driver?['user']?['phone'] ?? 'N/A'}'),
+            Text('Line: ${vehicle?['line']?['linename'] ?? 'N/A'}'),
+            Text('Status: ${isAtStation ? 'At Base Station' : 'On Route'}'),
+            Text(
+                'Last Update: ${location['updated_at']?.toString().substring(0, 19) ?? 'N/A'}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+}

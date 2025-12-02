@@ -31,8 +31,8 @@ export default {
   appName: process.env.APP_NAME || 'Service Taxi Reservation System',
   defaultLanguage: process.env.DEFAULT_LANGUAGE || 'ar',
   jwt: {
-    secret: process.env.JWT_SECRET,
-    expiresIn: process.env.JWT_ACCESS_EXPIRY,
+    secret: process.env.JWT_SECRET ,
+    expiresIn: process.env.JWT_ACCESS_EXPIRY ,
   },
   payment: {
     palpayApiKey: process.env.PALPAY_API_KEY,

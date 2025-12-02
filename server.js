@@ -8,7 +8,7 @@ import { testConnection, getConnectionStatus } from './config/dbcon.js';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './docs/swagger.js';
 import { generalLimiter } from './middleware/rateLimit.js';
-
+import timeRoutes from './routes/timeRoute.js';
 
 import authRoutes from './routes/authRoutes.js';
 import lineRoutes from './routes/lineRoutes.js';
@@ -18,13 +18,26 @@ import vehicleRoutes from './routes/vehicleRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import driverRoutes from './routes/driverRoutes.js';
+import scheduleRoutes from './routes/scheduleRoutes.js';
+import ratingRoutes from './routes/ratingRoutes.js';
+import locationRoutes from './routes/locationRoutes.js';
+
+
+// Background Jobs
+import { startTripOpeningJob } from './jobs/tripOpeningJob.js';
+import { startDepartureCheckJob } from './jobs/departureCheckJob.js';
+import { startNoShowCheckJob } from './jobs/noShowCheckJob.js';
+import { startDailyTripCreationJob } from './jobs/dailyTripCreationJob.js';
+import { startPredictionUpdateJob } from './jobs/predictionUpdateJob.js';
+import { initializeModel } from './services/rushHourPredictionService.js';
 
 const app = express();
 
 
 app.use(cors(appConfig.cors));
-app.use(express.json({ limit: '10mb' })); 
-app.use(express.urlencoded({ extended: true, limit: '10mb' })); 
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(i18n);
 
 
@@ -83,7 +96,11 @@ app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/wallets', walletRoutes);
 app.use('/api/admin', adminRoutes);
-
+app.use('/api/drivers', driverRoutes);
+app.use('/api/schedules', scheduleRoutes);
+app.use('/api/ratings', ratingRoutes);
+app.use('/api/time', timeRoutes);
+app.use('/api/locations', locationRoutes);
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
@@ -99,15 +116,36 @@ app.listen(PORT, async () => {
   logger.info(`Server running on port ${PORT}`);
   logger.info(`Environment: ${appConfig.nodeEnv}`);
   logger.info(`API Base URL: http://localhost:${PORT}/api`);
-  
-  
+
+
   logger.info('Testing database connection...');
   const dbTest = await testConnection();
   if (dbTest.connected) {
     logger.info('✅ Database connection verified');
+
+    // Start background jobs
+    logger.info('Starting background jobs...');
+    startTripOpeningJob();
+    startDepartureCheckJob();
+    startNoShowCheckJob();
+    startDailyTripCreationJob();
+    startPredictionUpdateJob();
+    logger.info('✅ All background jobs started');
+
+    // Initialize prediction model in background (non-blocking)
+    setImmediate(async () => {
+      try {
+        await initializeModel();
+      } catch (error) {
+        logger.warn('⚠️ Failed to initialize prediction model on startup', {
+          error: error.message,
+        });
+      }
+    });
   } else {
     logger.warn('⚠️ Database connection failed. Please check your configuration.');
     logger.warn(`Error: ${dbTest.error || 'Unknown error'}`);
+    logger.warn('⚠️ Background jobs not started due to database connection failure');
   }
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {

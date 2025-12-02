@@ -7,7 +7,7 @@ class Rating {
       .insert([ratingData])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   }
@@ -18,7 +18,7 @@ class Rating {
       .select('*, reservation(*), passenger(*, user(*)), trip(*)')
       .eq('ratingid', ratingid)
       .single();
-    
+
     if (error) throw error;
     return data;
   }
@@ -29,7 +29,7 @@ class Rating {
       .select('*, reservation(*), passenger(*, user(*)), trip(*)')
       .eq('bookingid', bookingid)
       .single();
-    
+
     if (error && error.code !== 'PGRST116') throw error;
     return data;
   }
@@ -40,7 +40,7 @@ class Rating {
       .select('*, reservation(*), passenger(*, user(*))')
       .eq('tripid', tripid)
       .order('created_at', { ascending: false });
-    
+
     if (error) throw error;
     return data;
   }
@@ -51,7 +51,7 @@ class Rating {
       .select('*, reservation(*), trip(*, line(*))')
       .eq('passengerid', passengerid)
       .order('created_at', { ascending: false });
-    
+
     if (error) throw error;
     return data;
   }
@@ -63,7 +63,7 @@ class Rating {
       .eq('ratingid', ratingid)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   }
@@ -73,16 +73,16 @@ class Rating {
       .from('trip_rating')
       .select('rating')
       .eq('tripid', tripid);
-    
+
     if (error) throw error;
-    
+
     if (!data || data.length === 0) {
       return { average: 0, count: 0 };
     }
-    
+
     const sum = data.reduce((acc, item) => acc + item.rating, 0);
     const average = sum / data.length;
-    
+
     return {
       average: Math.round(average * 10) / 10, // Round to 1 decimal place
       count: data.length,
@@ -94,7 +94,7 @@ class Rating {
       .from('trip_rating')
       .delete()
       .eq('ratingid', ratingid);
-    
+
     if (error) throw error;
     return true;
   }

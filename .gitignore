@@ -1,34 +1,214 @@
 # Dependencies
 node_modules/
-package-lock.json
-yarn.lock
 
 # Environment variables
 .env
 .env.local
+.env.*.local
 .env.production
+.env.development
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+frontend/.dart_tool/
+**/.dart_tool/
+frontend/.flutter-plugins
+**/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+**/.flutter-plugins-dependencies
+frontend/.packages
+**/.packages
+.metadata
+**/.metadata
+.pub-cache/
+**/.pub-cache/
+.pub/
+**/.pub/
+frontend/build/
+**/build/
+/coverage/
+**/coverage/
+
+# Build outputs
+frontend/android/app/build/
+frontend/android/build/
+frontend/android/.gradle/
+**/android/.gradle
+frontend/android/local.properties
+**/android/local.properties
+frontend/android/.idea/
+frontend/android/*.iml
+**/android/**/*.iml
+
+# Android related
+**/android/**/gradle-wrapper.jar
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/**/GeneratedPluginRegistrant.java
+frontend/android/.cxx/
+**/android/.cxx/
+frontend/android/.externalNativeBuild/
+**/android/.externalNativeBuild/
+
+# Android Studio will place build artifacts here
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
+
+# iOS/XCode related
+frontend/ios/Pods/
+**/ios/Pods/
+frontend/ios/.symlinks/
+**/ios/.symlinks/
+frontend/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.framework
+frontend/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Flutter.podspec
+frontend/ios/Flutter/ephemeral/
+**/ios/Flutter/ephemeral/
+frontend/ios/Flutter/Debug.xcconfig
+**/ios/Flutter/Debug.xcconfig
+frontend/ios/Flutter/Release.xcconfig
+**/ios/Flutter/Release.xcconfig
+frontend/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/Generated.xcconfig
+frontend/ios/.generated/
+**/ios/.generated/
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/*sync/
+**/ios/**/.sconsign.dblite
+**/ios/**/.tags*
+**/ios/**/.vagrant/
+**/ios/**/DerivedData/
+**/ios/**/Icon?
+**/ios/**/profile
+**/ios/**/xcuserdata
+**/ios/Flutter/App.framework
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# macOS/XCode related
+frontend/macos/Flutter/Flutter-Debug.xcconfig
+**/macos/Flutter/Flutter-Debug.xcconfig
+frontend/macos/Flutter/Flutter-Release.xcconfig
+**/macos/Flutter/Flutter-Release.xcconfig
+frontend/macos/Flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+**/macos/**/DerivedData/
+**/macos/**/Pods/
+**/macos/**/.symlinks/
+**/macos/**/xcuserdata
+
+# Flutter/Dart general
+*.iml
+**/*.iml
+.idea/
+**/.idea/
+
+# Symbolication related
+**/app.*.symbols
+
+# Obfuscation related
+**/app.*.map.json
 
 # Logs
 logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory
+coverage/
+*.lcov
+.nyc_output/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Output of 'npm pack'
+*.tgz
+
+# IDEs and editors
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
 
 # OS files
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Build
-dist/
-build/
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
 # Temporary files
-tmp/
-temp/
+*.tmp
+*.temp
+*.bak
+*.cache
 
+# Miscellaneous
+*.class
+*.pyc
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
 
+# IntelliJ related
+*.ipr
+*.iws
+
+# Recovered files
+recovered_file_*
+Pal-Taxi/
+
+# Uploaded files / media
+uploads/
+public/uploads/
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Redis dump
+dump.rdb
+
+# PM2
+.pm2/
+
+# Exceptions to above rules.
+!**/ios/**/default.mode1v3
+!**/ios/**/default.mode2v3
+!**/ios/**/default.pbxuser
+!**/ios/**/default.perspectivev3
+!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages

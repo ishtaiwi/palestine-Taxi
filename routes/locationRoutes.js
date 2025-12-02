@@ -1,5 +1,10 @@
 import express from 'express';
-import { updateDriverLocation, getDriverLocation } from '../controllers/locationController.js';
+import {
+  updateDriverLocation,
+  getDriverLocation,
+  getAllVehicleLocations,
+  getDriversAtBaseStation,
+} from '../controllers/locationController.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireDriver, requireAdmin } from '../middleware/authorization.js';
 
@@ -11,5 +16,6 @@ router.get('/driver/my-location', authenticate, requireDriver, getDriverLocation
 
 // Admin endpoints - for admin dashboard to get all vehicle locations
 router.get('/admin/vehicles', authenticate, requireAdmin, getAllVehicleLocations);
+router.get('/admin/base-station/drivers', authenticate, requireAdmin, getDriversAtBaseStation);
 
 export default router;

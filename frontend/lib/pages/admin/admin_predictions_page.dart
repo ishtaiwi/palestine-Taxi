@@ -33,16 +33,19 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
 
     try {
       final lines = await ApiService.getAllLines();
-      final selectedLine =
-          lines.isNotEmpty ? lines.first['lineid'] as String? : null;
+      final selectedLine = lines.isNotEmpty
+          ? lines.first['lineid'] as String?
+          : null;
       Map<String, dynamic>? predictions;
       List<Map<String, dynamic>> recommendations = [];
 
       if (selectedLine != null) {
-        predictions =
-            await ApiService.getRushHourPredictionsAdmin(lineId: selectedLine);
+        predictions = await ApiService.getRushHourPredictionsAdmin(
+          lineId: selectedLine,
+        );
         recommendations = await ApiService.getScheduleRecommendationsAdmin(
-            lineIds: [selectedLine]);
+          lineIds: [selectedLine],
+        );
       }
 
       final insights = await ApiService.getPredictionInsightsAdmin(limit: 5);
@@ -72,10 +75,12 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     });
 
     try {
-      final predictions =
-          await ApiService.getRushHourPredictionsAdmin(lineId: lineId);
-      final recommendations =
-          await ApiService.getScheduleRecommendationsAdmin(lineIds: [lineId]);
+      final predictions = await ApiService.getRushHourPredictionsAdmin(
+        lineId: lineId,
+      );
+      final recommendations = await ApiService.getScheduleRecommendationsAdmin(
+        lineIds: [lineId],
+      );
 
       setState(() {
         _predictionData = predictions['data'] ?? predictions;
@@ -96,16 +101,19 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     });
 
     try {
-      final result =
-          await ApiService.applyScheduleRecommendationAdmin(recommendation);
+      final result = await ApiService.applyScheduleRecommendationAdmin(
+        recommendation,
+      );
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text(result['message'] ?? 'Recommendation applied successfully'),
-          backgroundColor:
-              result['success'] == true ? Colors.green : Colors.red,
+          content: Text(
+            result['message'] ?? 'Recommendation applied successfully',
+          ),
+          backgroundColor: result['success'] == true
+              ? Colors.green
+              : Colors.red,
           duration: const Duration(seconds: 3),
         ),
       );
@@ -137,15 +145,17 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       _isRetraining = true;
     });
 
-    final result =
-        await ApiService.triggerPredictionRetrain(lineId: _selectedLineId);
+    final result = await ApiService.triggerPredictionRetrain(
+      lineId: _selectedLineId,
+    );
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(result['message'] ?? 'Retrain triggered'),
-        backgroundColor:
-            result['success'] == false ? Colors.red : Colors.blueGrey,
+        backgroundColor: result['success'] == false
+            ? Colors.red
+            : Colors.blueGrey,
       ),
     );
 
@@ -182,63 +192,64 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.redAccent),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadData,
-                  color: Colors.deepPurple,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          ? Center(
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              color: Colors.deepPurple,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                value: _selectedLineId,
-                                decoration: const InputDecoration(
-                                  labelText: 'Line',
-                                  filled: true,
-                                  fillColor: Color(0xFF10152A),
-                                  labelStyle: TextStyle(color: Colors.white70),
-                                  border: OutlineInputBorder(),
-                                ),
-                                dropdownColor: const Color(0xFF10152A),
-                                items: _lines
-                                    .map(
-                                      (line) => DropdownMenuItem<String>(
-                                        value: line['lineid'] as String?,
-                                        child: Text(
-                                          line['name_en'] ??
-                                              line['linename'] ??
-                                              'Line',
-                                          style: const TextStyle(
-                                              color: Colors.white),
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: _onLineChanged,
-                              ),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _selectedLineId,
+                            decoration: const InputDecoration(
+                              labelText: 'Line',
+                              filled: true,
+                              fillColor: Color(0xFF10152A),
+                              labelStyle: TextStyle(color: Colors.white70),
+                              border: OutlineInputBorder(),
                             ),
-                          ],
+                            dropdownColor: const Color(0xFF10152A),
+                            items: _lines
+                                .map(
+                                  (line) => DropdownMenuItem<String>(
+                                    value: line['lineid'] as String?,
+                                    child: Text(
+                                      line['name_en'] ??
+                                          line['linename'] ??
+                                          'Line',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: _onLineChanged,
+                          ),
                         ),
-                        const SizedBox(height: 16),
-                        _buildPredictionsSection(),
-                        const SizedBox(height: 16),
-                        _buildRecommendationsSection(),
-                        const SizedBox(height: 16),
-                        _buildInsightsSection(),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    _buildPredictionsSection(),
+                    const SizedBox(height: 16),
+                    _buildRecommendationsSection(),
+                    const SizedBox(height: 16),
+                    _buildInsightsSection(),
+                  ],
                 ),
+              ),
+            ),
     );
   }
 
@@ -261,12 +272,16 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                 return ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
-                  leading:
-                      const Icon(Icons.trending_up, color: Colors.orangeAccent),
+                  leading: const Icon(
+                    Icons.trending_up,
+                    color: Colors.orangeAccent,
+                  ),
                   title: Text(
                     '${prediction['date']} • ${_formatHour(prediction['hour'])}',
                     style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   subtitle: Text(
                     'Expected bookings: ${prediction['expectedBookings']?.toStringAsFixed(1) ?? prediction['expectedBookings']}\n'
@@ -334,6 +349,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                           side: const BorderSide(color: Colors.orange),
                         ),
                       ),
+                      const Spacer(),
                       Chip(
                         label: Text(
                           'Utilization ${(rec['utilization'] ?? 0).toStringAsFixed(2)}',
@@ -414,8 +430,10 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                 final data = line as Map<String, dynamic>;
                 return ListTile(
                   dense: true,
-                  leading: const Icon(Icons.directions_transit,
-                      color: Colors.lightBlueAccent),
+                  leading: const Icon(
+                    Icons.directions_transit,
+                    color: Colors.lightBlueAccent,
+                  ),
                   title: Text(
                     data['lineid'] ?? '',
                     style: const TextStyle(color: Colors.white),

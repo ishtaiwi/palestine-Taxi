@@ -212,3 +212,9 @@ dump.rdb
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+
+
+# README files
+README.md
+**/README.md
+**/README*.md

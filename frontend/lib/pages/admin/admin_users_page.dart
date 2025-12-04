@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
 
 class AdminUsersPage extends StatefulWidget {
   const AdminUsersPage({super.key});
@@ -83,6 +84,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   @override
   void initState() {
     super.initState();
+    AppTheme.init();
     _loadData();
     _loadLanguagePreference();
   }
@@ -150,10 +152,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                   colors: [color.withOpacity(0.2), color.withOpacity(0.1)],
                 )
               : null,
-          color: isSelected ? null : Colors.grey.shade100,
+          color: isSelected ? null : AppTheme.getCardBackground(0.1),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? color : Colors.grey.shade300,
+            color: isSelected ? color : AppTheme.getCardBorder(0.3),
             width: isSelected ? 2 : 1.5,
           ),
           boxShadow: isSelected
@@ -171,14 +173,14 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
           children: [
             Icon(
               icon,
-              color: isSelected ? color : Colors.grey.shade600,
+              color: isSelected ? color : AppTheme.textSecondary,
               size: 18,
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? color : const Color(0xFF1E3A5F),
+                color: isSelected ? color : AppTheme.textPrimary,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                 fontSize: 14,
               ),
@@ -223,15 +225,18 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.white, Color(0xFFF8F9FA)],
+          colors: [
+            AppTheme.getCardBackground(0.1),
+            AppTheme.getCardBackground(0.05),
+          ],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: AppTheme.getShadowColor(0.08),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -286,8 +291,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                     children: [
                       Text(
                         user['fullname'] ?? '',
-                        style: const TextStyle(
-                          color: Color(0xFF1E3A5F),
+                        style: TextStyle(
+                          color: AppTheme.textPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.3,
@@ -299,14 +304,14 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                           Icon(
                             Icons.email,
                             size: 14,
-                            color: Colors.grey.shade600,
+                            color: AppTheme.textSecondary,
                           ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               user['email'] ?? '',
                               style: TextStyle(
-                                color: Colors.grey.shade700,
+                                color: AppTheme.textSecondary,
                                 fontSize: 13,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -358,7 +363,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                                 Icon(
                                   Icons.phone,
                                   size: 14,
-                                  color: Colors.grey.shade600,
+                                  color: AppTheme.textSecondary,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -395,7 +400,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                         ],
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.white, size: 20),
+                        icon: const Icon(Icons.edit,
+                            color: Colors.white, size: 20),
                         onPressed: () => _handleEdit(user),
                       ),
                     ),
@@ -415,7 +421,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                         ],
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.white, size: 20),
+                        icon: const Icon(Icons.delete,
+                            color: Colors.white, size: 20),
                         onPressed: () => _handleDelete(user['userid']),
                       ),
                     ),
@@ -440,10 +447,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E3A5F),
+        backgroundColor: AppTheme.appBarColor,
         title: Text(
           t('editUser'),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: AppTheme.textPrimary),
         ),
         content: SingleChildScrollView(
           child: Form(
@@ -454,12 +461,13 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
               children: [
                 TextFormField(
                   controller: nameController,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: AppTheme.textPrimary),
                   decoration: InputDecoration(
                     labelText: t('name'),
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white54),
+                    labelStyle: TextStyle(color: AppTheme.textSecondary),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide:
+                          BorderSide(color: AppTheme.getCardBorder(0.5)),
                     ),
                     focusedBorder: const UnderlineInputBorder(
                       borderSide: BorderSide(color: Colors.orange),
@@ -475,12 +483,13 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: emailController,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: AppTheme.textPrimary),
                   decoration: InputDecoration(
                     labelText: t('email'),
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white54),
+                    labelStyle: TextStyle(color: AppTheme.textSecondary),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide:
+                          BorderSide(color: AppTheme.getCardBorder(0.5)),
                     ),
                     focusedBorder: const UnderlineInputBorder(
                       borderSide: BorderSide(color: Colors.orange),
@@ -499,12 +508,13 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: phoneController,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: AppTheme.textPrimary),
                   decoration: InputDecoration(
                     labelText: t('phone'),
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white54),
+                    labelStyle: TextStyle(color: AppTheme.textSecondary),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide:
+                          BorderSide(color: AppTheme.getCardBorder(0.5)),
                     ),
                     focusedBorder: const UnderlineInputBorder(
                       borderSide: BorderSide(color: Colors.orange),
@@ -529,15 +539,18 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                   items: [
                     DropdownMenuItem(
                       value: 'admin',
-                      child: Text('Admin', style: const TextStyle(color: Colors.white)),
+                      child: Text('Admin',
+                          style: const TextStyle(color: Colors.white)),
                     ),
                     DropdownMenuItem(
                       value: 'driver',
-                      child: Text('Driver', style: const TextStyle(color: Colors.white)),
+                      child: Text('Driver',
+                          style: const TextStyle(color: Colors.white)),
                     ),
                     DropdownMenuItem(
                       value: 'passenger',
-                      child: Text('Passenger', style: const TextStyle(color: Colors.white)),
+                      child: Text('Passenger',
+                          style: const TextStyle(color: Colors.white)),
                     ),
                   ],
                   onChanged: (value) {
@@ -551,7 +564,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(t('cancel'), style: const TextStyle(color: Colors.white70)),
+            child: Text(t('cancel'),
+                style: TextStyle(color: AppTheme.textSecondary)),
           ),
           TextButton(
             onPressed: () {
@@ -559,7 +573,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 Navigator.pop(context, true);
               }
             },
-            child: Text(t('save'), style: const TextStyle(color: Colors.orange)),
+            child:
+                Text(t('save'), style: const TextStyle(color: Colors.orange)),
           ),
         ],
       ),
@@ -580,7 +595,9 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       userid: user['userid'],
       fullname: nameController.text.trim(),
       email: emailController.text.trim(),
-      phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
+      phone: phoneController.text.trim().isEmpty
+          ? null
+          : phoneController.text.trim(),
       role: selectedRole,
     );
 
@@ -611,15 +628,16 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E3A5F),
+        backgroundColor: AppTheme.appBarColor,
         title: Text(
           t('confirmDelete'),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: AppTheme.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(t('no'), style: const TextStyle(color: Colors.white70)),
+            child:
+                Text(t('no'), style: TextStyle(color: AppTheme.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -659,26 +677,30 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F7FA),
+        backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
           title: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1E3A5F), Color(0xFF2C4A6B)],
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.appBarColor,
+                      AppTheme.appBarColor.withOpacity(0.8)
+                    ],
                   ),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.people, color: Colors.white, size: 24),
+                child:
+                    Icon(Icons.people, color: AppTheme.textPrimary, size: 24),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   t('title'),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
                     fontWeight: FontWeight.bold,
                     fontSize: 20,
                     letterSpacing: 0.5,
@@ -688,22 +710,22 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
             ],
           ),
           flexibleSpace: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF1E3A5F),
-                  Color(0xFF2C4A6B),
-                  Color(0xFF1E3A5F),
+                  AppTheme.appBarColor,
+                  AppTheme.appBarColor.withOpacity(0.8),
+                  AppTheme.appBarColor,
                 ],
               ),
             ),
           ),
           elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
+          iconTheme: IconThemeData(color: AppTheme.textPrimary),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: Icon(Icons.arrow_back, color: AppTheme.textPrimary),
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
@@ -737,24 +759,24 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                     margin: const EdgeInsets.all(16),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Colors.white,
-                          Color(0xFFF8F9FA),
+                          AppTheme.getCardBackground(0.1),
+                          AppTheme.getCardBackground(0.05),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
+                          color: AppTheme.getShadowColor(0.08),
                           blurRadius: 15,
                           offset: const Offset(0, 5),
                         ),
                       ],
                       border: Border.all(
-                        color: Colors.grey.shade200,
+                        color: AppTheme.getCardBorder(0.2),
                         width: 1,
                       ),
                     ),
@@ -767,7 +789,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
-                                  colors: [Color(0xFFF57C00), Color(0xFFE65100)],
+                                  colors: [
+                                    Color(0xFFF57C00),
+                                    Color(0xFFE65100)
+                                  ],
                                 ),
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -813,7 +838,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                               color: Colors.blue,
                               onTap: () {
                                 setState(() {
-                                  _selectedRoleFilter = _selectedRoleFilter == 'admin' ? null : 'admin';
+                                  _selectedRoleFilter =
+                                      _selectedRoleFilter == 'admin'
+                                          ? null
+                                          : 'admin';
                                   _applyFilter();
                                 });
                               },
@@ -825,7 +853,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                               color: Colors.green,
                               onTap: () {
                                 setState(() {
-                                  _selectedRoleFilter = _selectedRoleFilter == 'driver' ? null : 'driver';
+                                  _selectedRoleFilter =
+                                      _selectedRoleFilter == 'driver'
+                                          ? null
+                                          : 'driver';
                                   _applyFilter();
                                 });
                               },
@@ -837,7 +868,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                               color: Colors.orange,
                               onTap: () {
                                 setState(() {
-                                  _selectedRoleFilter = _selectedRoleFilter == 'passenger' ? null : 'passenger';
+                                  _selectedRoleFilter =
+                                      _selectedRoleFilter == 'passenger'
+                                          ? null
+                                          : 'passenger';
                                   _applyFilter();
                                 });
                               },
@@ -870,7 +904,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                                 Text(
                                   t('noUsers'),
                                   style: TextStyle(
-                                    color: Colors.grey.shade600,
+                                    color: AppTheme.textSecondary,
                                     fontSize: 18,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -893,4 +927,3 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     );
   }
 }
-

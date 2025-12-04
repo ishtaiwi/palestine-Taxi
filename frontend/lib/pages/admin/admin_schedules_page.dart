@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
 
 class AdminSchedulesPage extends StatefulWidget {
   const AdminSchedulesPage({super.key});
@@ -109,6 +110,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   @override
   void initState() {
     super.initState();
+    AppTheme.init();
     _loadData();
     _loadLanguagePreference();
   }
@@ -239,15 +241,16 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E3A5F),
+        backgroundColor: AppTheme.appBarColor,
         title: Text(
           t('confirmDelete'),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: AppTheme.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(t('no'), style: const TextStyle(color: Colors.white70)),
+            child:
+                Text(t('no'), style: TextStyle(color: AppTheme.textSecondary)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -348,27 +351,27 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFF060A1A),
+        backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
           title: Text(
             t('title'),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: AppTheme.textPrimary,
               fontWeight: FontWeight.bold,
             ),
           ),
-          backgroundColor: const Color(0xFF1E3A5F), // لون فاتح أكثر
+          backgroundColor: AppTheme.appBarColor,
           elevation: 2,
-          iconTheme: const IconThemeData(
-            color: Colors.white, // أيقونات بيضاء
+          iconTheme: IconThemeData(
+            color: AppTheme.textPrimary,
           ),
-          actionsIconTheme: const IconThemeData(
-            color: Colors.white, // أيقونات الأزرار بيضاء
+          actionsIconTheme: IconThemeData(
+            color: AppTheme.textPrimary,
           ),
           leading: IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.arrow_back,
-              color: Colors.white,
+              color: AppTheme.textPrimary,
             ),
             onPressed: () => Navigator.pop(context),
           ),
@@ -376,7 +379,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
             IconButton(
               icon: Icon(
                 _isArabic ? Icons.language : Icons.translate,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
               ),
               onPressed: () {
                 setState(() {
@@ -387,16 +390,16 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
             ),
             if (_schedules.isNotEmpty)
               PopupMenuButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.more_vert,
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                 ),
-                color: const Color(0xFF1E3A5F),
+                color: AppTheme.appBarColor,
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     child: Text(
                       t('createAllTrips'),
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: AppTheme.textPrimary),
                     ),
                     onTap: () => _handleCreateAllTrips(),
                   ),
@@ -405,7 +408,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
             IconButton(
               icon: Icon(
                 _showCreateForm ? Icons.close : Icons.add,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
               ),
               onPressed: () {
                 setState(() {
@@ -433,7 +436,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                         ? Center(
                             child: Text(
                               t('noSchedules'),
-                              style: const TextStyle(color: Colors.white70),
+                              style: TextStyle(color: AppTheme.textSecondary),
                             ),
                           )
                         : ListView.builder(
@@ -455,9 +458,9 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        border: const Border(
-          bottom: BorderSide(color: Colors.white24),
+        color: AppTheme.getCardBackground(0.05),
+        border: Border(
+          bottom: BorderSide(color: AppTheme.getCardBorder(0.24)),
         ),
       ),
       child: Form(
@@ -469,32 +472,38 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
               value: _selectedLineId,
               decoration: InputDecoration(
                 labelText: t('line'),
-                labelStyle: const TextStyle(color: Colors.white70),
+                labelStyle: TextStyle(color: AppTheme.textSecondary),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.white54),
+                  borderSide: BorderSide(color: AppTheme.getCardBorder(0.54)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.white),
+                  borderSide: BorderSide(color: AppTheme.textPrimary),
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: AppTheme.getCardBackground(0.1),
               ),
-              dropdownColor: const Color(0xFF0B132B),
-              style: const TextStyle(color: Colors.white),
-              iconEnabledColor: Colors.white,
+              dropdownColor: AppTheme.getCardBackground(0.1),
+              style: TextStyle(color: AppTheme.textPrimary),
+              iconEnabledColor: AppTheme.textPrimary,
               items: _lines.map((line) {
                 return DropdownMenuItem<String>(
                   value: line['lineid'],
                   child: Text(
                     _isArabic
-                        ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? 'Unknown')
-                        : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? 'Unknown'),
-                    style: const TextStyle(color: Colors.white),
+                        ? (line['name_ar']?.toString() ??
+                            line['linename']?.toString() ??
+                            line['name_en']?.toString() ??
+                            'Unknown')
+                        : (line['name_en']?.toString() ??
+                            line['linename']?.toString() ??
+                            line['name_ar']?.toString() ??
+                            'Unknown'),
+                    style: TextStyle(color: AppTheme.textPrimary),
                   ),
                 );
               }).toList(),
@@ -516,22 +525,23 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                     initialValue: _startHour.toString(),
                     decoration: InputDecoration(
                       labelText: t('startHour'),
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      labelStyle: TextStyle(color: AppTheme.textSecondary),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white54),
+                        borderSide:
+                            BorderSide(color: AppTheme.getCardBorder(0.54)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white),
+                        borderSide: BorderSide(color: AppTheme.textPrimary),
                       ),
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.1),
+                      fillColor: AppTheme.getCardBackground(0.1),
                     ),
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: AppTheme.textPrimary),
                     keyboardType: TextInputType.number,
                     onChanged: (value) {
                       _startHour = int.tryParse(value) ?? 7;
@@ -551,22 +561,23 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                     initialValue: _endHour.toString(),
                     decoration: InputDecoration(
                       labelText: t('endHour'),
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      labelStyle: TextStyle(color: AppTheme.textSecondary),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white54),
+                        borderSide:
+                            BorderSide(color: AppTheme.getCardBorder(0.54)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white),
+                        borderSide: BorderSide(color: AppTheme.textPrimary),
                       ),
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.1),
+                      fillColor: AppTheme.getCardBackground(0.1),
                     ),
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: AppTheme.textPrimary),
                     keyboardType: TextInputType.number,
                     onChanged: (value) {
                       _endHour = int.tryParse(value) ?? 19;
@@ -622,7 +633,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
             SwitchListTile(
               title: Text(
                 _active ? t('active') : t('inactive'),
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: AppTheme.textPrimary),
               ),
               value: _active,
               onChanged: (value) {
@@ -648,10 +659,11 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                       });
                     },
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white70),
+                      foregroundColor: AppTheme.textPrimary,
+                      side: BorderSide(color: AppTheme.getCardBorder(0.7)),
                     ),
-                    child: Text(t('cancel'), style: const TextStyle(color: Colors.white)),
+                    child: Text(t('cancel'),
+                        style: TextStyle(color: AppTheme.textPrimary)),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -664,7 +676,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
                     ),
-                    child: Text(t('save'), style: const TextStyle(color: Colors.white)),
+                    child: Text(t('save'),
+                        style: TextStyle(color: AppTheme.textPrimary)),
                   ),
                 ),
               ],
@@ -678,8 +691,14 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   Widget _buildScheduleCard(Map<String, dynamic> schedule) {
     final line = schedule['line'] as Map<String, dynamic>?;
     final lineName = _isArabic
-        ? (line?['name_ar']?.toString() ?? line?['linename']?.toString() ?? line?['name_en']?.toString() ?? 'Unknown')
-        : (line?['name_en']?.toString() ?? line?['linename']?.toString() ?? line?['name_ar']?.toString() ?? 'Unknown');
+        ? (line?['name_ar']?.toString() ??
+            line?['linename']?.toString() ??
+            line?['name_en']?.toString() ??
+            'Unknown')
+        : (line?['name_en']?.toString() ??
+            line?['linename']?.toString() ??
+            line?['name_ar']?.toString() ??
+            'Unknown');
     final startHour = schedule['start_hour'] ?? 0;
     final endHour = schedule['end_hour'] ?? 23;
     final interval = schedule['interval_minutes'] ?? 60;
@@ -687,7 +706,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     final templateid = schedule['templateid'] as String;
 
     return Card(
-      color: Colors.white.withOpacity(0.05),
+      color: AppTheme.getCardBackground(0.05),
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -699,8 +718,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                 Expanded(
                   child: Text(
                     lineName,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -717,8 +736,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                   ),
                   child: Text(
                     active ? t('active') : t('inactive'),
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
                       fontSize: 12,
                     ),
                   ),
@@ -728,12 +747,12 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
             const SizedBox(height: 12),
             Text(
               '${t('from')} $startHour:00 ${t('to')} $endHour:00',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: AppTheme.textSecondary),
             ),
             const SizedBox(height: 4),
             Text(
               '${t('every')} $interval ${interval == 60 ? t('hour') : t('minutes')}',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: AppTheme.textSecondary),
             ),
             const SizedBox(height: 16),
             Row(
@@ -741,11 +760,13 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => _handleCreateTrips(templateid),
-                    icon: const Icon(Icons.add_circle_outline, color: Colors.white),
-                    label: Text(t('createTrips'), style: const TextStyle(color: Colors.white)),
+                    icon: Icon(Icons.add_circle_outline,
+                        color: AppTheme.textPrimary),
+                    label: Text(t('createTrips'),
+                        style: TextStyle(color: AppTheme.textPrimary)),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white70),
+                      foregroundColor: AppTheme.textPrimary,
+                      side: BorderSide(color: AppTheme.getCardBorder(0.7)),
                     ),
                   ),
                 ),
@@ -768,4 +789,3 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     );
   }
 }
-

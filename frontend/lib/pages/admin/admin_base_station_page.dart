@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
 
 class AdminBaseStationPage extends StatefulWidget {
   const AdminBaseStationPage({super.key});
@@ -21,6 +22,7 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
   @override
   void initState() {
     super.initState();
+    AppTheme.init();
     _loadStations();
   }
 
@@ -384,9 +386,14 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        title: const Text('Base Stations'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        title: Text(
+          'Base Stations',
+          style: TextStyle(color: AppTheme.textPrimary),
+        ),
+        backgroundColor: AppTheme.appBarColor,
+        iconTheme: IconThemeData(color: AppTheme.textPrimary),
         actions: [
           IconButton(
             icon: Icon(_showMap ? Icons.list : Icons.map),

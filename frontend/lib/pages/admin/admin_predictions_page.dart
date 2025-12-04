@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
 
 class AdminPredictionsPage extends StatefulWidget {
   const AdminPredictionsPage({super.key});
@@ -22,6 +23,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
   @override
   void initState() {
     super.initState();
+    AppTheme.init();
     _loadData();
   }
 
@@ -33,9 +35,8 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
 
     try {
       final lines = await ApiService.getAllLines();
-      final selectedLine = lines.isNotEmpty
-          ? lines.first['lineid'] as String?
-          : null;
+      final selectedLine =
+          lines.isNotEmpty ? lines.first['lineid'] as String? : null;
       Map<String, dynamic>? predictions;
       List<Map<String, dynamic>> recommendations = [];
 
@@ -111,9 +112,8 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
           content: Text(
             result['message'] ?? 'Recommendation applied successfully',
           ),
-          backgroundColor: result['success'] == true
-              ? Colors.green
-              : Colors.red,
+          backgroundColor:
+              result['success'] == true ? Colors.green : Colors.red,
           duration: const Duration(seconds: 3),
         ),
       );
@@ -153,9 +153,8 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(result['message'] ?? 'Retrain triggered'),
-        backgroundColor: result['success'] == false
-            ? Colors.red
-            : Colors.blueGrey,
+        backgroundColor:
+            result['success'] == false ? Colors.red : Colors.blueGrey,
       ),
     );
 
@@ -167,14 +166,15 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF060A1A),
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'AI Predictions',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(
+              color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: const Color(0xFF1E3A5F),
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: AppTheme.appBarColor,
+        iconTheme: IconThemeData(color: AppTheme.textPrimary),
         actions: [
           IconButton(
             onPressed: _isRetraining ? null : _triggerRetrain,
@@ -192,64 +192,68 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-          ? Center(
-              child: Text(
-                _error!,
-                style: const TextStyle(color: Colors.redAccent),
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              color: Colors.deepPurple,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              ? Center(
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  color: Colors.deepPurple,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: _selectedLineId,
-                            decoration: const InputDecoration(
-                              labelText: 'Line',
-                              filled: true,
-                              fillColor: Color(0xFF10152A),
-                              labelStyle: TextStyle(color: Colors.white70),
-                              border: OutlineInputBorder(),
-                            ),
-                            dropdownColor: const Color(0xFF10152A),
-                            items: _lines
-                                .map(
-                                  (line) => DropdownMenuItem<String>(
-                                    value: line['lineid'] as String?,
-                                    child: Text(
-                                      line['name_en'] ??
-                                          line['linename'] ??
-                                          'Line',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                      ),
-                                    ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: _selectedLineId,
+                                decoration: InputDecoration(
+                                  labelText: 'Line',
+                                  filled: true,
+                                  fillColor: AppTheme.getCardBackground(0.1),
+                                  labelStyle:
+                                      TextStyle(color: AppTheme.textSecondary),
+                                  border: OutlineInputBorder(
+                                    borderSide: BorderSide(
+                                        color: AppTheme.getCardBorder(0.2)),
                                   ),
-                                )
-                                .toList(),
-                            onChanged: _onLineChanged,
-                          ),
+                                ),
+                                dropdownColor: AppTheme.getCardBackground(0.1),
+                                items: _lines
+                                    .map(
+                                      (line) => DropdownMenuItem<String>(
+                                        value: line['lineid'] as String?,
+                                        child: Text(
+                                          line['name_en'] ??
+                                              line['linename'] ??
+                                              'Line',
+                                          style: TextStyle(
+                                            color: AppTheme.textPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: _onLineChanged,
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 16),
+                        _buildPredictionsSection(),
+                        const SizedBox(height: 16),
+                        _buildRecommendationsSection(),
+                        const SizedBox(height: 16),
+                        _buildInsightsSection(),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    _buildPredictionsSection(),
-                    const SizedBox(height: 16),
-                    _buildRecommendationsSection(),
-                    const SizedBox(height: 16),
-                    _buildInsightsSection(),
-                  ],
+                  ),
                 ),
-              ),
-            ),
     );
   }
 
@@ -260,9 +264,9 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     return _buildPanel(
       title: 'Upcoming Rush Hours',
       child: predictions.isEmpty
-          ? const Text(
+          ? Text(
               'No rush hour predictions available.',
-              style: TextStyle(color: Colors.white70),
+              style: TextStyle(color: AppTheme.textSecondary),
             )
           : ListView.separated(
               shrinkWrap: true,
@@ -278,19 +282,20 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                   ),
                   title: Text(
                     '${prediction['date']} • ${_formatHour(prediction['hour'])}',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   subtitle: Text(
                     'Expected bookings: ${prediction['expectedBookings']?.toStringAsFixed(1) ?? prediction['expectedBookings']}\n'
                     'Confidence: ${(((prediction['confidence'] ?? 0) as num) * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(color: Colors.white70),
+                    style: TextStyle(color: AppTheme.textSecondary),
                   ),
                 );
               },
-              separatorBuilder: (_, __) => const Divider(color: Colors.white12),
+              separatorBuilder: (_, __) =>
+                  Divider(color: AppTheme.getCardBorder(0.12)),
               itemCount: predictions.length.clamp(0, 5),
             ),
     );
@@ -300,9 +305,9 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     if (_recommendations.isEmpty) {
       return _buildPanel(
         title: 'Recommendations',
-        child: const Text(
+        child: Text(
           'No active recommendations. Model will suggest changes once demand spikes are detected.',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: AppTheme.textSecondary),
         ),
       );
     }
@@ -313,7 +318,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
         children: _recommendations.map((rec) {
           final recId = rec['id']?.toString() ?? '';
           return Card(
-            color: const Color(0xFF0F1B2B),
+            color: AppTheme.getCardBackground(0.1),
             margin: const EdgeInsets.only(bottom: 12),
             child: Padding(
               padding: const EdgeInsets.all(12),
@@ -322,15 +327,15 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                 children: [
                   Text(
                     rec['summary'] ?? 'Recommendation',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     rec['details'] ?? '',
-                    style: const TextStyle(color: Colors.white70),
+                    style: TextStyle(color: AppTheme.textSecondary),
                   ),
                   const SizedBox(height: 6),
                   Wrap(
@@ -342,7 +347,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                           'Confidence ${(rec['confidence'] ?? rec['priority'] ?? 0).toStringAsFixed(2)}',
                           style: const TextStyle(color: Colors.orange),
                         ),
-                        backgroundColor: const Color(0xFF0F1B2B),
+                        backgroundColor: AppTheme.getCardBackground(0.1),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
@@ -355,7 +360,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                           'Utilization ${(rec['utilization'] ?? 0).toStringAsFixed(2)}',
                           style: const TextStyle(color: Colors.orange),
                         ),
-                        backgroundColor: const Color(0xFF0F1B2B),
+                        backgroundColor: AppTheme.getCardBackground(0.1),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
@@ -368,7 +373,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                             'Available: ${rec['totalAvailableSeats']}',
                             style: const TextStyle(color: Colors.lightBlue),
                           ),
-                          backgroundColor: const Color(0xFF0F1B2B),
+                          backgroundColor: AppTheme.getCardBackground(0.1),
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
@@ -421,9 +426,9 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     return _buildPanel(
       title: 'Network Insights',
       child: topLines.isEmpty
-          ? const Text(
+          ? Text(
               'No demand insights yet.',
-              style: TextStyle(color: Colors.white70),
+              style: TextStyle(color: AppTheme.textSecondary),
             )
           : Column(
               children: topLines.map((line) {
@@ -436,11 +441,11 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                   ),
                   title: Text(
                     data['lineid'] ?? '',
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: AppTheme.textPrimary),
                   ),
                   subtitle: Text(
                     'Avg utilization ${(data['avgUtilization'] ?? 0).toStringAsFixed(2)}',
-                    style: const TextStyle(color: Colors.white70),
+                    style: TextStyle(color: AppTheme.textSecondary),
                   ),
                 );
               }).toList(),
@@ -453,17 +458,17 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1324),
+        color: AppTheme.getCardBackground(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: AppTheme.getCardBorder(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: AppTheme.textPrimary,
               fontWeight: FontWeight.bold,
               fontSize: 16,
             ),

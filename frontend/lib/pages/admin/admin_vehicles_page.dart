@@ -128,7 +128,7 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                 ? Center(
                     child: Text(
                       t('noVehicles'),
-                      style: const TextStyle(color: Colors.white70),
+                      style: TextStyle(color: AppTheme.textSecondary),
                     ),
                   )
                 : ListView.builder(
@@ -137,15 +137,15 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                     itemBuilder: (context, index) {
                       final vehicle = _vehicles[index];
                       return Card(
-                        color: Colors.white.withOpacity(0.05),
+                        color: AppTheme.getCardBackground(0.05),
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
                           leading: const Icon(Icons.directions_car,
                               color: Colors.orange, size: 40),
                           title: Text(
                             vehicle['plateno'] ?? 'No Plate',
-                            style: const TextStyle(
-                                color: Colors.white,
+                            style: TextStyle(
+                                color: AppTheme.textPrimary,
                                 fontWeight: FontWeight.bold),
                           ),
                           subtitle: Column(
@@ -153,11 +153,11 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                             children: [
                               Text(
                                 '${t('seatLayout')}: ${vehicle['seatlayout'] ?? ''}',
-                                style: const TextStyle(color: Colors.white70),
+                                style: TextStyle(color: AppTheme.textSecondary),
                               ),
                               Text(
                                 '${t('seats')}: ${vehicle['seatnum'] ?? 0}',
-                                style: const TextStyle(color: Colors.white70),
+                                style: TextStyle(color: AppTheme.textSecondary),
                               ),
                               if (vehicle['status'] != null)
                                 Container(
@@ -175,8 +175,9 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                                     vehicle['status'] == 'active'
                                         ? t('active')
                                         : t('inactive'),
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 12),
+                                    style: TextStyle(
+                                        color: AppTheme.textPrimary,
+                                        fontSize: 12),
                                   ),
                                 ),
                             ],

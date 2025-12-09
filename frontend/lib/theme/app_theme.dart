@@ -22,18 +22,20 @@ class AppTheme {
   static const Color lightBorder = Color(0xFFE0E0E0);
 
   // Get current theme colors
-  static Color get backgroundColor => _isDarkMode ? darkBackground : lightBackground;
+  static Color get backgroundColor =>
+      _isDarkMode ? darkBackground : lightBackground;
   static Color get appBarColor => _isDarkMode ? darkAppBar : lightAppBar;
-  static Color get cardBackground => _isDarkMode 
-      ? darkCardBackground 
-      : lightCardBackground;
-  static Color get textPrimary => _isDarkMode ? darkTextPrimary : lightTextPrimary;
-  static Color get textSecondary => _isDarkMode ? darkTextSecondary : lightTextSecondary;
+  static Color get cardBackground =>
+      _isDarkMode ? darkCardBackground : lightCardBackground;
+  static Color get textPrimary =>
+      _isDarkMode ? darkTextPrimary : lightTextPrimary;
+  static Color get textSecondary =>
+      _isDarkMode ? darkTextSecondary : lightTextSecondary;
   static Color get borderColor => _isDarkMode ? darkBorder : lightBorder;
 
   // Helper methods for common color patterns
   static Color getCardBackground([double opacity = 0.05]) {
-    return _isDarkMode 
+    return _isDarkMode
         ? Colors.white.withOpacity(opacity)
         : Colors.black.withOpacity(opacity * 0.1);
   }
@@ -73,4 +75,3 @@ class AppTheme {
     await prefs.setBool(_themeKey, _isDarkMode);
   }
 }
-

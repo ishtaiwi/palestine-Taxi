@@ -320,64 +320,62 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: roleColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: roleColor.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            Icon(
+                              roleIcon,
+                              size: 14,
+                              color: roleColor,
                             ),
-                            decoration: BoxDecoration(
-                              color: roleColor.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: roleColor.withOpacity(0.3),
-                                width: 1,
+                            const SizedBox(width: 6),
+                            Text(
+                              role?.toUpperCase() ?? '',
+                              style: TextStyle(
+                                color: roleColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
                               ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  roleIcon,
-                                  size: 14,
-                                  color: roleColor,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  role?.toUpperCase() ?? '',
-                                  style: TextStyle(
-                                    color: roleColor,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (user['phone'] != null) ...[
+                        const SizedBox(width: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.phone,
+                              size: 14,
+                              color: AppTheme.textSecondary,
                             ),
-                          ),
-                          if (user['phone'] != null) ...[
-                            const SizedBox(width: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.phone,
-                                  size: 14,
-                                  color: AppTheme.textSecondary,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  user['phone']?.toString() ?? '',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade700,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(width: 4),
+                            Text(
+                              user['phone']?.toString() ?? '',
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
-                        ],
-                      ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

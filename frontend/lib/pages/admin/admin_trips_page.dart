@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
 
 class AdminTripsPage extends StatefulWidget {
   const AdminTripsPage({super.key});
@@ -51,6 +52,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
   @override
   void initState() {
     super.initState();
+    AppTheme.init();
     _loadData();
     _loadLanguagePreference();
   }
@@ -105,24 +107,25 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFF060A1A),
+        backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
           title: Text(
             t('title'),
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle(
+                color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
           ),
-          backgroundColor: const Color(0xFF1E3A5F),
+          backgroundColor: AppTheme.appBarColor,
           elevation: 2,
-          iconTheme: const IconThemeData(color: Colors.white),
+          iconTheme: IconThemeData(color: AppTheme.textPrimary),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: Icon(Icons.arrow_back, color: AppTheme.textPrimary),
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
             IconButton(
               icon: Icon(
                 _isArabic ? Icons.language : Icons.translate,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
               ),
               onPressed: () {
                 setState(() {
@@ -139,7 +142,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                 ? Center(
                     child: Text(
                       t('noTrips'),
-                      style: const TextStyle(color: Colors.white70),
+                      style: TextStyle(color: AppTheme.textSecondary),
                     ),
                   )
                 : ListView.builder(
@@ -149,41 +152,55 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                       final trip = _trips[index];
                       final line = trip['line'] as Map<String, dynamic>?;
                       return Card(
-                        color: Colors.white.withOpacity(0.05),
+                        color: AppTheme.getCardBackground(0.05),
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
-                          leading: const Icon(Icons.directions_bus, color: Colors.purple, size: 40),
+                          leading: const Icon(Icons.directions_bus,
+                              color: Colors.purple, size: 40),
                           title: Text(
                             (_isArabic
-                                ? (line?['name_ar']?.toString() ?? line?['linename']?.toString() ?? line?['name_en']?.toString() ?? 'Unknown Line')
-                                : (line?['name_en']?.toString() ?? line?['linename']?.toString() ?? line?['name_ar']?.toString() ?? 'Unknown Line')),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                ? (line?['name_ar']?.toString() ??
+                                    line?['linename']?.toString() ??
+                                    line?['name_en']?.toString() ??
+                                    'Unknown Line')
+                                : (line?['name_en']?.toString() ??
+                                    line?['linename']?.toString() ??
+                                    line?['name_ar']?.toString() ??
+                                    'Unknown Line')),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 '${t('departure')}: ${_formatDate(trip['deptime'])}',
-                                style: const TextStyle(color: Colors.white70),
+                                style: TextStyle(color: AppTheme.textSecondary),
                               ),
                               Text(
                                 '${t('seats')}: ${trip['availableseats'] ?? 0} | ${t('bookings')}: ${trip['totalbookings'] ?? 0}',
-                                style: const TextStyle(color: Colors.white70),
+                                style: TextStyle(color: AppTheme.textSecondary),
                               ),
                               if (trip['status'] != null)
                                 Container(
                                   margin: const EdgeInsets.only(top: 4),
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.blue.withOpacity(0.3),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
-                                    trip['status'] == 'scheduled' ? t('scheduled') :
-                                    trip['status'] == 'in_progress' ? t('in_progress') :
-                                    trip['status'] == 'completed' ? t('completed') :
-                                    t('cancelled'),
-                                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                                    trip['status'] == 'scheduled'
+                                        ? t('scheduled')
+                                        : trip['status'] == 'in_progress'
+                                            ? t('in_progress')
+                                            : trip['status'] == 'completed'
+                                                ? t('completed')
+                                                : t('cancelled'),
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 12),
                                   ),
                                 ),
                             ],
@@ -196,4 +213,3 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
     );
   }
 }
-

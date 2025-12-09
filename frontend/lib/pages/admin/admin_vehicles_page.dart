@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
 
 class AdminVehiclesPage extends StatefulWidget {
   const AdminVehiclesPage({super.key});
@@ -47,6 +48,7 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
   @override
   void initState() {
     super.initState();
+    AppTheme.init();
     _loadData();
     _loadLanguagePreference();
   }
@@ -91,24 +93,25 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFF060A1A),
+        backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
           title: Text(
             t('title'),
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle(
+                color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
           ),
-          backgroundColor: const Color(0xFF1E3A5F),
+          backgroundColor: AppTheme.appBarColor,
           elevation: 2,
-          iconTheme: const IconThemeData(color: Colors.white),
+          iconTheme: IconThemeData(color: AppTheme.textPrimary),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: Icon(Icons.arrow_back, color: AppTheme.textPrimary),
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
             IconButton(
               icon: Icon(
                 _isArabic ? Icons.language : Icons.translate,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
               ),
               onPressed: () {
                 setState(() {
@@ -125,7 +128,7 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                 ? Center(
                     child: Text(
                       t('noVehicles'),
-                      style: const TextStyle(color: Colors.white70),
+                      style: TextStyle(color: AppTheme.textSecondary),
                     ),
                   )
                 : ListView.builder(
@@ -134,36 +137,47 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                     itemBuilder: (context, index) {
                       final vehicle = _vehicles[index];
                       return Card(
-                        color: Colors.white.withOpacity(0.05),
+                        color: AppTheme.getCardBackground(0.05),
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
-                          leading: const Icon(Icons.directions_car, color: Colors.orange, size: 40),
+                          leading: const Icon(Icons.directions_car,
+                              color: Colors.orange, size: 40),
                           title: Text(
                             vehicle['plateno'] ?? 'No Plate',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontWeight: FontWeight.bold),
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 '${t('seatLayout')}: ${vehicle['seatlayout'] ?? ''}',
-                                style: const TextStyle(color: Colors.white70),
+                                style: TextStyle(color: AppTheme.textSecondary),
                               ),
                               Text(
                                 '${t('seats')}: ${vehicle['seatnum'] ?? 0}',
-                                style: const TextStyle(color: Colors.white70),
+                                style: TextStyle(color: AppTheme.textSecondary),
                               ),
                               if (vehicle['status'] != null)
                                 Container(
                                   margin: const EdgeInsets.only(top: 4),
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: (vehicle['status'] == 'active' ? Colors.green : Colors.red).withOpacity(0.3),
+                                    color: (vehicle['status'] == 'active'
+                                            ? Colors.green
+                                            : Colors.red)
+                                        .withOpacity(0.3),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
-                                    vehicle['status'] == 'active' ? t('active') : t('inactive'),
-                                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                                    vehicle['status'] == 'active'
+                                        ? t('active')
+                                        : t('inactive'),
+                                    style: TextStyle(
+                                        color: AppTheme.textPrimary,
+                                        fontSize: 12),
                                   ),
                                 ),
                             ],
@@ -176,4 +190,3 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
     );
   }
 }
-

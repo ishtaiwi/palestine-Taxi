@@ -2454,6 +2454,58 @@ class ApiService {
   }
 
   // ============================================
+  // ADMIN - PAYMENTS API
+  // ============================================
+
+  /// Get all payments (admin)
+  static Future<List<Map<String, dynamic>>> getAllPayments({
+    String? status,
+    String? method,
+    String? type,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      String url = '${AppConfig.apiBaseUrl}/payments';
+      final params = <String, String>{};
+      if (status != null) params['status'] = status;
+      if (method != null) params['method'] = method;
+      if (type != null) params['type'] = type;
+      if (params.isNotEmpty) {
+        url += '?${Uri(queryParameters: params).query}';
+      }
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        // Backend returns array directly or wrapped in object
+        if (decoded is List) {
+          return decoded.map((p) => Map<String, dynamic>.from(p)).toList();
+        } else if (decoded is Map && decoded['payments'] is List) {
+          return (decoded['payments'] as List)
+              .map((p) => Map<String, dynamic>.from(p))
+              .toList();
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        throw Exception('Failed to load payments');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  // ============================================
   // RATINGS API
   // ============================================
 
@@ -2619,40 +2671,8 @@ class ApiService {
   }
 
   // ============================================
-  // ADMIN - PAYMENTS API
+  // LOCATION TRACKING API
   // ============================================
-
-  /// Get all payments (admin)
-  static Future<List<Map<String, dynamic>>> getAllPayments() async {
-    try {
-      final token = await getToken();
-      if (token == null) {
-        throw Exception('Not authenticated');
-      }
-
-      final response = await http.get(
-        Uri.parse('${AppConfig.apiBaseUrl}/payments'),
-        headers: {
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(AppConfig.requestTimeout);
-
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-        if (decoded is Map && decoded['payments'] is List) {
-          return (decoded['payments'] as List)
-              .map((p) => Map<String, dynamic>.from(p))
-              .toList();
-        }
-        throw Exception('Unexpected response format');
-      } else {
-        throw Exception('Failed to load payments');
-      }
-    } catch (exception) {
-      throw Exception(exception.toString());
-    }
-  }
 
   // ============================================
   // LOCATION TRACKING API

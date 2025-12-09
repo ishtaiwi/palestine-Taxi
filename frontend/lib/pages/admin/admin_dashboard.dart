@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../../services/api_service.dart';
 import '../../services/supabase_realtime_service.dart';
 import '../../screens/auth/login_page.dart';
+import '../../theme/app_theme.dart';
 import 'admin_schedules_page.dart';
 import 'admin_lines_page.dart';
 import 'admin_users_page.dart';
@@ -89,6 +90,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   void initState() {
     super.initState();
+    AppTheme.init().then((_) {
+      if (mounted) setState(() {});
+    });
     _loadUserData();
     _loadPredictionInsights();
     _loadMapData();
@@ -261,36 +265,47 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFF060A1A),
+        backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
           title: Text(
             t('title'),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: AppTheme.textPrimary,
               fontWeight: FontWeight.bold,
             ),
           ),
-          backgroundColor: const Color(0xFF1E3A5F), // لون فاتح أكثر
+          backgroundColor: AppTheme.appBarColor,
           elevation: 2,
-          iconTheme: const IconThemeData(
-            color: Colors.white, // أيقونات بيضاء
+          iconTheme: IconThemeData(
+            color: AppTheme.textPrimary,
           ),
-          actionsIconTheme: const IconThemeData(
-            color: Colors.white, // أيقونات الأزرار بيضاء
+          actionsIconTheme: IconThemeData(
+            color: AppTheme.textPrimary,
           ),
           actions: [
             IconButton(
               icon: Icon(
+                AppTheme.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                color: AppTheme.textPrimary,
+              ),
+              onPressed: () async {
+                await AppTheme.toggleTheme();
+                if (mounted) setState(() {});
+              },
+              tooltip: AppTheme.isDarkMode ? 'Light Mode' : 'Dark Mode',
+            ),
+            IconButton(
+              icon: Icon(
                 _isArabic ? Icons.language : Icons.translate,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
               ),
               onPressed: () => _switchLanguage(!_isArabic),
               tooltip: _isArabic ? 'English' : 'العربية',
             ),
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.logout,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
               ),
               onPressed: _handleLogout,
               tooltip: t('logout'),
@@ -349,8 +364,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       const SizedBox(height: 24),
                       Text(
                         t('systemManagement'),
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: AppTheme.textPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -553,8 +568,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           children: [
                             Text(
                               t('generalStats'),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: AppTheme.textPrimary,
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -629,8 +644,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           children: [
                             Text(
                               t('accountInfo'),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: AppTheme.textPrimary,
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -682,8 +697,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: AppTheme.textPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -722,8 +737,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 ),
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  style: TextStyle(
+                    color: AppTheme.textSecondary,
                     fontSize: 11,
                   ),
                 ),
@@ -743,17 +758,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: AppTheme.getCardBackground(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(color: AppTheme.getCardBorder(0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             _isArabic ? 'تحليلات الطلب' : 'AI Demand Insights',
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: AppTheme.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
@@ -768,7 +783,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               _isArabic
                   ? 'لا توجد بيانات كافية بعد لتوليد التوقعات'
                   : 'No demand signals yet. Predictions will appear after bookings accumulate.',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: AppTheme.textSecondary),
             )
           else
             Column(
@@ -784,14 +799,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ((data['buckets'] as List?)?.isNotEmpty == true)
                         ? (data['buckets'][0]['line']?['linename'] ?? 'Line')
                         : 'Line',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   subtitle: Text(
                     '${_isArabic ? 'نسبة الإشغال' : 'Avg utilization'} $utilization',
-                    style: const TextStyle(color: Colors.white70),
+                    style: TextStyle(color: AppTheme.textSecondary),
                   ),
                 );
               }).toList(),
@@ -800,7 +815,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           if (!_insightsLoading && model != null)
             Text(
               '${_isArabic ? 'آخر تدريب' : 'Last trained'}: ${_formatTimestamp(model['lastTrainedAt'])}',
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
+              style: TextStyle(
+                  color: AppTheme.textSecondary.withOpacity(0.7), fontSize: 12),
             ),
         ],
       ),
@@ -830,7 +846,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
-        Icon(icon, color: Colors.white70, size: 20),
+        Icon(icon, color: AppTheme.textSecondary, size: 20),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -838,15 +854,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  color: Colors.white70,
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
                   fontSize: 12,
                 ),
               ),
               Text(
                 value,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
@@ -879,18 +895,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.08),
-            Colors.white.withValues(alpha: 0.03),
+            AppTheme.getCardBackground(0.08),
+            AppTheme.getCardBackground(0.03),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.15),
+          color: AppTheme.getCardBorder(0.15),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: AppTheme.getShadowColor(0.3),
             blurRadius: 10,
             spreadRadius: 2,
             offset: const Offset(0, 4),
@@ -923,8 +939,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     Flexible(
                       child: Text(
                         _isArabic ? 'تتبع المركبات' : 'Vehicle Tracking',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: AppTheme.textPrimary,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -975,12 +991,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: AppTheme.getCardBorder(0.2),
                 width: 2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.5),
+                  color: AppTheme.getShadowColor(0.5),
                   blurRadius: 15,
                   spreadRadius: 2,
                   offset: const Offset(0, 4),
@@ -1089,10 +1105,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: AppTheme.getCardBackground(0.05),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: AppTheme.getCardBorder(0.1),
               ),
             ),
             child: Wrap(

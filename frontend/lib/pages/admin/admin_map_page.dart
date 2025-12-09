@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../services/api_service.dart';
 import '../../services/supabase_realtime_service.dart';
+import '../../theme/app_theme.dart';
 
 class AdminMapPage extends StatefulWidget {
   const AdminMapPage({super.key});
@@ -25,6 +26,7 @@ class _AdminMapPageState extends State<AdminMapPage> {
   @override
   void initState() {
     super.initState();
+    AppTheme.init();
     _loadData();
     _subscribeToRealtimeUpdates();
   }
@@ -147,9 +149,14 @@ class _AdminMapPageState extends State<AdminMapPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
-        title: const Text('Vehicle Tracking Map'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        title: Text(
+          'Vehicle Tracking Map',
+          style: TextStyle(color: AppTheme.textPrimary),
+        ),
+        backgroundColor: AppTheme.appBarColor,
+        iconTheme: IconThemeData(color: AppTheme.textPrimary),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -166,7 +173,7 @@ class _AdminMapPageState extends State<AdminMapPage> {
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  color: Colors.grey[200],
+                  color: AppTheme.getCardBackground(0.1),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -330,7 +337,7 @@ class _AdminMapPageState extends State<AdminMapPage> {
                 // Stats bar
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                  color: Colors.grey[200],
+                  color: AppTheme.getCardBackground(0.1),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [

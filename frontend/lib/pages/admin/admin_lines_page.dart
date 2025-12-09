@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
 
 class AdminLinesPage extends StatefulWidget {
   const AdminLinesPage({super.key});
@@ -84,6 +85,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
   @override
   void initState() {
     super.initState();
+    AppTheme.init();
     _loadData();
     _loadLanguagePreference();
   }
@@ -142,7 +144,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     if (nameAr.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isArabic ? 'الاسم بالعربية مطلوب' : 'Arabic name is required'),
+          content: Text(
+              _isArabic ? 'الاسم بالعربية مطلوب' : 'Arabic name is required'),
           backgroundColor: Colors.red,
         ),
       );
@@ -155,7 +158,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
             nameAr: nameAr.isNotEmpty ? nameAr : null,
             nameEn: nameEn.isNotEmpty ? nameEn : null,
             baseprice: double.tryParse(_basePriceController.text) ?? 0,
-            additionalprice: double.tryParse(_additionalPriceController.text) ?? 0,
+            additionalprice:
+                double.tryParse(_additionalPriceController.text) ?? 0,
             estduration: int.tryParse(_durationController.text),
             distance: double.tryParse(_distanceController.text),
             active: _active,
@@ -164,7 +168,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
             nameAr: nameAr.isNotEmpty ? nameAr : null,
             nameEn: nameEn.isNotEmpty ? nameEn : null,
             baseprice: double.tryParse(_basePriceController.text) ?? 0,
-            additionalprice: double.tryParse(_additionalPriceController.text) ?? 0,
+            additionalprice:
+                double.tryParse(_additionalPriceController.text) ?? 0,
             estduration: int.tryParse(_durationController.text),
             distance: double.tryParse(_distanceController.text),
             active: _active,
@@ -212,7 +217,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       _nameArController.text = line['name_ar'] ?? line['linename'] ?? '';
       _nameEnController.text = line['name_en'] ?? '';
       _basePriceController.text = (line['baseprice'] ?? 0).toString();
-      _additionalPriceController.text = (line['additionalprice'] ?? 0).toString();
+      _additionalPriceController.text =
+          (line['additionalprice'] ?? 0).toString();
       _durationController.text = (line['estduration'] ?? '').toString();
       _distanceController.text = (line['distance'] ?? '').toString();
       _active = line['active'] ?? true;
@@ -271,28 +277,28 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFF060A1A),
+        backgroundColor: AppTheme.backgroundColor,
         appBar: AppBar(
           title: Text(
             t('title'),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: AppTheme.textPrimary,
               fontWeight: FontWeight.bold,
             ),
           ),
-          backgroundColor: const Color(0xFF1E3A5F),
+          backgroundColor: AppTheme.appBarColor,
           elevation: 2,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actionsIconTheme: const IconThemeData(color: Colors.white),
+          iconTheme: IconThemeData(color: AppTheme.textPrimary),
+          actionsIconTheme: IconThemeData(color: AppTheme.textPrimary),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: Icon(Icons.arrow_back, color: AppTheme.textPrimary),
             onPressed: () => Navigator.pop(context),
           ),
           actions: [
             IconButton(
               icon: Icon(
                 _isArabic ? Icons.language : Icons.translate,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
               ),
               onPressed: () {
                 setState(() {
@@ -304,7 +310,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
             IconButton(
               icon: Icon(
                 _showCreateForm ? Icons.close : Icons.add,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
               ),
               onPressed: () {
                 if (_showCreateForm) {
@@ -363,7 +369,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
               decoration: InputDecoration(
                 labelText: t('lineNameAr'),
                 labelStyle: const TextStyle(color: Colors.white70),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: Colors.white54),
@@ -376,7 +383,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                 fillColor: Colors.white.withOpacity(0.1),
               ),
               style: const TextStyle(color: Colors.white),
-              validator: (value) => value?.isEmpty ?? true ? t('required') : null,
+              validator: (value) =>
+                  value?.isEmpty ?? true ? t('required') : null,
               textDirection: TextDirection.rtl,
             ),
             const SizedBox(height: 16),
@@ -386,7 +394,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
               decoration: InputDecoration(
                 labelText: t('lineNameEn'),
                 labelStyle: const TextStyle(color: Colors.white70),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: const BorderSide(color: Colors.white54),
@@ -410,7 +419,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                     decoration: InputDecoration(
                       labelText: t('basePrice'),
                       labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: Colors.white54),
@@ -424,7 +434,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                     ),
                     style: const TextStyle(color: Colors.white),
                     keyboardType: TextInputType.number,
-                    validator: (value) => value?.isEmpty ?? true ? t('required') : null,
+                    validator: (value) =>
+                        value?.isEmpty ?? true ? t('required') : null,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -434,7 +445,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                     decoration: InputDecoration(
                       labelText: t('additionalPrice'),
                       labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: Colors.white54),
@@ -461,7 +473,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                     decoration: InputDecoration(
                       labelText: t('duration'),
                       labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: Colors.white54),
@@ -484,7 +497,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                     decoration: InputDecoration(
                       labelText: t('distance'),
                       labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8)),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: Colors.white54),
@@ -521,7 +535,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                       foregroundColor: Colors.white,
                       side: const BorderSide(color: Colors.white70),
                     ),
-                    child: Text(t('cancel'), style: const TextStyle(color: Colors.white)),
+                    child: Text(t('cancel'),
+                        style: const TextStyle(color: Colors.white)),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -532,7 +547,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
                     ),
-                    child: Text(t('save'), style: const TextStyle(color: Colors.white)),
+                    child: Text(t('save'),
+                        style: const TextStyle(color: Colors.white)),
                   ),
                 ),
               ],
@@ -545,17 +561,18 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
 
   Widget _buildLineCard(Map<String, dynamic> line) {
     // Get line name based on current language
-    final lineName = _isArabic 
+    final lineName = _isArabic
         ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? '')
         : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? '');
-    
+
     return Card(
       color: Colors.white.withOpacity(0.05),
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         title: Text(
           lineName,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style:
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -569,7 +586,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                 margin: const EdgeInsets.only(top: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: (line['active'] == true ? Colors.green : Colors.red).withOpacity(0.3),
+                  color: (line['active'] == true ? Colors.green : Colors.red)
+                      .withOpacity(0.3),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -596,4 +614,3 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     );
   }
 }
-

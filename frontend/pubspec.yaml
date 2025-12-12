@@ -21,6 +21,7 @@ dependencies:
   supabase_flutter: ^2.0.0
   latlong2: ^0.9.1
   url_launcher: ^6.2.5
+  image_picker: ^1.0.7
   fl_chart: ^0.69.0
   intl: ^0.20.2
 

@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
 import '../../screens/auth/login_page.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/passenger_bottom_nav_bar.dart';
 import 'passenger_trips_page.dart';
 import 'passenger_reservations_page.dart';
 import 'passenger_wallet_page.dart';
+import 'passenger_profile_page.dart';
 
 class PassengerHomePage extends StatefulWidget {
   const PassengerHomePage({super.key});
@@ -16,10 +22,14 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   bool _isArabic = true;
+  bool _isDarkMode = false; // Light mode as default
+  String? _profileImagePath; // Local path to profile image
+  final ImagePicker _imagePicker = ImagePicker();
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
       'title': 'الصفحة الرئيسية - مسافر',
+      'home': 'الرئيسية',
       'welcome': 'مرحباً',
       'bookNow': 'احجز رحلتك الآن',
       'quickActions': 'إجراءات سريعة',
@@ -30,6 +40,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       'favoriteTrips': 'الرحلات المفضلة',
       'noFavorites': 'لا توجد رحلات مفضلة حتى الآن',
       'accountInfo': 'معلومات الحساب',
+      'name': 'الاسم',
       'email': 'البريد الإلكتروني',
       'phone': 'رقم الهاتف',
       'role': 'الدور',
@@ -41,6 +52,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     },
     'en': {
       'title': 'Home - Passenger',
+      'home': 'Home',
       'welcome': 'Welcome',
       'bookNow': 'Book your trip now',
       'quickActions': 'Quick Actions',
@@ -51,6 +63,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       'favoriteTrips': 'Favorite Trips',
       'noFavorites': 'No favorite trips yet',
       'accountInfo': 'Account Information',
+      'name': 'Name',
       'email': 'Email',
       'phone': 'Phone',
       'role': 'Role',
@@ -109,6 +122,8 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   void initState() {
     super.initState();
     _loadUserData();
+    _loadThemePreference();
+    _loadProfileImage();
   }
 
   Future<void> _loadUserData() async {
@@ -121,12 +136,69 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     });
   }
 
-  Future<void> _switchLanguage(bool arabic) async {
-    await ApiService.saveLanguagePreference(arabic);
+  Future<void> _loadThemePreference() async {
+    await AppTheme.init();
     setState(() {
-      _isArabic = arabic;
+      _isDarkMode = AppTheme.isDarkMode;
     });
   }
+
+  Future<void> _loadProfileImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final imagePath = prefs.getString('profile_image_path');
+    if (imagePath != null && File(imagePath).existsSync()) {
+      setState(() {
+        _profileImagePath = imagePath;
+      });
+    }
+  }
+
+  Future<void> _pickProfileImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        // Save the image path locally
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('profile_image_path', image.path);
+
+        setState(() {
+          _profileImagePath = image.path;
+        });
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isArabic ? 'تم تحديث صورة الملف الشخصي' : 'Profile image updated',
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isArabic ? 'فشل تحميل الصورة' : 'Failed to upload image',
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
 
   Future<void> _handleLogout() async {
     await ApiService.clearAuthData();
@@ -142,171 +214,383 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
 
+    // Theme-aware colors
+    final backgroundColor = _isDarkMode
+        ? const Color(0xFF0A0E21)
+        : const Color.fromARGB(255, 224, 228, 231); // Soft blue-gray background, easy on eyes
+    final appBarColor = _isDarkMode
+        ? const Color(0xFF1E3A5F)
+        : const Color(0xFF2C5F8D);
+    final cardColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : const Color(0xFFFAFBFC); // Off-white with slight cool tint
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final textSecondaryColor = _isDarkMode
+        ? const Color(0xFFB0BEC5)
+        : const Color(0xFF546E7A);
+    const accentColor = Color(0xFFF57C00);
+
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F7FA),
-        appBar: AppBar(
-          title: Text(
-            t('title'),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+        backgroundColor: backgroundColor,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(70),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _isDarkMode
+                    ? [
+                        const Color(0xFF1C2541),
+                        const Color(0xFF2C3E50),
+                        const Color(0xFF1C2541),
+                      ]
+                    : [
+                        const Color(0xFF2C5F8D),
+                        const Color(0xFF1E3A5F),
+                        const Color(0xFF2C5F8D),
+                      ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: AppBar(
+              title: Text(
+                t('title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: true,
+              iconTheme: const IconThemeData(color: Colors.white),
+              actionsIconTheme: const IconThemeData(color: Colors.white),
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.logout_rounded, size: 22),
+                    onPressed: _handleLogout,
+                    tooltip: t('logout'),
+                  ),
+                ),
+              ],
             ),
           ),
-          backgroundColor: const Color(0xFF1E3A5F),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actionsIconTheme: const IconThemeData(color: Colors.white),
-          actions: [
-            IconButton(
-              icon: Icon(_isArabic ? Icons.language : Icons.translate),
-              onPressed: () => _switchLanguage(!_isArabic),
-              tooltip: _isArabic ? 'English' : 'العربية',
-            ),
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: _handleLogout,
-              tooltip: t('logout'),
-            ),
-          ],
         ),
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                ),
+              )
             : SafeArea(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Welcome Card - Professional Design
                       Container(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(32),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Color(0xFFF57C00),
-                              Color(0xFFE65100),
-                              Color(0xFFF57C00),
+                              Color(0xFF2C5F8D), // Professional blue
+                              Color(0xFF1E3A5F), // Dark navy
+                              Color(0xFF2C5F8D), // Professional blue
                             ],
+                            stops: [0.0, 0.5, 1.0],
                           ),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(28),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFF57C00).withOpacity(0.3),
-                              blurRadius: 20,
+                              color: const Color(0xFF2C5F8D).withAlpha(102),
+                              blurRadius: 24,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 12),
+                            ),
+                            BoxShadow(
+                              color: Colors.black.withAlpha(51),
+                              blurRadius: 16,
                               offset: const Offset(0, 8),
                             ),
                           ],
                         ),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    t('welcome'),
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    _userData?['fullname'] ?? t('passenger'),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.25),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: Colors.white.withOpacity(0.5),
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.directions_bus,
-                                          color: Colors.white,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          t('bookNow'),
-                                          style: const TextStyle(
+                            // Greeting Row with Profile Image
+                            Row(
+                              children: [
+                                // Profile Image with Upload
+                                GestureDetector(
+                                  onTap: _pickProfileImage,
+                                  child: Stack(
+                                    children: [
+                                      // Profile Image Container
+                                      Container(
+                                        width: 80,
+                                        height: 80,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
                                             color: Colors.white,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
+                                            width: 3,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withAlpha(77),
+                                              blurRadius: 16,
+                                              spreadRadius: 2,
+                                            ),
+                                          ],
+                                        ),
+                                        child: ClipOval(
+                                          child: _profileImagePath != null
+                                              ? Image.file(
+                                                  File(_profileImagePath!),
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (context, error, stackTrace) {
+                                                    return _buildDefaultAvatar();
+                                                  },
+                                                )
+                                              : _buildDefaultAvatar(),
+                                        ),
+                                      ),
+                                      // Camera Icon Overlay
+                                      Positioned(
+                                        bottom: 0,
+                                        right: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                accentColor,
+                                                accentColor.withAlpha(204),
+                                              ],
+                                            ),
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.camera_alt_rounded,
+                                            color: Colors.white,
+                                            size: 16,
                                           ),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
+                                const SizedBox(width: 16),
+                                // Greeting Text
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _isArabic ? 'مرحباً بك!' : 'Hello!',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      // User name with hello icon
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              _userData?['fullname'] ?? t('passenger'),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 28,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 0.3,
+                                                height: 1.2,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Icon(
+                                            Icons.waving_hand_rounded,
+                                            color: Colors.amber,
+                                            size: 28,
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            // Divider
+                            Container(
+                              height: 1,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.white.withAlpha(0),
+                                    Colors.white.withAlpha(102),
+                                    Colors.white.withAlpha(0),
+                                  ],
+                                ),
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.25),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.6),
-                                  width: 2.5,
+                            const SizedBox(height: 24),
+                            // Taxi System Message
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withAlpha(26),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.local_taxi_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
                                 ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Text(
+                                    _isArabic
+                                        ? 'رحلتك القادمة على بعد نقرة واحدة'
+                                        : 'Your next ride is just a tap away',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 0.3,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            // Quick Stats Row
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildWelcomeStatCard(
+                                    icon: Icons.route_rounded,
+                                    label: _isArabic ? 'رحلات متاحة' : 'Available Trips',
+                                    value: '24/7',
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildWelcomeStatCard(
+                                    icon: Icons.verified_user_rounded,
+                                    label: _isArabic ? 'آمن وموثوق' : 'Safe & Secure',
+                                    value: '100%',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Quick Actions Section Header
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              accentColor.withAlpha(26),
+                              accentColor.withAlpha(13),
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: accentColor.withAlpha(51),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: accentColor,
+                                borderRadius: BorderRadius.circular(10),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.white.withOpacity(0.2),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
+                                    color: accentColor.withAlpha(76),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
                               child: const Icon(
-                                Icons.person_outline,
+                                Icons.dashboard_rounded,
                                 color: Colors.white,
-                                size: 44,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              t('quickActions'),
+                              style: TextStyle(
+                                color: textPrimaryColor,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
-
-                      Text(
-                        t('quickActions'),
-                        style: const TextStyle(
-                          color: Color(0xFF1E3A5F),
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
                       Row(
                         children: [
                           Expanded(
                             child: _buildActionCard(
-                              icon: Icons.directions_bus,
+                              icon: Icons.directions_bus_rounded,
                               title: t('viewTrips'),
-                              color: Colors.blue,
+                              color: const Color(0xFF2196F3),
+                              cardColor: cardColor,
+                              textColor: textPrimaryColor,
+                              isDarkMode: _isDarkMode,
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -317,12 +601,15 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               },
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 14),
                           Expanded(
                             child: _buildActionCard(
-                              icon: Icons.book_online,
+                              icon: Icons.book_online_rounded,
                               title: t('myReservations'),
-                              color: Colors.green,
+                              color: const Color(0xFF4CAF50),
+                              cardColor: cardColor,
+                              textColor: textPrimaryColor,
+                              isDarkMode: _isDarkMode,
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -335,14 +622,17 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
                       Row(
                         children: [
                           Expanded(
                             child: _buildActionCard(
-                              icon: Icons.account_balance_wallet,
+                              icon: Icons.account_balance_wallet_rounded,
                               title: t('myWallet'),
-                              color: Colors.orange,
+                              color: const Color(0xFFFF9800),
+                              cardColor: cardColor,
+                              textColor: textPrimaryColor,
+                              isDarkMode: _isDarkMode,
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -353,39 +643,96 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               },
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 14),
                           Expanded(
                             child: _buildActionCard(
-                              icon: Icons.person,
+                              icon: Icons.person_rounded,
                               title: t('profile'),
-                              color: Colors.purple,
-                              onTap: () {},
+                              color: const Color(0xFF9C27B0),
+                              cardColor: cardColor,
+                              textColor: textPrimaryColor,
+                              isDarkMode: _isDarkMode,
+                              onTap: () {
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PassengerProfilePage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
 
-                      Text(
-                        t('favoriteTrips'),
-                        style: const TextStyle(
-                          color: Color(0xFF1E3A5F),
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
+                      // Favorite Trips Section Header
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFE91E63).withAlpha(26),
+                              const Color(0xFFE91E63).withAlpha(13),
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFFE91E63).withAlpha(51),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE91E63),
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFE91E63).withAlpha(76),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.favorite_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              t('favoriteTrips'),
+                              style: TextStyle(
+                                color: textPrimaryColor,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 20),
                       if (_favoriteTrips.isEmpty)
                         Container(
-                          padding: const EdgeInsets.all(20),
+                          padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade200),
+                            color: cardColor,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: _isDarkMode
+                                  ? Colors.white.withAlpha(38)
+                                  : Colors.grey.shade200,
+                            ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: Colors.black.withAlpha(13),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -393,14 +740,20 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.favorite_border, color: Colors.grey.shade400, size: 24),
-                              const SizedBox(width: 12),
-                              Text(
-                                t('noFavorites'),
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
+                              Icon(
+                                Icons.favorite_border_rounded,
+                                color: textSecondaryColor,
+                                size: 28,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  t('noFavorites'),
+                                  style: TextStyle(
+                                    color: textSecondaryColor,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ],
@@ -411,40 +764,45 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                           children: _favoriteTrips
                               .map(
                                 (trip) => Padding(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 8),
+                                  padding: const EdgeInsets.only(bottom: 14),
                                   child: _buildFavoriteTripCard(
-                                    from: _isArabic 
+                                    from: _isArabic
                                         ? trip['fromAr'] as String
                                         : trip['fromEn'] as String,
-                                    to: _isArabic 
+                                    to: _isArabic
                                         ? trip['toAr'] as String
                                         : trip['toEn'] as String,
                                     line: trip['line'] as String,
-                                    lastBooked: _isArabic 
+                                    lastBooked: _isArabic
                                         ? trip['lastBookedAr'] as String
                                         : trip['lastBookedEn'] as String,
-                                    accentColor:
-                                        trip['color'] as Color? ?? Colors.blue,
+                                    accentColor: trip['color'] as Color? ?? Colors.blue,
+                                    cardColor: cardColor,
+                                    textColor: textPrimaryColor,
+                                    textSecondaryColor: textSecondaryColor,
+                                    isDarkMode: _isDarkMode,
                                   ),
                                 ),
                               )
                               .toList(),
                         ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 28),
 
+                      // Account Info Section
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: Colors.grey.shade200,
+                            color: _isDarkMode
+                                ? Colors.white.withAlpha(38)
+                                : Colors.grey.shade200,
                             width: 1.5,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
+                              color: Colors.black.withAlpha(20),
                               blurRadius: 15,
                               offset: const Offset(0, 5),
                             ),
@@ -456,46 +814,61 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF57C00).withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(10),
+                                    color: accentColor.withAlpha(51),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: const Icon(
-                                    Icons.person_outline,
-                                    color: Color(0xFFF57C00),
-                                    size: 20,
+                                  child: Icon(
+                                    Icons.person_outline_rounded,
+                                    color: accentColor,
+                                    size: 24,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 14),
                                 Text(
                                   t('accountInfo'),
-                                  style: const TextStyle(
-                                    color: Color(0xFF1E3A5F),
-                                    fontSize: 18,
+                                  style: TextStyle(
+                                    color: textPrimaryColor,
+                                    fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 0.5,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 20),
                             _buildInfoRow(
                               Icons.email_outlined,
                               t('email'),
                               _userData?['email'] ?? '',
+                              accentColor,
+                              textPrimaryColor,
+                              textSecondaryColor,
+                              cardColor,
+                              _isDarkMode,
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 14),
                             _buildInfoRow(
                               Icons.phone_outlined,
                               t('phone'),
                               _userData?['phone'] ?? '',
+                              accentColor,
+                              textPrimaryColor,
+                              textSecondaryColor,
+                              cardColor,
+                              _isDarkMode,
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 14),
                             _buildInfoRow(
                               Icons.badge_outlined,
                               t('role'),
                               _userData?['role'] ?? 'PASSENGER',
+                              accentColor,
+                              textPrimaryColor,
+                              textSecondaryColor,
+                              cardColor,
+                              _isDarkMode,
                             ),
                           ],
                         ),
@@ -504,31 +877,69 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                   ),
                 ),
               ),
+        bottomNavigationBar: PassengerBottomNavBar(
+          currentIndex: 2, // Home is index 2
+          isDarkMode: _isDarkMode,
+          isArabic: _isArabic,
+          onTap: (index) {
+            PassengerBottomNavBar.navigateToPage(context, index);
+          },
+        ),
       ),
     );
   }
+
+
+
 
   Widget _buildActionCard({
     required IconData icon,
     required String title,
     required Color color,
+    required Color cardColor,
+    required Color textColor,
+    required bool isDarkMode,
     required VoidCallback onTap,
   }) {
+    // Create a lighter and darker shade for gradient
+    final Color lightShade = Color.lerp(color, Colors.white, 0.15)!;
+    final Color darkShade = Color.lerp(color, Colors.black, 0.2)!;
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(24),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 22),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: color.withOpacity(0.3),
-            width: 2,
+          gradient: LinearGradient(
+            colors: [
+              lightShade,
+              color,
+              darkShade,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: const [0.0, 0.5, 1.0],
           ),
+          borderRadius: BorderRadius.circular(24),
           boxShadow: [
+            // Main colored shadow
             BoxShadow(
-              color: color.withOpacity(0.15),
+              color: color.withAlpha(128),
+              blurRadius: 20,
+              spreadRadius: 2,
+              offset: const Offset(0, 10),
+            ),
+            // Secondary shadow for depth
+            BoxShadow(
+              color: color.withAlpha(64),
+              blurRadius: 30,
+              spreadRadius: -5,
+              offset: const Offset(0, 15),
+            ),
+            // Dark shadow for contrast
+            BoxShadow(
+              color: Colors.black.withAlpha(51),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -537,23 +948,48 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Icon container with glow effect
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: Colors.white.withAlpha(64),
                 shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withAlpha(102),
+                  width: 2.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.white.withAlpha(51),
+                    blurRadius: 15,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
-              child: Icon(icon, color: color, size: 32),
+              child: Icon(icon, color: Colors.white, size: 38),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: const Color(0xFF1E3A5F),
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.3,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15.5,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+                height: 1.3,
+                shadows: [
+                  Shadow(
+                    color: Colors.black38,
+                    offset: Offset(0, 2),
+                    blurRadius: 4,
+                  ),
+                  Shadow(
+                    color: Colors.black12,
+                    offset: Offset(0, 1),
+                    blurRadius: 2,
+                  ),
+                ],
               ),
             ),
           ],
@@ -562,28 +998,41 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value,
+    Color accentColor,
+    Color textPrimaryColor,
+    Color textSecondaryColor,
+    Color cardColor,
+    bool isDarkMode,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
+        color: isDarkMode
+            ? Colors.white.withAlpha(13)
+            : const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: Colors.grey.shade200,
+          color: isDarkMode
+              ? Colors.white.withAlpha(25)
+              : Colors.grey.shade200,
           width: 1,
         ),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF57C00).withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
+              color: accentColor.withAlpha(38),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: const Color(0xFFF57C00), size: 20),
+            child: Icon(icon, color: accentColor, size: 22),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,17 +1040,18 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                 Text(
                   label,
                   style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 12,
+                    color: textSecondaryColor,
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
+                    letterSpacing: 0.2,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   value,
-                  style: const TextStyle(
-                    color: Color(0xFF1E3A5F),
-                    fontSize: 15,
+                  style: TextStyle(
+                    color: textPrimaryColor,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.3,
                   ),
@@ -620,27 +1070,30 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     required String line,
     required String lastBooked,
     required Color accentColor,
+    required Color cardColor,
+    required Color textColor,
+    required Color textSecondaryColor,
+    required bool isDarkMode,
   }) {
     final isRtl = _isArabic;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: accentColor.withOpacity(0.4),
+          color: accentColor.withAlpha(102),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withOpacity(0.15),
+            color: accentColor.withAlpha(38),
             blurRadius: 15,
             offset: const Offset(0, 6),
           ),
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withAlpha(13),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -653,18 +1106,17 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      accentColor.withOpacity(0.3),
-                      accentColor.withOpacity(0.2),
+                      accentColor.withAlpha(76),
+                      accentColor.withAlpha(51),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(25),
                   border: Border.all(
-                    color: accentColor.withOpacity(0.5),
+                    color: accentColor.withAlpha(128),
                     width: 1.5,
                   ),
                 ),
@@ -672,17 +1124,18 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.route,
+                      Icons.route_rounded,
                       color: accentColor,
-                      size: 14,
+                      size: 16,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Text(
                       line,
                       style: TextStyle(
                         color: accentColor,
                         fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                        fontSize: 13,
+                        letterSpacing: 0.2,
                       ),
                     ),
                   ],
@@ -690,85 +1143,164 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.2),
+                  color: accentColor.withAlpha(51),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.favorite,
+                  Icons.favorite_rounded,
                   color: accentColor,
-                  size: 18,
+                  size: 20,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           Row(
             children: [
               Icon(
-                Icons.location_on,
+                Icons.location_on_rounded,
                 color: accentColor,
-                size: 18,
+                size: 20,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   t('fromTo', {'from': from, 'to': to}),
-                  style: const TextStyle(
-                    color: Color(0xFF1E3A5F),
+                  style: TextStyle(
+                    color: textColor,
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.3,
+                    height: 1.3,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Row(
             children: [
               Icon(
-                Icons.access_time,
-                color: Colors.white.withOpacity(0.7),
-                size: 16,
+                Icons.access_time_rounded,
+                color: textSecondaryColor,
+                size: 18,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Text(
                 '${t('lastBooked')}: $lastBooked',
                 style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 13,
+                  color: textSecondaryColor,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
+                  letterSpacing: 0.2,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: () {},
-              icon: const Icon(Icons.flash_on, size: 18),
+              icon: const Icon(Icons.flash_on_rounded, size: 20),
               label: Text(
                 t('bookThisTrip'),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
+                  fontSize: 15,
                   letterSpacing: 0.5,
                 ),
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: accentColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 elevation: 4,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Welcome Card Stat Widget
+  Widget _buildWelcomeStatCard({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(38),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withAlpha(77),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            color: Colors.white,
+            size: 26,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withAlpha(217),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.2,
+              height: 1.2,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Default Avatar Widget
+  Widget _buildDefaultAvatar() {
+    const accentColor = Color(0xFFF57C00);
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accentColor,
+            accentColor.withAlpha(204),
+          ],
+        ),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.person_rounded,
+          color: Colors.white,
+          size: 48,
+        ),
       ),
     );
   }

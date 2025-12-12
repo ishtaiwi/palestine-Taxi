@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/driver_bottom_nav_bar.dart';
+import 'driver_home.dart';
 import 'qr_scanner_page.dart';
 
 class DriverTripsPage extends StatefulWidget {
@@ -11,6 +14,7 @@ class DriverTripsPage extends StatefulWidget {
 
 class _DriverTripsPageState extends State<DriverTripsPage> {
   bool _isArabic = true;
+  bool _isDarkMode = false;
   bool _isLoading = true;
   String? _error;
   List<Map<String, dynamic>> _trips = [];
@@ -87,9 +91,11 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
 
   Future<void> _initialize() async {
     final isArabic = await ApiService.getLanguagePreference();
+    await AppTheme.init();
     if (mounted) {
       setState(() {
         _isArabic = isArabic;
+        _isDarkMode = AppTheme.isDarkMode;
       });
     }
     await _loadTrips();
@@ -419,49 +425,110 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    // Theme-aware colors
+    final backgroundColor = _isDarkMode
+        ? const Color(0xFF0A0E21)
+        : const Color.fromARGB(255, 224, 228, 231);
+    final appBarColor = _isDarkMode
+        ? const Color(0xFF1E3A5F)
+        : const Color(0xFF2C5F8D);
 
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFF060A1A),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF1E3A5F), // خلفية فاتحة أكثر
-          foregroundColor: Colors.white,
-          elevation: 2,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actionsIconTheme: const IconThemeData(color: Colors.white),
-          title: Text(
-            t('title'),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+        backgroundColor: backgroundColor,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(70),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _isDarkMode
+                    ? [
+                        const Color(0xFF1C2541),
+                        const Color(0xFF2C3E50),
+                        const Color(0xFF1C2541),
+                      ]
+                    : [
+                        const Color(0xFF2C5F8D),
+                        const Color(0xFF1E3A5F),
+                        const Color(0xFF2C5F8D),
+                      ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: AppBar(
+              leading: Container(
+                margin: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DriverHomePage(),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+              title: Text(
+                t('title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: true,
+              iconTheme: const IconThemeData(color: Colors.white),
+              actionsIconTheme: const IconThemeData(color: Colors.white),
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    onPressed: _loadTrips,
+                    tooltip: t('refresh'),
+                  ),
+                ),
+              ],
             ),
           ),
-          actions: [
-            IconButton(
-              icon: Icon(
-                _isArabic ? Icons.language : Icons.translate,
-                color: Colors.white,
-              ),
-              onPressed: () async {
-                final next = !_isArabic;
-                await ApiService.saveLanguagePreference(next);
-                if (mounted) {
-                  setState(() {
-                    _isArabic = next;
-                  });
-                }
-              },
-              tooltip: _isArabic ? 'English' : 'العربية',
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: _loadTrips,
-              tooltip: t('refresh'),
-            ),
-          ],
         ),
         body: _buildBody(),
+        bottomNavigationBar: DriverBottomNavBar(
+          currentIndex: 0, // My Trips is index 0
+          isDarkMode: _isDarkMode,
+          isArabic: _isArabic,
+          onTap: (index) {
+            DriverBottomNavBar.navigateToPage(context, index);
+          },
+        ),
       ),
     );
   }
@@ -470,6 +537,14 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
+
+    // Theme-aware colors
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final textSecondaryColor = _isDarkMode
+        ? const Color(0xFFB0BEC5)
+        : const Color(0xFF546E7A);
 
     if (_error != null) {
       return Center(
@@ -481,7 +556,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
+                style: TextStyle(color: textPrimaryColor),
               ),
               const SizedBox(height: 16),
               FilledButton.tonal(
@@ -498,7 +573,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       return Center(
         child: Text(
           t('noTrips'),
-          style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
+          style: TextStyle(color: textPrimaryColor),
         ),
       );
     }
@@ -511,8 +586,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
         children: [
           Text(
             t('subtitle'),
-            style: const TextStyle(
-              color: Colors.white, // نص أبيض على خلفية غامقة
+            style: TextStyle(
+              color: textSecondaryColor,
               fontSize: 14,
             ),
           ),
@@ -528,13 +603,28 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     final line = trip['line'] as Map<String, dynamic>? ?? {};
     final departureTime = _formatDateTime(trip['deptime']);
     final status = trip['status']?.toString() ?? 'scheduled';
+    
+    final cardColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : const Color(0xFFFAFBFC);
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final textSecondaryColor = _isDarkMode
+        ? const Color(0xFFB0BEC5)
+        : const Color(0xFF546E7A);
+    final borderColor = _isDarkMode
+        ? Colors.white24
+        : Colors.grey.shade300;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: _isDarkMode
+            ? Colors.white.withOpacity(0.04)
+            : cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(color: borderColor),
       ),
       child: ExpansionTile(
         onExpansionChanged: (expanded) {
@@ -542,7 +632,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             _loadReservations(tripId);
           }
         },
-        collapsedIconColor: Colors.white,
+        collapsedIconColor: textPrimaryColor,
         iconColor: Colors.orange,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -551,8 +641,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               _isArabic
                   ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '---')
                   : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '---'),
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: textPrimaryColor,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -560,12 +650,12 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             const SizedBox(height: 4),
             Text(
               '${t('departure')}: $departureTime',
-              style: const TextStyle(color: Colors.white, fontSize: 12), // نص أبيض على خلفية غامقة
+              style: TextStyle(color: textSecondaryColor, fontSize: 12),
             ),
             const SizedBox(height: 2),
             Text(
               '${t('status')}: $status',
-              style: const TextStyle(color: Colors.white, fontSize: 12), // نص أبيض على خلفية غامقة
+              style: TextStyle(color: textSecondaryColor, fontSize: 12),
             ),
           ],
         ),
@@ -588,7 +678,10 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                   const SizedBox(width: 8),
                   Text(
                     t('assignedDriver'),
-                    style: const TextStyle(color: Colors.white, fontSize: 14), // نص أبيض على خلفية غامقة
+                    style: TextStyle(
+                      color: _isDarkMode ? Colors.white : const Color(0xFF1E3A5F),
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -611,7 +704,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                   icon: const Icon(Icons.qr_code_scanner),
                   label: Text(t('checkinQR')),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
+                    foregroundColor: _isDarkMode ? Colors.white : Colors.green,
                     side: const BorderSide(color: Colors.green),
                   ),
                 ),
@@ -653,23 +746,33 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
   Widget _buildTripStatsRow(Map<String, dynamic> trip) {
     final availSeats = trip['availableseats']?.toString() ?? '--';
     final totalBookings = trip['totalbookings']?.toString() ?? '0';
+    
+    final textSecondaryColor = _isDarkMode
+        ? const Color(0xFFB0BEC5)
+        : const Color(0xFF546E7A);
+    final cardBgColor = _isDarkMode
+        ? Colors.white.withOpacity(0.05)
+        : Colors.grey.shade100;
+    final borderColor = _isDarkMode
+        ? Colors.white10
+        : Colors.grey.shade300;
 
     Widget buildStat(String label, String value) {
       return Expanded(
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: cardBgColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white10),
+            border: Border.all(color: borderColor),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  color: Colors.white, // نص أبيض على خلفية غامقة
+                style: TextStyle(
+                  color: textSecondaryColor,
                   fontSize: 12,
                 ),
               ),
@@ -715,8 +818,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       children: [
         Text(
           t('reservations'),
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: _isDarkMode ? Colors.white : const Color(0xFF1E3A5F),
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -725,12 +828,16 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
         if (reservations == null)
           Text(
             t('none'),
-            style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
+            style: TextStyle(
+              color: _isDarkMode ? Colors.white : const Color(0xFF546E7A),
+            ),
           )
         else if (reservations.isEmpty)
           Text(
             t('none'),
-            style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
+            style: TextStyle(
+              color: _isDarkMode ? Colors.white : const Color(0xFF546E7A),
+            ),
           )
         else
           Column(
@@ -772,13 +879,26 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
 
     final isCheckedIn = status == 'checked_in';
 
+    final cardBgColor = _isDarkMode
+        ? Colors.white.withOpacity(0.05)
+        : Colors.grey.shade50;
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final textSecondaryColor = _isDarkMode
+        ? const Color(0xFFB0BEC5)
+        : const Color(0xFF546E7A);
+    final borderColor = _isDarkMode
+        ? Colors.white12
+        : Colors.grey.shade300;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: cardBgColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -801,23 +921,23 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                   children: [
                     Text(
                       user['fullname']?.toString() ?? t('passenger'),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: textPrimaryColor,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
                       '${t('seat')}: $seat',
-                      style: const TextStyle(color: Colors.white, fontSize: 12), // نص أبيض على خلفية غامقة
+                      style: TextStyle(color: textSecondaryColor, fontSize: 12),
                     ),
                   ],
                 ),
               ),
               Text(
                 status,
-                style: const TextStyle(
-                  color: Colors.white, // نص أبيض على خلفية غامقة
+                style: TextStyle(
+                  color: textSecondaryColor,
                   fontSize: 12,
                 ),
               ),

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/passenger_bottom_nav_bar.dart';
+import 'passenger_home.dart';
 
 class PassengerWalletPage extends StatefulWidget {
   const PassengerWalletPage({super.key});
@@ -11,6 +14,7 @@ class PassengerWalletPage extends StatefulWidget {
 class _PassengerWalletPageState extends State<PassengerWalletPage> {
   bool _isLoading = true;
   bool _isArabic = true;
+  bool _isDarkMode = false; // Light mode as default
   String? _error;
   Map<String, dynamic>? _wallet;
   final TextEditingController _amountController = TextEditingController();
@@ -74,10 +78,18 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
 
   Future<void> _initialize() async {
     final isArabic = await ApiService.getLanguagePreference();
+    await _loadThemePreference();
     setState(() {
       _isArabic = isArabic;
     });
     await _loadWallet();
+  }
+
+  Future<void> _loadThemePreference() async {
+    await AppTheme.init();
+    setState(() {
+      _isDarkMode = AppTheme.isDarkMode;
+    });
   }
 
   Future<void> _loadWallet() async {
@@ -159,45 +171,71 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
 
   Future<void> _showAddBalanceDialog() async {
     _amountController.clear();
+
+    // Theme-aware colors for dialog
+    final dialogBgColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : Colors.white;
+
+    final textPrimary = _isDarkMode
+        ? const Color(0xFFE8EAF6)
+        : const Color(0xFF1E3A5F);
+
+    final textSecondary = _isDarkMode
+        ? const Color(0xFFB0BEC5)
+        : Colors.grey.shade700;
+
+    final fillColor = _isDarkMode
+        ? const Color(0xFF1E3A5F).withAlpha(77)
+        : Colors.grey.shade50;
+
+    final borderColor = _isDarkMode
+        ? const Color(0xFF2C5F8D)
+        : Colors.grey.shade300;
+
+    final focusedBorderColor = _isDarkMode
+        ? const Color(0xFF64B5F6)
+        : const Color(0xFF1E3A5F);
+
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: dialogBgColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
         title: Row(
           children: [
-            Icon(Icons.account_balance_wallet, color: const Color(0xFF1E3A5F), size: 24),
+            Icon(Icons.account_balance_wallet, color: textPrimary, size: 24),
             const SizedBox(width: 12),
             Text(
               t('addBalance'),
-              style: const TextStyle(color: Color(0xFF1E3A5F), fontWeight: FontWeight.bold),
+              style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
             ),
           ],
         ),
         content: TextField(
           controller: _amountController,
           keyboardType: TextInputType.number,
-          style: const TextStyle(color: Color(0xFF1E3A5F), fontWeight: FontWeight.w500),
+          style: TextStyle(color: textPrimary, fontWeight: FontWeight.w500),
           decoration: InputDecoration(
             labelText: t('enterAmount'),
-            labelStyle: TextStyle(color: Colors.grey.shade700),
+            labelStyle: TextStyle(color: textSecondary),
             prefixText: '₪ ',
-            prefixStyle: const TextStyle(color: Color(0xFF1E3A5F), fontWeight: FontWeight.w600),
+            prefixStyle: TextStyle(color: textPrimary, fontWeight: FontWeight.w600),
             filled: true,
-            fillColor: Colors.grey.shade50,
+            fillColor: fillColor,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: borderColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: borderColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF1E3A5F), width: 2),
+              borderSide: BorderSide(color: focusedBorderColor, width: 2),
             ),
           ),
         ),
@@ -206,7 +244,7 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               t('cancel'),
-              style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+              style: TextStyle(color: textSecondary, fontWeight: FontWeight.w500),
             ),
           ),
           FilledButton(
@@ -236,30 +274,116 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
     final balance = _wallet?['balance'] ?? 0.0;
 
+    // Theme-aware colors
+    final backgroundColor = _isDarkMode
+        ? const Color(0xFF0A0E21)
+        : const Color(0xFFECF0F3);
+
+    final cardColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : const Color(0xFFFAFBFC);
+
+    final textPrimary = _isDarkMode
+        ? const Color(0xFFE8EAF6)
+        : const Color(0xFF1E3A5F);
+
+    final textSecondary = _isDarkMode
+        ? const Color(0xFFB0BEC5)
+        : Colors.grey.shade600;
+
+    final appBarColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : const Color(0xFF2C5F8D);
+
+    final borderColor = _isDarkMode
+        ? const Color(0xFF2C3E50)
+        : Colors.grey.shade200;
+
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F7FA),
-        appBar: AppBar(
-          title: Text(
-            t('title'),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+        backgroundColor: backgroundColor,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(70),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _isDarkMode
+                    ? [
+                        const Color(0xFF1C2541),
+                        const Color(0xFF2C3E50),
+                        const Color(0xFF1C2541),
+                      ]
+                    : [
+                        const Color(0xFF2C5F8D),
+                        const Color(0xFF1E3A5F),
+                        const Color(0xFF2C5F8D),
+                      ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: AppBar(
+              leading: Container(
+                margin: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PassengerHomePage(),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+              title: Text(
+                t('title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: true,
+              iconTheme: const IconThemeData(color: Colors.white),
+              actionsIconTheme: const IconThemeData(color: Colors.white),
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    onPressed: _loadWallet,
+                    tooltip: t('refresh'),
+                  ),
+                ),
+              ],
             ),
           ),
-          backgroundColor: const Color(0xFF1E3A5F),
-          foregroundColor: Colors.white,
-          elevation: 2,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actionsIconTheme: const IconThemeData(color: Colors.white),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _loadWallet,
-              tooltip: t('refresh'),
-            ),
-          ],
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -272,14 +396,14 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                         const SizedBox(height: 16),
                         Text(
                           _error!,
-                          style: const TextStyle(color: Color(0xFF1E3A5F)),
+                          style: TextStyle(color: textPrimary),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: _loadWallet,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor: const Color(0xFF2C5F8D),
                             foregroundColor: Colors.white,
                           ),
                           child: Text(t('refresh'), style: const TextStyle(color: Colors.white)),
@@ -308,7 +432,7 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.green.withOpacity(0.4),
+                                  color: Colors.green.withAlpha(102),
                                   blurRadius: 15,
                                   offset: const Offset(0, 6),
                                 ),
@@ -319,7 +443,7 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withAlpha(51),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
@@ -332,7 +456,7 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                 Text(
                                   t('balance'),
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.9),
+                                    color: Colors.white.withAlpha(230),
                                     fontSize: 16,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -379,8 +503,8 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                           // Transactions Section
                           Text(
                             t('transactions'),
-                            style: const TextStyle(
-                              color: Color(0xFF1E3A5F),
+                            style: TextStyle(
+                              color: textPrimary,
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
@@ -449,19 +573,26 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                 margin: const EdgeInsets.only(bottom: 12),
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.1),
+                                  color: cardColor,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: borderColor,
                                     width: 1,
                                   ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withAlpha(13),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
                                 child: Row(
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
-                                        color: typeColor.withOpacity(0.2),
+                                        color: typeColor.withAlpha(51),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Icon(
@@ -477,8 +608,8 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                         children: [
                                           Text(
                                             typeLabel,
-                                            style: const TextStyle(
-                                              color: Color(0xFF1E3A5F),
+                                            style: TextStyle(
+                                              color: textPrimary,
                                               fontSize: 16,
                                               fontWeight: FontWeight.bold,
                                             ),
@@ -487,7 +618,7 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                           Text(
                                             formattedDate,
                                             style: TextStyle(
-                                              color: Colors.grey.shade600,
+                                              color: textSecondary,
                                               fontSize: 12,
                                               fontWeight: FontWeight.w500,
                                             ),
@@ -501,8 +632,8 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                         Text(
                                           '${isIncoming || type == 'deposit' || type == 'refund' ? '+' : '-'}${amount.toStringAsFixed(2)} ₪',
                                           style: TextStyle(
-                                            color: isIncoming || type == 'deposit' || type == 'refund' 
-                                                ? Colors.green 
+                                            color: isIncoming || type == 'deposit' || type == 'refund'
+                                                ? Colors.green
                                                 : Colors.red,
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
@@ -515,7 +646,7 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                             vertical: 4,
                                           ),
                                           decoration: BoxDecoration(
-                                            color: statusColor.withOpacity(0.2),
+                                            color: statusColor.withAlpha(51),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
@@ -537,12 +668,12 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: cardColor,
                                 borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.grey.shade200),
+                                border: Border.all(color: borderColor),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
+                                    color: Colors.black.withAlpha(13),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),
@@ -551,12 +682,12 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.receipt_long, color: Colors.grey.shade400, size: 24),
+                                  Icon(Icons.receipt_long, color: textSecondary, size: 24),
                                   const SizedBox(width: 12),
                                   Text(
                                     t('noTransactions'),
                                     style: TextStyle(
-                                      color: Colors.grey.shade600,
+                                      color: textSecondary,
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -569,6 +700,14 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                       ),
                     ),
                   ),
+        bottomNavigationBar: PassengerBottomNavBar(
+          currentIndex: 3, // My Wallet is index 3
+          isDarkMode: _isDarkMode,
+          isArabic: _isArabic,
+          onTap: (index) {
+            PassengerBottomNavBar.navigateToPage(context, index);
+          },
+        ),
       ),
     );
   }

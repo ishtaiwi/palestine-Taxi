@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/driver_bottom_nav_bar.dart';
+import 'driver_home.dart';
 
 class DriverProfilePage extends StatefulWidget {
   const DriverProfilePage({super.key});
@@ -12,6 +15,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
   Map<String, dynamic>? _profileData;
   bool _isLoading = true;
   bool _isArabic = true;
+  bool _isDarkMode = false;
   String? _error;
 
   final Map<String, Map<String, String>> _texts = {
@@ -48,6 +52,14 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
       'pending': 'قيد الانتظار',
       'approved': 'معتمد',
       'rejected': 'مرفوض',
+      'settings': 'الإعدادات',
+      'language': 'اللغة',
+      'theme': 'المظهر',
+      'lightMode': 'الوضع الفاتح',
+      'darkMode': 'الوضع الداكن',
+      'arabic': 'العربية',
+      'english': 'English',
+      'accountInfo': 'معلومات الحساب',
     },
     'en': {
       'title': 'Profile',
@@ -86,6 +98,14 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
       'base': 'Base',
       'distance': 'Distance',
       'duration': 'Duration',
+      'settings': 'Settings',
+      'language': 'Language',
+      'theme': 'Theme',
+      'lightMode': 'Light Mode',
+      'darkMode': 'Dark Mode',
+      'arabic': 'العربية',
+      'english': 'English',
+      'accountInfo': 'Account Information',
     },
   };
 
@@ -104,8 +124,10 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
 
   Future<void> _loadLanguagePreference() async {
     final isArabic = await ApiService.getLanguagePreference();
+    await AppTheme.init();
     setState(() {
       _isArabic = isArabic;
+      _isDarkMode = AppTheme.isDarkMode;
     });
   }
 
@@ -131,6 +153,20 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
         });
       }
     }
+  }
+
+  Future<void> _toggleTheme() async {
+    await AppTheme.toggleTheme();
+    setState(() {
+      _isDarkMode = AppTheme.isDarkMode;
+    });
+  }
+
+  Future<void> _switchLanguage(bool arabic) async {
+    await ApiService.saveLanguagePreference(arabic);
+    setState(() {
+      _isArabic = arabic;
+    });
   }
 
   Color _getStatusColor(String? status) {
@@ -166,29 +202,57 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
   }
 
   Widget _buildInfoRow(IconData icon, String label, String? value, {Color? valueColor}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final textSecondaryColor = _isDarkMode
+        ? Colors.white70
+        : const Color(0xFF546E7A);
+    final accentColor = Colors.orange;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _isDarkMode
+            ? Colors.white.withOpacity(0.05)
+            : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _isDarkMode
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.shade200,
+          width: 1,
+        ),
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.orange, size: 24),
-          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: accentColor, size: 20),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  style: TextStyle(
+                    color: textSecondaryColor,
                     fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value ?? t('unknown'),
                   style: TextStyle(
-                    color: valueColor ?? Colors.white,
+                    color: valueColor ?? textPrimaryColor,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -202,71 +266,372 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
   }
 
   Widget _buildSection(String title, Widget child) {
+    final cardColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : const Color(0xFFFAFBFC);
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final accentColor = Colors.orange;
+    
+    // Determine icon based on title
+    IconData sectionIcon;
+    if (title == t('driverInfo')) {
+      sectionIcon = Icons.person;
+    } else if (title == t('lineInfo')) {
+      sectionIcon = Icons.alt_route;
+    } else if (title == t('vehicleInfo')) {
+      sectionIcon = Icons.directions_car;
+    } else {
+      sectionIcon = Icons.info;
+    }
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white24),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _isDarkMode
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.shade200,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(_isDarkMode ? 0.3 : 0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  sectionIcon,
+                  color: accentColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  color: textPrimaryColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           child,
         ],
       ),
     );
   }
 
+  Widget _buildSettingsSection() {
+    final cardColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : const Color(0xFFFAFBFC);
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final textSecondaryColor = _isDarkMode
+        ? Colors.white70
+        : const Color(0xFF546E7A);
+    final accentColor = Colors.orange;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _isDarkMode
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.shade200,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(_isDarkMode ? 0.3 : 0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.settings,
+                  color: accentColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                t('settings'),
+                style: TextStyle(
+                  color: textPrimaryColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // Language Setting
+          _buildSettingTile(
+            icon: Icons.language,
+            title: t('language'),
+            subtitle: _isArabic ? t('arabic') : t('english'),
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  backgroundColor: cardColor,
+                  title: Text(
+                    t('language'),
+                    style: TextStyle(
+                      color: textPrimaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        title: Text(
+                          t('arabic'),
+                          style: TextStyle(color: textPrimaryColor),
+                        ),
+                        leading: Radio<bool>(
+                          value: true,
+                          groupValue: _isArabic,
+                          onChanged: (value) {
+                            Navigator.pop(context);
+                            _switchLanguage(true);
+                          },
+                          activeColor: accentColor,
+                        ),
+                      ),
+                      ListTile(
+                        title: Text(
+                          t('english'),
+                          style: TextStyle(color: textPrimaryColor),
+                        ),
+                        leading: Radio<bool>(
+                          value: false,
+                          groupValue: _isArabic,
+                          onChanged: (value) {
+                            Navigator.pop(context);
+                            _switchLanguage(false);
+                          },
+                          activeColor: accentColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            textPrimaryColor: textPrimaryColor,
+            textSecondaryColor: textSecondaryColor,
+            accentColor: accentColor,
+          ),
+          Divider(
+            height: 1,
+            color: _isDarkMode
+                ? Colors.white.withOpacity(0.1)
+                : Colors.grey.shade300,
+          ),
+          // Theme Setting
+          _buildSettingTile(
+            icon: _isDarkMode ? Icons.light_mode : Icons.dark_mode,
+            title: t('theme'),
+            subtitle: _isDarkMode ? t('darkMode') : t('lightMode'),
+            onTap: _toggleTheme,
+            textPrimaryColor: textPrimaryColor,
+            textSecondaryColor: textSecondaryColor,
+            accentColor: accentColor,
+            trailing: Switch(
+              value: _isDarkMode,
+              onChanged: (value) => _toggleTheme(),
+              activeColor: accentColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    required Color textPrimaryColor,
+    required Color textSecondaryColor,
+    required Color accentColor,
+    Widget? trailing,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: accentColor.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: accentColor, size: 20),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: textPrimaryColor,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          color: textSecondaryColor,
+          fontSize: 14,
+        ),
+      ),
+      trailing: trailing ??
+          Icon(
+            Icons.chevron_right,
+            color: textSecondaryColor,
+          ),
+      onTap: onTap,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    // Theme-aware colors
+    final backgroundColor = _isDarkMode
+        ? const Color(0xFF0A0E21)
+        : const Color.fromARGB(255, 224, 228, 231);
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final textSecondaryColor = _isDarkMode
+        ? Colors.white70
+        : const Color(0xFF546E7A);
 
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFF060A1A),
-        appBar: AppBar(
-          title: Text(
-            t('title'),
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          backgroundColor: const Color(0xFF1E3A5F),
-          elevation: 2,
-          iconTheme: const IconThemeData(color: Colors.white),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          actions: [
-            IconButton(
-              icon: Icon(
-                _isArabic ? Icons.language : Icons.translate,
-                color: Colors.white,
+        backgroundColor: backgroundColor,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(70),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _isDarkMode
+                    ? [
+                        const Color(0xFF1C2541),
+                        const Color(0xFF2C3E50),
+                        const Color(0xFF1C2541),
+                      ]
+                    : [
+                        const Color(0xFF2C5F8D),
+                        const Color(0xFF1E3A5F),
+                        const Color(0xFF2C5F8D),
+                      ],
               ),
-              onPressed: () {
-                setState(() {
-                  _isArabic = !_isArabic;
-                  ApiService.saveLanguagePreference(_isArabic);
-                });
-              },
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: _loadProfile,
-              tooltip: t('refresh'),
+            child: AppBar(
+              leading: Container(
+                margin: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DriverHomePage(),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+              title: Text(
+                t('title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: true,
+              iconTheme: const IconThemeData(color: Colors.white),
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    onPressed: _loadProfile,
+                    tooltip: t('refresh'),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -279,12 +644,12 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                         const SizedBox(height: 16),
                         Text(
                           t('error'),
-                          style: const TextStyle(color: Colors.white, fontSize: 18),
+                          style: TextStyle(color: textPrimaryColor, fontSize: 18),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           _error ?? t('error'),
-                          style: const TextStyle(color: Colors.white70, fontSize: 14),
+                          style: TextStyle(color: textSecondaryColor, fontSize: 14),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
@@ -303,7 +668,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                     ? Center(
                         child: Text(
                           t('error'),
-                          style: const TextStyle(color: Colors.white70),
+                          style: TextStyle(color: textSecondaryColor),
                         ),
                       )
                     : Builder(
@@ -312,7 +677,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                             return Center(
                               child: Text(
                                 t('error'),
-                                style: const TextStyle(color: Colors.white70),
+                                style: TextStyle(color: textSecondaryColor),
                               ),
                             );
                           }
@@ -468,11 +833,23 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                                     ],
                                   ),
                                 ),
+                                const SizedBox(height: 20),
+
+                                // Settings Section
+                                _buildSettingsSection(),
                               ],
                             ),
                           );
                         },
                       ),
+        bottomNavigationBar: DriverBottomNavBar(
+          currentIndex: 4, // Profile is index 4
+          isDarkMode: _isDarkMode,
+          isArabic: _isArabic,
+          onTap: (index) {
+            DriverBottomNavBar.navigateToPage(context, index);
+          },
+        ),
       ),
     );
   }

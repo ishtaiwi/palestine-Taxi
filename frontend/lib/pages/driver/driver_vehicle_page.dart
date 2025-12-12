@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/driver_bottom_nav_bar.dart';
+import 'driver_home.dart';
 
 class DriverVehiclePage extends StatefulWidget {
   const DriverVehiclePage({super.key});
@@ -11,6 +14,7 @@ class DriverVehiclePage extends StatefulWidget {
 
 class _DriverVehiclePageState extends State<DriverVehiclePage> {
   bool _isArabic = true;
+  bool _isDarkMode = false;
   bool _isLoadingVehicles = true;
   bool _isLoadingSeatMap = false;
   String? _error;
@@ -44,6 +48,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       'seatLayout7': '7+1 (ثمانية مقاعد)',
       'upcomingTrip': 'الرحلة القادمة',
       'unknown': 'غير معروف',
+      'vehicleInfo': 'معلومات المركبة',
       'toggleBroken': 'تغيير حالة المقعد',
       'tapSeat': 'اضغط لتغيير حالة المقعد (باستثناء المقعد المحجوز)',
       'refresh': 'تحديث',
@@ -73,6 +78,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       'seatLayout7': '7+1 (Eight seats)',
       'upcomingTrip': 'Upcoming trip',
       'unknown': 'Unknown',
+      'vehicleInfo': 'Vehicle Information',
       'toggleBroken': 'Toggle seat status',
       'tapSeat': 'Tap a seat to toggle its status (reserved seats locked)',
       'refresh': 'Refresh',
@@ -81,7 +87,11 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     },
   };
 
-  String t(String key) => _texts[_isArabic ? 'ar' : 'en']![key]!;
+  String t(String key) {
+    final textMap = _texts[_isArabic ? 'ar' : 'en'];
+    if (textMap == null) return key;
+    return textMap[key] ?? key;
+  }
 
   @override
   void initState() {
@@ -91,8 +101,10 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
 
   Future<void> _initialize() async {
     final isArabic = await ApiService.getLanguagePreference();
+    await AppTheme.init();
     setState(() {
       _isArabic = isArabic;
+      _isDarkMode = AppTheme.isDarkMode;
     });
     await _loadVehicles();
   }
@@ -223,53 +235,121 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    // Theme-aware colors
+    final backgroundColor = _isDarkMode
+        ? const Color(0xFF0A0E21)
+        : const Color.fromARGB(255, 224, 228, 231);
 
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFF060A1A),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF0B132B),
-          iconTheme: const IconThemeData(
-            color: Colors.white,
-          ),
-          title: Text(
-            t('title'),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          actions: [
-            IconButton(
-              icon: Icon(
-                _isArabic ? Icons.language : Icons.translate,
-                color: Colors.white,
+        backgroundColor: backgroundColor,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(70),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _isDarkMode
+                    ? [
+                        const Color(0xFF1C2541),
+                        const Color(0xFF2C3E50),
+                        const Color(0xFF1C2541),
+                      ]
+                    : [
+                        const Color(0xFF2C5F8D),
+                        const Color(0xFF1E3A5F),
+                        const Color(0xFF2C5F8D),
+                      ],
               ),
-              onPressed: () async {
-                final next = !_isArabic;
-                await ApiService.saveLanguagePreference(next);
-                if (mounted) {
-                  setState(() => _isArabic = next);
-                }
-              },
-              tooltip: _isArabic ? 'English' : 'العربية',
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white),
-              onPressed: _loadVehicles,
-              tooltip: t('refresh'),
+            child: AppBar(
+              leading: Container(
+                margin: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DriverHomePage(),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+              title: Text(
+                t('title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: true,
+              iconTheme: const IconThemeData(color: Colors.white),
+              actionsIconTheme: const IconThemeData(color: Colors.white),
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    onPressed: _loadVehicles,
+                    tooltip: t('refresh'),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
         body: _isLoadingVehicles
             ? const Center(child: CircularProgressIndicator())
             : _buildBody(),
+        bottomNavigationBar: DriverBottomNavBar(
+          currentIndex: 3, // My Vehicle is index 3
+          isDarkMode: _isDarkMode,
+          isArabic: _isArabic,
+          onTap: (index) {
+            DriverBottomNavBar.navigateToPage(context, index);
+          },
+        ),
       ),
     );
   }
 
   Widget _buildBody() {
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final textSecondaryColor = _isDarkMode
+        ? const Color(0xFFB0BEC5)
+        : const Color(0xFF546E7A);
+    
     if (_error != null) {
       return Center(
         child: Padding(
@@ -280,7 +360,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
+                style: TextStyle(color: textPrimaryColor),
               ),
               const SizedBox(height: 16),
               FilledButton.tonal(
@@ -303,14 +383,16 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
               Icon(
                 Icons.directions_car_outlined,
                 size: 64,
-                color: Colors.white.withOpacity(0.5),
+                color: _isDarkMode
+                    ? Colors.white.withOpacity(0.5)
+                    : textSecondaryColor,
               ),
               const SizedBox(height: 16),
               Text(
                 t('noVehicles'),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white, // نص أبيض على خلفية غامقة
+                style: TextStyle(
+                  color: textPrimaryColor,
                   fontSize: 16,
                 ),
               ),
@@ -331,23 +413,83 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-        Text(
-          t('subtitle'),
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.85),
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
+          // Header Section
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _isDarkMode
+                    ? [
+                        const Color(0xFF1C2541).withOpacity(0.6),
+                        const Color(0xFF2C3E50).withOpacity(0.4),
+                      ]
+                    : [
+                        const Color(0xFF2C5F8D).withOpacity(0.1),
+                        const Color(0xFF1E3A5F).withOpacity(0.05),
+                      ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _isDarkMode
+                    ? Colors.white.withOpacity(0.1)
+                    : Colors.grey.shade200,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.directions_car_rounded,
+                    color: Colors.orange,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        t('title'),
+                        style: TextStyle(
+                          color: textPrimaryColor,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        t('subtitle'),
+                        style: TextStyle(
+                          color: textSecondaryColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           _buildVehicleSelector(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           if (_selectedVehicle != null) _buildVehicleInfoCard(_selectedVehicle!),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           _buildSeatMap(),
         ],
       ),
@@ -355,85 +497,28 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
   }
 
   Widget _buildVehicleSelector() {
+    final cardColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : const Color(0xFFFAFBFC);
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.1),
-            Colors.white.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.25),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 10,
-            spreadRadius: 1,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          dropdownColor: const Color(0xFF0B132B),
-          value: _selectedVehicle?['vehicleid']?.toString(),
-          iconEnabledColor: Colors.white,
-          style: const TextStyle(color: Colors.white),
-          items: _vehicles
-              .map(
-                (vehicle) => DropdownMenuItem<String>(
-                  value: vehicle['vehicleid']?.toString(),
-                  child: Text(
-                    '${t('plate')}: ${vehicle['plateno'] ?? t('unknown')}',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (value) {
-            final vehicle = _vehicles.firstWhere(
-              (item) => item['vehicleid']?.toString() == value,
-            );
-            setState(() {
-              _selectedVehicle = vehicle;
-            });
-            _loadSeatMap(vehicle['vehicleid']?.toString() ?? '');
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVehicleInfoCard(Map<String, dynamic> vehicle) {
-    return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFFF57C00).withOpacity(0.15),
-            const Color(0xFFF57C00).withOpacity(0.05),
-          ],
-        ),
+        color: cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFFF57C00).withOpacity(0.3),
-          width: 1.5,
+          color: _isDarkMode
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.shade200,
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFF57C00).withOpacity(0.2),
+            color: Colors.black.withOpacity(_isDarkMode ? 0.3 : 0.08),
             blurRadius: 15,
-            spreadRadius: 1,
             offset: const Offset(0, 4),
           ),
         ],
@@ -441,27 +526,219 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildInfoRow(Icons.directions_car, t('plate'), vehicle['plateno'] ?? t('unknown')),
-          const SizedBox(height: 8),
-          _buildInfoRow(Icons.event_seat, t('seats'), vehicle['seatnum']?.toString() ?? '--'),
-          const SizedBox(height: 8),
-          _buildInfoRow(Icons.alt_route, t('line'), _isArabic
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.list_alt_rounded,
+                  color: Colors.orange,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                t('vehicles'),
+                style: TextStyle(
+                  color: textPrimaryColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              color: _isDarkMode
+                  ? Colors.white.withOpacity(0.05)
+                  : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isDarkMode
+                    ? Colors.white.withOpacity(0.1)
+                    : Colors.grey.shade200,
+              ),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                dropdownColor: _isDarkMode
+                    ? const Color(0xFF1C2541)
+                    : const Color(0xFFFAFBFC),
+                value: _selectedVehicle?['vehicleid']?.toString(),
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Colors.orange,
+                  size: 28,
+                ),
+                style: TextStyle(
+                  color: textPrimaryColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+                items: _vehicles
+                    .map(
+                      (vehicle) => DropdownMenuItem<String>(
+                        value: vehicle['vehicleid']?.toString(),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.directions_car_rounded,
+                              color: Colors.orange,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '${t('plate')}: ${vehicle['plateno'] ?? t('unknown')}',
+                              style: TextStyle(color: textPrimaryColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  final vehicle = _vehicles.firstWhere(
+                    (item) => item['vehicleid']?.toString() == value,
+                  );
+                  setState(() {
+                    _selectedVehicle = vehicle;
+                  });
+                  _loadSeatMap(vehicle['vehicleid']?.toString() ?? '');
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVehicleInfoCard(Map<String, dynamic> vehicle) {
+    final cardColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : const Color(0xFFFAFBFC);
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _isDarkMode
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.shade200,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(_isDarkMode ? 0.3 : 0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.orange.withOpacity(0.3),
+                      Colors.orange.withOpacity(0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.info_outline_rounded,
+                  color: Colors.orange,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                t('vehicleInfo'),
+                style: TextStyle(
+                  color: textPrimaryColor,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _buildInfoRow(Icons.directions_car_rounded, t('plate'), vehicle['plateno'] ?? t('unknown')),
+          const SizedBox(height: 12),
+          _buildInfoRow(Icons.event_seat_rounded, t('seats'), vehicle['seatnum']?.toString() ?? '--'),
+          const SizedBox(height: 12),
+          _buildInfoRow(Icons.alt_route_rounded, t('line'), _isArabic
               ? (vehicle['line']?['name_ar']?.toString() ?? vehicle['line']?['linename']?.toString() ?? vehicle['line']?['name_en']?.toString() ?? t('unknown'))
               : (vehicle['line']?['name_en']?.toString() ?? vehicle['line']?['linename']?.toString() ?? vehicle['line']?['name_ar']?.toString() ?? t('unknown'))),
           if (_upcomingTrip != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              t('upcomingTrip'),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.orange.withOpacity(0.15),
+                    Colors.orange.withOpacity(0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.orange.withOpacity(0.3),
+                  width: 1,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            _buildInfoRow(
-              Icons.schedule,
-              t('departure'),
-              _formatDateTime(_upcomingTrip?['deptime']),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.schedule_rounded,
+                        color: Colors.orange,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        t('upcomingTrip'),
+                        style: TextStyle(
+                          color: textPrimaryColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildInfoRow(
+                    Icons.access_time_rounded,
+                    t('departure'),
+                    _formatDateTime(_upcomingTrip?['deptime']),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
@@ -474,10 +751,17 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final textSecondaryColor = _isDarkMode
+        ? const Color(0xFFB0BEC5)
+        : const Color(0xFF546E7A);
+    
     if (_seatRows.isEmpty) {
       return Text(
         t('tapSeat'),
-        style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
+        style: TextStyle(color: textPrimaryColor),
       );
     }
 
@@ -488,15 +772,43 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          t('tapSeat'),
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _isDarkMode
+                ? Colors.white.withOpacity(0.05)
+                : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _isDarkMode
+                  ? Colors.white.withOpacity(0.1)
+                  : Colors.grey.shade200,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                color: Colors.orange,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  t('tapSeat'),
+                  style: TextStyle(
+                    color: _isDarkMode
+                        ? Colors.white.withOpacity(0.9)
+                        : textSecondaryColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(24),
@@ -504,19 +816,26 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.08),
-                Colors.white.withOpacity(0.03),
-              ],
+              colors: _isDarkMode
+                  ? [
+                      Colors.white.withOpacity(0.08),
+                      Colors.white.withOpacity(0.03),
+                    ]
+                  : [
+                      Colors.grey.shade50,
+                      Colors.white,
+                    ],
             ),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: Colors.white.withOpacity(0.2),
+              color: _isDarkMode
+                  ? Colors.white.withOpacity(0.2)
+                  : Colors.grey.shade200,
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withOpacity(_isDarkMode ? 0.3 : 0.08),
                 blurRadius: 20,
                 spreadRadius: 2,
                 offset: const Offset(0, 4),
@@ -762,14 +1081,24 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
   }
 
   Widget _buildLegend() {
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final legendBgColor = _isDarkMode
+        ? Colors.white.withOpacity(0.08)
+        : Colors.grey.shade100;
+    final legendBorderColor = _isDarkMode
+        ? Colors.white.withOpacity(0.2)
+        : Colors.grey.shade300;
+    
     Widget legendItem(Color color, String label) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: legendBgColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: Colors.white.withOpacity(0.2),
+            color: legendBorderColor,
             width: 1,
           ),
         ),
@@ -783,7 +1112,9 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                 color: color,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.4),
+                  color: _isDarkMode
+                      ? Colors.white.withOpacity(0.4)
+                      : Colors.grey.shade400,
                   width: 2,
                 ),
                 boxShadow: [
@@ -798,8 +1129,8 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
             const SizedBox(width: 10),
             Text(
               label,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: textPrimaryColor,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
               ),
@@ -821,23 +1152,42 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    final textSecondaryColor = _isDarkMode
+        ? Colors.white70
+        : const Color(0xFF546E7A);
+    
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _isDarkMode
+            ? Colors.white.withOpacity(0.05)
+            : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _isDarkMode
+              ? Colors.white.withOpacity(0.1)
+              : Colors.grey.shade200,
+          width: 1,
+        ),
+      ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFF57C00).withOpacity(0.2),
+              color: Colors.orange.withOpacity(0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               icon,
-              color: const Color(0xFFF57C00),
+              color: Colors.orange,
               size: 20,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -845,18 +1195,18 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                 Text(
                   label,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
+                    color: textSecondaryColor,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                  style: TextStyle(
+                    color: textPrimaryColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
                   ),
                 ),
               ],

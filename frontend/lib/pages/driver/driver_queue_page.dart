@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/driver_bottom_nav_bar.dart';
+import 'driver_home.dart';
 
 class DriverQueuePage extends StatefulWidget {
   final bool embedded;
   final bool? isArabicOverride;
+  final bool? isDarkModeOverride;
 
   const DriverQueuePage({
     super.key,
     this.embedded = false,
     this.isArabicOverride,
+    this.isDarkModeOverride,
   });
 
   @override
@@ -18,6 +23,7 @@ class DriverQueuePage extends StatefulWidget {
 
 class _DriverQueuePageState extends State<DriverQueuePage> {
   late bool _isArabic;
+  late bool _isDarkMode;
   bool _isLoading = true;
   bool _isMutating = false;
   String? _error;
@@ -60,10 +66,23 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
   void initState() {
     super.initState();
     _isArabic = widget.isArabicOverride ?? true;
+    _isDarkMode = widget.isDarkModeOverride ?? AppTheme.isDarkMode;
     if (widget.isArabicOverride == null) {
       _loadPreferences();
     }
+    if (widget.isDarkModeOverride == null) {
+      _loadThemePreference();
+    }
     _loadQueue();
+  }
+
+  Future<void> _loadThemePreference() async {
+    await AppTheme.init();
+    if (mounted) {
+      setState(() {
+        _isDarkMode = AppTheme.isDarkMode;
+      });
+    }
   }
 
   @override
@@ -74,6 +93,13 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
         widget.isArabicOverride != _isArabic) {
       setState(() {
         _isArabic = widget.isArabicOverride!;
+      });
+    }
+    if (widget.isDarkModeOverride != null &&
+        widget.isDarkModeOverride != oldWidget.isDarkModeOverride &&
+        widget.isDarkModeOverride != _isDarkMode) {
+      setState(() {
+        _isDarkMode = widget.isDarkModeOverride!;
       });
     }
   }
@@ -155,46 +181,108 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
       return body;
     }
 
+    // Theme-aware colors for full page view
+    final backgroundColor = _isDarkMode
+        ? const Color(0xFF0A0E21)
+        : const Color.fromARGB(255, 224, 228, 231);
+    final appBarColor = _isDarkMode
+        ? const Color(0xFF1E3A5F)
+        : const Color(0xFF2C5F8D);
+
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFF060A1A),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF1E3A5F), // خلفية فاتحة أكثر
-          foregroundColor: Colors.white,
-          elevation: 2,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actionsIconTheme: const IconThemeData(color: Colors.white),
-          title: Text(
-            t('title'),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+        backgroundColor: backgroundColor,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(70),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _isDarkMode
+                    ? [
+                        const Color(0xFF1C2541),
+                        const Color(0xFF2C3E50),
+                        const Color(0xFF1C2541),
+                      ]
+                    : [
+                        const Color(0xFF2C5F8D),
+                        const Color(0xFF1E3A5F),
+                        const Color(0xFF2C5F8D),
+                      ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: AppBar(
+              leading: Container(
+                margin: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DriverHomePage(),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+              title: Text(
+                t('title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: true,
+              iconTheme: const IconThemeData(color: Colors.white),
+              actionsIconTheme: const IconThemeData(color: Colors.white),
+              actions: [],
             ),
           ),
-          actions: [
-            IconButton(
-              icon: Icon(
-                _isArabic ? Icons.language : Icons.translate,
-                color: Colors.white,
-              ),
-              onPressed: () async {
-                final next = !_isArabic;
-                await ApiService.saveLanguagePreference(next);
-                if (mounted) {
-                  setState(() => _isArabic = next);
-                }
-              },
-              tooltip: _isArabic ? 'English' : 'العربية',
-            ),
-          ],
         ),
         body: body,
+        bottomNavigationBar: widget.embedded
+            ? null
+            : DriverBottomNavBar(
+                currentIndex: 1, // Check-in is index 1
+                isDarkMode: _isDarkMode,
+                isArabic: _isArabic,
+                onTap: (index) {
+                  DriverBottomNavBar.navigateToPage(context, index);
+                },
+              ),
       ),
     );
   }
 
   Widget _buildBody() {
+    // Theme-aware colors
+    final textPrimaryColor = _isDarkMode
+        ? Colors.white
+        : const Color(0xFF1E3A5F);
+    
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -209,7 +297,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 16), // نص أبيض على خلفية غامقة
+                style: TextStyle(color: textPrimaryColor, fontSize: 16),
               ),
               const SizedBox(height: 16),
               FilledButton.tonal(
@@ -257,7 +345,9 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
           Text(
             t('notInQueue'),
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: _isDarkMode
+                  ? Colors.white.withOpacity(0.7)
+                  : AppTheme.lightTextSecondary,
             ),
           ),
         const SizedBox(height: 12),
@@ -266,14 +356,19 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
             width: double.infinity,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: _isDarkMode
+                  ? Colors.white.withOpacity(0.05)
+                  : Colors.grey.shade100,
               borderRadius: BorderRadius.circular(16),
+              border: _isDarkMode
+                  ? null
+                  : Border.all(color: Colors.grey.shade300, width: 1),
             ),
             child: Center(
               child: Text(
                 t('noDrivers'),
-                style: const TextStyle(
-                  color: Colors.white, // نص أبيض على خلفية غامقة
+                style: TextStyle(
+                  color: _isDarkMode ? Colors.white : AppTheme.lightTextPrimary,
                   fontSize: 16,
                 ),
               ),
@@ -289,16 +384,31 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
               final driver = entry['driver'] as Map<String, dynamic>? ?? {};
               final user = driver['user'] as Map<String, dynamic>? ?? {};
               final isCurrent = current != null && current['queueid'] == entry['queueid'];
+              final textColor = _isDarkMode ? Colors.white : AppTheme.lightTextPrimary;
+              final secondaryTextColor = _isDarkMode
+                  ? Colors.white.withOpacity(0.8)
+                  : AppTheme.lightTextSecondary;
+              
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isCurrent
-                      ? const Color(0xFF1B5E20).withOpacity(0.15)
-                      : Colors.white.withOpacity(0.05),
+                      ? (_isDarkMode
+                          ? const Color(0xFF1B5E20).withOpacity(0.15)
+                          : Colors.green.shade50)
+                      : (_isDarkMode
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.grey.shade50),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isCurrent ? const Color(0xFF1B5E20) : Colors.white24,
+                    color: isCurrent
+                        ? (_isDarkMode
+                            ? const Color(0xFF1B5E20)
+                            : Colors.green.shade300)
+                        : (_isDarkMode
+                            ? Colors.white24
+                            : Colors.grey.shade300),
                     width: isCurrent ? 2 : 1,
                   ),
                 ),
@@ -318,8 +428,8 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
                         children: [
                           Text(
                             user['fullname']?.toString() ?? '---',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: textColor,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
@@ -327,8 +437,8 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
                           const SizedBox(height: 4),
                           Text(
                             user['phone']?.toString() ?? '',
-                            style: const TextStyle(
-                              color: Colors.white, // نص أبيض على خلفية غامقة
+                            style: TextStyle(
+                              color: secondaryTextColor,
                               fontSize: 12,
                             ),
                           ),
@@ -338,7 +448,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
                     const SizedBox(width: 12),
                     Text(
                       t('statusWaiting'),
-                      style: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
+                      style: TextStyle(color: secondaryTextColor),
                     ),
                   ],
                 ),
@@ -451,17 +561,25 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: _isDarkMode
+            ? Colors.white.withOpacity(0.05)
+            : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(
+          color: _isDarkMode
+              ? Colors.white24
+              : Colors.grey.shade300,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white, // نص أبيض على خلفية غامقة
+            style: TextStyle(
+              color: _isDarkMode
+                  ? Colors.white
+                  : AppTheme.lightTextSecondary,
               fontSize: 12,
             ),
           ),

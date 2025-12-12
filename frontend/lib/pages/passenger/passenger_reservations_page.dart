@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../services/api_service.dart';
+import '../../theme/app_theme.dart';
+import '../../widgets/passenger_bottom_nav_bar.dart';
+import 'passenger_home.dart';
 
 class PassengerReservationsPage extends StatefulWidget {
   const PassengerReservationsPage({super.key});
@@ -12,6 +15,7 @@ class PassengerReservationsPage extends StatefulWidget {
 class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
   bool _isLoading = true;
   bool _isArabic = true;
+  bool _isDarkMode = false; // Light mode as default
   String? _error;
   List<Map<String, dynamic>> _reservations = [];
   String? _selectedStatus;
@@ -103,6 +107,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
   void initState() {
     super.initState();
     _initialize();
+    _loadThemePreference();
   }
 
   Future<void> _initialize() async {
@@ -111,6 +116,13 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
       _isArabic = isArabic;
     });
     await _loadReservations();
+  }
+
+  Future<void> _loadThemePreference() async {
+    await AppTheme.init();
+    setState(() {
+      _isDarkMode = AppTheme.isDarkMode;
+    });
   }
 
   Future<void> _loadReservations() async {
@@ -594,30 +606,114 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
 
+    // Theme-aware colors
+    final backgroundColor = _isDarkMode
+        ? const Color(0xFF0A0E21)
+        : const Color(0xFFECF0F3); // Soft blue-gray background
+
+    final cardColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : const Color(0xFFFAFBFC); // Off-white with cool tint
+
+    final textPrimary = _isDarkMode
+        ? const Color(0xFFE8EAF6)
+        : const Color(0xFF1E3A5F); // Dark navy for light mode
+
+    final textSecondary = _isDarkMode
+        ? const Color(0xFFB0BEC5)
+        : const Color(0xFF546E7A); // Medium gray-blue
+
+    final appBarColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : const Color(0xFF2C5F8D); // Professional blue
+
+    const accentColor = Color(0xFFF57C00); // Orange accent
+
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F7FA),
-        appBar: AppBar(
-          title: Text(
-            t('title'),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+        backgroundColor: backgroundColor,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(70),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _isDarkMode
+                    ? [
+                        const Color(0xFF1C2541),
+                        const Color(0xFF2C3E50),
+                        const Color(0xFF1C2541),
+                      ]
+                    : [
+                        const Color(0xFF2C5F8D),
+                        const Color(0xFF1E3A5F),
+                        const Color(0xFF2C5F8D),
+                      ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: AppBar(
+              leading: Container(
+                margin: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PassengerHomePage(),
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ),
+              title: Text(
+                t('title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: true,
+              iconTheme: const IconThemeData(color: Colors.white),
+              actionsIconTheme: const IconThemeData(color: Colors.white),
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    onPressed: _loadReservations,
+                    tooltip: t('refresh'),
+                  ),
+                ),
+              ],
             ),
           ),
-          backgroundColor: const Color(0xFF1E3A5F),
-          foregroundColor: Colors.white,
-          elevation: 2,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actionsIconTheme: const IconThemeData(color: Colors.white),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _loadReservations,
-              tooltip: t('refresh'),
-            ),
-          ],
         ),
         body: SafeArea(
           child: Column(
@@ -626,10 +722,10 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardColor,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withAlpha(13),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -639,15 +735,15 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildStatusChip(null, t('all')),
+                      _buildStatusChip(null, t('all'), textPrimary, cardColor),
                       const SizedBox(width: 8),
-                      _buildStatusChip('confirmed', t('confirmed')),
+                      _buildStatusChip('confirmed', t('confirmed'), textPrimary, cardColor),
                       const SizedBox(width: 8),
-                      _buildStatusChip('pending', t('pending')),
+                      _buildStatusChip('pending', t('pending'), textPrimary, cardColor),
                       const SizedBox(width: 8),
-                      _buildStatusChip('checked_in', t('checked_in')),
+                      _buildStatusChip('checked_in', t('checked_in'), textPrimary, cardColor),
                       const SizedBox(width: 8),
-                      _buildStatusChip('cancelled', t('cancelled')),
+                      _buildStatusChip('cancelled', t('cancelled'), textPrimary, cardColor),
                     ],
                   ),
                 ),
@@ -705,29 +801,41 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
             ],
           ),
         ),
+        bottomNavigationBar: PassengerBottomNavBar(
+          currentIndex: 1, // My Reservations is index 1
+          isDarkMode: _isDarkMode,
+          isArabic: _isArabic,
+          onTap: (index) {
+            PassengerBottomNavBar.navigateToPage(context, index);
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildDriverInfoRow(IconData icon, String label, String value) {
+  Widget _buildDriverInfoRow(IconData icon, String label, String value, Color textColor) {
+    final iconColor = _isDarkMode
+        ? const Color(0xFF64B5F6)
+        : Colors.blue.shade700;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
-          Icon(icon, color: Colors.white70, size: 16),
+          Icon(icon, color: iconColor, size: 16),
           const SizedBox(width: 8),
           Text(
             '$label: ',
-            style: const TextStyle(
-              color: Colors.white70,
+            style: TextStyle(
+              color: iconColor,
               fontSize: 12,
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: textColor,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -738,13 +846,13 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     );
   }
 
-  Widget _buildStatusChip(String? status, String label) {
+  Widget _buildStatusChip(String? status, String label, Color textColor, Color bgColor) {
     final isSelected = _selectedStatus == status;
     return FilterChip(
       label: Text(
         label,
-        style: const TextStyle(
-          color: Colors.white, // نص أبيض دائماً
+        style: TextStyle(
+          color: isSelected ? Colors.white : textColor, // White when selected, theme color otherwise
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -755,11 +863,13 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
         });
         _loadReservations();
       },
-      selectedColor: Colors.blue, // خلفية زرقاء عند التحديد
-      backgroundColor: const Color(0xFF1E3A5F).withOpacity(0.5), // خلفية غامقة عند عدم التحديد
+      selectedColor: const Color(0xFF2C5F8D), // Professional blue when selected
+      backgroundColor: _isDarkMode
+          ? const Color(0xFF1E3A5F).withAlpha(128)
+          : const Color(0xFF2C5F8D).withAlpha(51), // Theme-aware background
       checkmarkColor: Colors.white,
-      labelStyle: const TextStyle(
-        color: Colors.white, // نص أبيض دائماً
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : textColor, // White when selected, theme color otherwise
         fontWeight: FontWeight.w500,
       ),
     );
@@ -775,15 +885,28 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     final line = trip?['line'] as Map<String, dynamic>? ?? reservation['line'] as Map<String, dynamic>?;
     final deptime = trip?['deptime']?.toString() ?? reservation['scheduled_trip_time']?.toString() ?? '';
 
+    // Theme-aware colors
+    final cardColor = _isDarkMode
+        ? const Color(0xFF1C2541)
+        : const Color(0xFFFAFBFC);
+
+    final textPrimary = _isDarkMode
+        ? const Color(0xFFE8EAF6)
+        : const Color(0xFF1E3A5F);
+
+    final borderColor = _isDarkMode
+        ? const Color(0xFF2C3E50)
+        : Colors.grey.shade200;
+
     // Get line name based on current language
     final lineName = _isArabic
-        ? (line?['name_ar']?.toString() ?? 
-           line?['linename']?.toString() ?? 
-           line?['name_en']?.toString() ?? 
+        ? (line?['name_ar']?.toString() ??
+           line?['linename']?.toString() ??
+           line?['name_en']?.toString() ??
            '')
-        : (line?['name_en']?.toString() ?? 
-           line?['linename']?.toString() ?? 
-           line?['name_ar']?.toString() ?? 
+        : (line?['name_en']?.toString() ??
+           line?['linename']?.toString() ??
+           line?['name_ar']?.toString() ??
            '');
 
     DateTime? departureTime;
@@ -801,15 +924,15 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.grey.shade200,
+          color: borderColor,
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withAlpha(20),
             blurRadius: 15,
             offset: const Offset(0, 6),
           ),
@@ -820,8 +943,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
         child: Container(
           padding: const EdgeInsets.all(20),
           child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           Row(
             children: [
               Expanded(
@@ -833,7 +956,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF57C00).withOpacity(0.2),
+                            color: const Color(0xFFF57C00).withAlpha(51),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(
@@ -846,8 +969,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                         Expanded(
                           child: Text(
                             lineName,
-                            style: const TextStyle(
-                              color: Color(0xFF1E3A5F),
+                            style: TextStyle(
+                              color: textPrimary,
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
@@ -864,12 +987,12 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: bookingType == 'future'
-                                  ? [Colors.orange.withOpacity(0.3), Colors.orange.withOpacity(0.2)]
-                                  : [Colors.blue.withOpacity(0.3), Colors.blue.withOpacity(0.2)],
+                                  ? [Colors.orange.withAlpha(77), Colors.orange.withAlpha(51)]
+                                  : [Colors.blue.withAlpha(77), Colors.blue.withAlpha(51)],
                             ),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: bookingType == 'future' ? Colors.orange.withOpacity(0.5) : Colors.blue.withOpacity(0.5),
+                              color: bookingType == 'future' ? Colors.orange.withAlpha(128) : Colors.blue.withAlpha(128),
                               width: 1.5,
                             ),
                           ),
@@ -897,10 +1020,10 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: _getStatusColor(status).withOpacity(0.2),
+                            color: _getStatusColor(status).withAlpha(51),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: _getStatusColor(status).withOpacity(0.5),
+                              color: _getStatusColor(status).withAlpha(128),
                               width: 1.5,
                             ),
                           ),
@@ -941,7 +1064,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFF57C00).withOpacity(0.4),
+                      color: const Color(0xFFF57C00).withAlpha(102),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -962,7 +1085,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                     Text(
                       t('price'),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withAlpha(230),
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
                       ),
@@ -976,22 +1099,22 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
           if (departureTime != null)
             Row(
               children: [
-                Icon(Icons.access_time, color: const Color(0xFF1E3A5F), size: 16),
+                Icon(Icons.access_time, color: textPrimary, size: 16),
                 const SizedBox(width: 4),
                 Text(
                   '${departureTime.day}/${departureTime.month}/${departureTime.year} ${departureTime.hour.toString().padLeft(2, '0')}:${departureTime.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(color: Color(0xFF1E3A5F), fontWeight: FontWeight.w500),
+                  style: TextStyle(color: textPrimary, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.event_seat, color: const Color(0xFF1E3A5F), size: 16),
+              Icon(Icons.event_seat, color: textPrimary, size: 16),
               const SizedBox(width: 4),
               Text(
                 '${t('seat')}: $seat',
-                style: const TextStyle(color: Color(0xFF1E3A5F), fontWeight: FontWeight.w500),
+                style: TextStyle(color: textPrimary, fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -1051,12 +1174,21 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: _isDarkMode
+                    ? const Color(0xFF1E3A5F).withAlpha(128)
+                    : Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade200, width: 1.5),
+                border: Border.all(
+                  color: _isDarkMode
+                      ? const Color(0xFF2C5F8D)
+                      : Colors.blue.shade200,
+                  width: 1.5,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: _isDarkMode
+                        ? Colors.blue.withAlpha(26)
+                        : Colors.blue.withAlpha(26),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -1067,12 +1199,20 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.person, color: Colors.blue.shade700, size: 20),
+                      Icon(
+                        Icons.person,
+                        color: _isDarkMode
+                            ? const Color(0xFF64B5F6)
+                            : Colors.blue.shade700,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         t('driverInfo'),
                         style: TextStyle(
-                          color: Colors.blue.shade700,
+                          color: _isDarkMode
+                              ? const Color(0xFF64B5F6)
+                              : Colors.blue.shade700,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1085,12 +1225,14 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                       Icons.person,
                       t('driverName'),
                       trip['vehicle']['driver']['user']['fullname']?.toString() ?? '-',
+                      textPrimary,
                     ),
                     if (trip['vehicle']['driver']['user']['phone'] != null)
                       _buildDriverInfoRow(
                         Icons.phone,
                         t('driverPhone'),
                         trip['vehicle']['driver']['user']['phone']?.toString() ?? '-',
+                        textPrimary,
                       ),
                   ],
                   if (trip['vehicle'] != null) ...[
@@ -1098,14 +1240,16 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                     _buildDriverInfoRow(
                       Icons.directions_car,
                       t('vehiclePlate'),
-                      trip['vehicle']['platenum']?.toString() ?? 
-                      trip['vehicle']['plateno']?.toString() ?? 
+                      trip['vehicle']['platenum']?.toString() ??
+                      trip['vehicle']['plateno']?.toString() ??
                       (_isArabic ? 'غير متوفر' : 'Not Available'),
+                      textPrimary,
                     ),
                     _buildDriverInfoRow(
                       Icons.local_taxi,
                       t('vehicleType'),
                       trip['vehicle']['seatnum'] == 5 ? '4+1' : trip['vehicle']['seatnum'] == 8 ? '7+1' : '${trip['vehicle']['seatnum']} seats',
+                      textPrimary,
                     ),
                   ],
                 ],

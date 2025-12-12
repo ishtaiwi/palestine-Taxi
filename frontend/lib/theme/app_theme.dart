@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AppTheme {
   static const String _themeKey = 'app_theme_mode';
-  static bool _isDarkMode = true;
+  static bool _isDarkMode = false; // Light mode as default
 
   // Dark mode colors
   static const Color darkBackground = Color(0xFF060A1A);
@@ -13,13 +13,13 @@ class AppTheme {
   static const Color darkTextSecondary = Color(0xFFB0B0B0);
   static const Color darkBorder = Color(0x3FFFFFFF);
 
-  // Light mode colors
-  static const Color lightBackground = Color(0xFFF5F5F5);
-  static const Color lightAppBar = Color(0xFF2196F3);
-  static const Color lightCardBackground = Colors.white;
-  static const Color lightTextPrimary = Color(0xFF212121);
-  static const Color lightTextSecondary = Color(0xFF757575);
-  static const Color lightBorder = Color(0xFFE0E0E0);
+  // Light mode colors - Eye-friendly palette
+  static const Color lightBackground = Color(0xFFECF0F3); // Soft blue-gray, easy on eyes
+  static const Color lightAppBar = Color(0xFF2C5F8D); // Professional blue
+  static const Color lightCardBackground = Color(0xFFFAFBFC); // Off-white with cool tint
+  static const Color lightTextPrimary = Color(0xFF1E3A5F); // Dark navy
+  static const Color lightTextSecondary = Color(0xFF546E7A); // Medium gray-blue
+  static const Color lightBorder = Color(0xFFD1D9E0); // Soft gray-blue border
 
   // Get current theme colors
   static Color get backgroundColor =>
@@ -55,7 +55,7 @@ class AppTheme {
   // Initialize theme from preferences
   static Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    _isDarkMode = prefs.getBool(_themeKey) ?? true;
+    _isDarkMode = prefs.getBool(_themeKey) ?? false; // Default to light mode
   }
 
   // Get current theme mode

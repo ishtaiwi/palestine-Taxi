@@ -14,6 +14,7 @@ import 'admin_payments_page.dart';
 import 'admin_predictions_page.dart';
 import 'admin_map_page.dart';
 import 'admin_base_station_page.dart';
+import 'admin_reports_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -488,7 +489,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               icon: Icons.bar_chart,
                               title: t('reports'),
                               color: Colors.red,
-                              onTap: () {},
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AdminReportsPage(),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],

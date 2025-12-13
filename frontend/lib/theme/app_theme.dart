@@ -12,14 +12,19 @@ class AppTheme {
   static const Color darkTextPrimary = Colors.white;
   static const Color darkTextSecondary = Color(0xFFB0B0B0);
   static const Color darkBorder = Color(0x3FFFFFFF);
+  static const Color darkDateBackground = Color(0x3FFFFFFF);
 
   // Light mode colors - Eye-friendly palette
-  static const Color lightBackground = Color(0xFFECF0F3); // Soft blue-gray, easy on eyes
+  static const Color lightBackground =
+      Color(0xFFECF0F3); // Soft blue-gray, easy on eyes
   static const Color lightAppBar = Color(0xFF2C5F8D); // Professional blue
-  static const Color lightCardBackground = Color(0xFFFAFBFC); // Off-white with cool tint
+  static const Color lightCardBackground =
+      Color(0xFFFAFBFC); // Off-white with cool tint
   static const Color lightTextPrimary = Color(0xFF1E3A5F); // Dark navy
   static const Color lightTextSecondary = Color(0xFF546E7A); // Medium gray-blue
   static const Color lightBorder = Color(0xFFD1D9E0); // Soft gray-blue border
+  static const Color lightDateBackground =
+      Color(0xFFD1D9E0); // Soft gray-blue border
 
   // Get current theme colors
   static Color get backgroundColor =>

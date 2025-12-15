@@ -12,6 +12,7 @@ class AppTheme {
   static const Color darkTextPrimary = Colors.white;
   static const Color darkTextSecondary = Color(0xFFB0B0B0);
   static const Color darkBorder = Color(0x3FFFFFFF);
+  static const Color darkDateBackground = Color(0xFF101428);
 
   // Light mode colors - Eye-friendly palette
   static const Color lightBackground = Color(0xFFECF0F3); // Soft blue-gray, easy on eyes
@@ -20,6 +21,7 @@ class AppTheme {
   static const Color lightTextPrimary = Color(0xFF1E3A5F); // Dark navy
   static const Color lightTextSecondary = Color(0xFF546E7A); // Medium gray-blue
   static const Color lightBorder = Color(0xFFD1D9E0); // Soft gray-blue border
+  static const Color lightDateBackground = Color(0xFFFFFFFF);
 
   // Get current theme colors
   static Color get backgroundColor =>

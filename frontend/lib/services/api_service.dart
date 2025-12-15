@@ -2316,9 +2316,241 @@ class ApiService {
     }
   }
 
-  
-  
-  
+  // ============================================
+  // ADMIN - REPORTS API
+  // ============================================
+
+  /// Get revenue time series data (admin)
+  static Future<Map<String, dynamic>> getRevenueTimeSeries({
+    String? startDate,
+    String? endDate,
+    String? groupBy,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final queryParams = <String, String>{};
+      if (startDate != null) queryParams['startDate'] = startDate;
+      if (endDate != null) queryParams['endDate'] = endDate;
+      if (groupBy != null) queryParams['groupBy'] = groupBy;
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/revenue-timeseries')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else {
+        throw Exception('Failed to load revenue time series');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  /// Get booking time series data (admin)
+  static Future<Map<String, dynamic>> getBookingTimeSeries({
+    String? startDate,
+    String? endDate,
+    String? groupBy,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final queryParams = <String, String>{};
+      if (startDate != null) queryParams['startDate'] = startDate;
+      if (endDate != null) queryParams['endDate'] = endDate;
+      if (groupBy != null) queryParams['groupBy'] = groupBy;
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/booking-timeseries')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else {
+        throw Exception('Failed to load booking time series');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  /// Get trip statistics (admin)
+  static Future<Map<String, dynamic>> getTripStatistics({
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final queryParams = <String, String>{};
+      if (startDate != null) queryParams['startDate'] = startDate;
+      if (endDate != null) queryParams['endDate'] = endDate;
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/trip-statistics')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else {
+        throw Exception('Failed to load trip statistics');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  /// Get user growth data (admin)
+  static Future<Map<String, dynamic>> getUserGrowth({
+    String? startDate,
+    String? endDate,
+    String? groupBy,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final queryParams = <String, String>{};
+      if (startDate != null) queryParams['startDate'] = startDate;
+      if (endDate != null) queryParams['endDate'] = endDate;
+      if (groupBy != null) queryParams['groupBy'] = groupBy;
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/user-growth')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else {
+        throw Exception('Failed to load user growth data');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  /// Get vehicle utilization data (admin)
+  static Future<Map<String, dynamic>> getVehicleUtilization({
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final queryParams = <String, String>{};
+      if (startDate != null) queryParams['startDate'] = startDate;
+      if (endDate != null) queryParams['endDate'] = endDate;
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/vehicle-utilization')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else {
+        throw Exception('Failed to load vehicle utilization data');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  /// Get line performance data (admin)
+  static Future<Map<String, dynamic>> getLinePerformance({
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final queryParams = <String, String>{};
+      if (startDate != null) queryParams['startDate'] = startDate;
+      if (endDate != null) queryParams['endDate'] = endDate;
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/line-performance')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else {
+        throw Exception('Failed to load line performance data');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  // ============================================
+  // ADMIN - USERS API
+  // ============================================
 
   
   static Future<List<Map<String, dynamic>>> getAllUsers() async {

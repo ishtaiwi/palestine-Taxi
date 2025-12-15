@@ -11,10 +11,15 @@ class AdminLinesPage extends StatefulWidget {
 
 class _AdminLinesPageState extends State<AdminLinesPage> {
   List<Map<String, dynamic>> _lines = [];
+  List<Map<String, dynamic>> _filteredLines = [];
   bool _isLoading = true;
   bool _isArabic = true;
-  bool _showCreateForm = false;
 
+  
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  
   final _formKey = GlobalKey<FormState>();
   final _nameArController = TextEditingController();
   final _nameEnController = TextEditingController();
@@ -51,6 +56,11 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'yes': 'نعم',
       'no': 'لا',
       'required': 'مطلوب',
+      'search': 'بحث عن خط...',
+      'lineDetails': 'تفاصيل الخط',
+      'currency': 'شيكل',
+      'min': 'دقيقة',
+      'km': 'كم',
     },
     'en': {
       'title': 'Lines Management',
@@ -77,6 +87,11 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'yes': 'Yes',
       'no': 'No',
       'required': 'Required',
+      'search': 'Search lines...',
+      'lineDetails': 'Line Details',
+      'currency': 'NIS',
+      'min': 'min',
+      'km': 'km',
     },
   };
 
@@ -88,10 +103,12 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     AppTheme.init();
     _loadData();
     _loadLanguagePreference();
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    _searchController.dispose();
     _nameArController.dispose();
     _nameEnController.dispose();
     _basePriceController.dispose();
@@ -99,6 +116,13 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     _durationController.dispose();
     _distanceController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase();
+      _applyFilter();
+    });
   }
 
   Future<void> _loadLanguagePreference() async {
@@ -117,6 +141,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       final lines = await ApiService.getAllLines();
       setState(() {
         _lines = lines;
+        _applyFilter();
         _isLoading = false;
       });
     } catch (e) {
@@ -127,11 +152,25 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${t('error')}: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     }
+  }
+
+  void _applyFilter() {
+    _filteredLines = _lines.where((line) {
+      final nameAr = (line['name_ar'] ?? '').toString().toLowerCase();
+      final nameEn = (line['name_en'] ?? '').toString().toLowerCase();
+      final lineName = (line['linename'] ?? '').toString().toLowerCase();
+      
+      return _searchQuery.isEmpty || 
+             nameAr.contains(_searchQuery) || 
+             nameEn.contains(_searchQuery) ||
+             lineName.contains(_searchQuery);
+    }).toList();
   }
 
   Future<void> _handleSave() async {
@@ -140,79 +179,91 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     final nameAr = _nameArController.text.trim();
     final nameEn = _nameEnController.text.trim();
 
-    // At least Arabic name is required
+    
     if (nameAr.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
               _isArabic ? 'الاسم بالعربية مطلوب' : 'Arabic name is required'),
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
 
-    final result = _editingLineId != null
-        ? await ApiService.updateLine(
-            _editingLineId!,
-            nameAr: nameAr.isNotEmpty ? nameAr : null,
-            nameEn: nameEn.isNotEmpty ? nameEn : null,
-            baseprice: double.tryParse(_basePriceController.text) ?? 0,
-            additionalprice:
-                double.tryParse(_additionalPriceController.text) ?? 0,
-            estduration: int.tryParse(_durationController.text),
-            distance: double.tryParse(_distanceController.text),
-            active: _active,
-          )
-        : await ApiService.createLine(
-            nameAr: nameAr.isNotEmpty ? nameAr : null,
-            nameEn: nameEn.isNotEmpty ? nameEn : null,
-            baseprice: double.tryParse(_basePriceController.text) ?? 0,
-            additionalprice:
-                double.tryParse(_additionalPriceController.text) ?? 0,
-            estduration: int.tryParse(_durationController.text),
-            distance: double.tryParse(_distanceController.text),
-            active: _active,
-          );
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
 
-    if (mounted) {
-      if (result['success'] == true) {
+    try {
+      final result = _editingLineId != null
+          ? await ApiService.updateLine(
+              _editingLineId!,
+              nameAr: nameAr.isNotEmpty ? nameAr : null,
+              nameEn: nameEn.isNotEmpty ? nameEn : null,
+              baseprice: double.tryParse(_basePriceController.text) ?? 0,
+              additionalprice:
+                  double.tryParse(_additionalPriceController.text) ?? 0,
+              estduration: int.tryParse(_durationController.text),
+              distance: double.tryParse(_distanceController.text),
+              active: _active,
+            )
+          : await ApiService.createLine(
+              nameAr: nameAr.isNotEmpty ? nameAr : null,
+              nameEn: nameEn.isNotEmpty ? nameEn : null,
+              baseprice: double.tryParse(_basePriceController.text) ?? 0,
+              additionalprice:
+                  double.tryParse(_additionalPriceController.text) ?? 0,
+              estduration: int.tryParse(_durationController.text),
+              distance: double.tryParse(_distanceController.text),
+              active: _active,
+            );
+
+      
+      if (mounted) Navigator.pop(context); 
+      if (mounted) Navigator.pop(context); 
+
+      if (mounted) {
+        if (result['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? t('success')),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          _loadData();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message'] ?? t('error')),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context); 
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message'] ?? t('success')),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _resetForm();
-        _loadData();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? t('error')),
-            backgroundColor: Colors.red,
+            content: Text('${t('error')}: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     }
   }
 
-  void _resetForm() {
-    setState(() {
-      _showCreateForm = false;
-      _editingLineId = null;
-      _nameArController.clear();
-      _nameEnController.clear();
-      _basePriceController.clear();
-      _additionalPriceController.clear();
-      _durationController.clear();
-      _distanceController.clear();
-      _active = true;
-    });
-  }
-
-  void _openEditForm(Map<String, dynamic> line) {
-    setState(() {
-      _showCreateForm = true;
+  void _openFormDialog({Map<String, dynamic>? line}) {
+    
+    if (line != null) {
       _editingLineId = line['lineid'];
       _nameArController.text = line['name_ar'] ?? line['linename'] ?? '';
       _nameEnController.text = line['name_en'] ?? '';
@@ -222,26 +273,155 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       _durationController.text = (line['estduration'] ?? '').toString();
       _distanceController.text = (line['distance'] ?? '').toString();
       _active = line['active'] ?? true;
-    });
+    } else {
+      _editingLineId = null;
+      _nameArController.clear();
+      _nameEnController.clear();
+      _basePriceController.clear();
+      _additionalPriceController.clear();
+      _durationController.clear();
+      _distanceController.clear();
+      _active = true;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.cardBackground,
+        title: Text(
+          line == null ? t('createLine') : t('edit'),
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: SizedBox(
+            width: double.maxFinite,
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildTextField(
+                    controller: _nameArController,
+                    label: t('lineNameAr'),
+                    icon: Icons.text_fields_rounded,
+                    validator: (value) =>
+                        value?.isEmpty ?? true ? t('required') : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _nameEnController,
+                    label: t('lineNameEn'),
+                    icon: Icons.language_rounded,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _basePriceController,
+                          label: t('basePrice'),
+                          icon: Icons.attach_money_rounded,
+                          isNumber: true,
+                          validator: (value) =>
+                              value?.isEmpty ?? true ? t('required') : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _additionalPriceController,
+                          label: t('additionalPrice'),
+                          icon: Icons.add_circle_outline_rounded,
+                          isNumber: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _durationController,
+                          label: t('duration'),
+                          icon: Icons.timer_rounded,
+                          isNumber: true,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _distanceController,
+                          label: t('distance'),
+                          icon: Icons.straighten_rounded,
+                          isNumber: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  StatefulBuilder(
+                    builder: (context, setState) => SwitchListTile(
+                      title: Text(
+                        _active ? t('active') : t('inactive'),
+                        style: TextStyle(color: AppTheme.textPrimary),
+                      ),
+                      value: _active,
+                      activeColor: Colors.green,
+                      contentPadding: EdgeInsets.zero,
+                      onChanged: (value) => setState(() => _active = value),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(t('cancel'), style: TextStyle(color: AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: _handleSave,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.appBarColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(t('save'), style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleDelete(String lineid) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E3A5F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.cardBackground,
         title: Text(
           t('confirmDelete'),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: AppTheme.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(t('no'), style: const TextStyle(color: Colors.white70)),
+            child: Text(t('no'), style: TextStyle(color: AppTheme.textSecondary)),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(t('yes'), style: const TextStyle(color: Colors.red)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(t('yes'), style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -256,6 +436,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
           SnackBar(
             content: Text(result['message'] ?? t('success')),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
           ),
         );
         _loadData();
@@ -263,7 +444,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? t('error')),
-            backgroundColor: Colors.red,
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -278,70 +460,32 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        appBar: AppBar(
-          title: Text(
-            t('title'),
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+        appBar: _buildAppBar(),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => _openFormDialog(),
           backgroundColor: AppTheme.appBarColor,
-          elevation: 2,
-          iconTheme: IconThemeData(color: AppTheme.textPrimary),
-          actionsIconTheme: IconThemeData(color: AppTheme.textPrimary),
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: AppTheme.textPrimary),
-            onPressed: () => Navigator.pop(context),
-          ),
-          actions: [
-            IconButton(
-              icon: Icon(
-                _isArabic ? Icons.language : Icons.translate,
-                color: AppTheme.textPrimary,
-              ),
-              onPressed: () {
-                setState(() {
-                  _isArabic = !_isArabic;
-                  ApiService.saveLanguagePreference(_isArabic);
-                });
-              },
-            ),
-            IconButton(
-              icon: Icon(
-                _showCreateForm ? Icons.close : Icons.add,
-                color: AppTheme.textPrimary,
-              ),
-              onPressed: () {
-                if (_showCreateForm) {
-                  _resetForm();
-                } else {
-                  setState(() {
-                    _showCreateForm = true;
-                  });
-                }
-              },
-            ),
-          ],
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
+          label: Text(t('createLine'), style: const TextStyle(color: Colors.white)),
         ),
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.appBarColor,
+                ),
+              )
             : Column(
                 children: [
-                  if (_showCreateForm) _buildForm(),
+                  _buildSearchBar(),
                   Expanded(
-                    child: _lines.isEmpty
-                        ? Center(
-                            child: Text(
-                              t('noLines'),
-                              style: const TextStyle(color: Colors.white70),
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _lines.length,
+                    child: _filteredLines.isEmpty
+                        ? _buildEmptyState()
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), 
+                            itemCount: _filteredLines.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 12),
                             itemBuilder: (context, index) {
-                              return _buildLineCard(_lines[index]);
+                              return _buildLineCard(_filteredLines[index]);
                             },
                           ),
                   ),
@@ -351,265 +495,320 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     );
   }
 
-  Widget _buildForm() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        border: const Border(bottom: BorderSide(color: Colors.white24)),
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: AppTheme.appBarColor,
+      elevation: 0,
+      centerTitle: true,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
       ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Arabic Name Field
-            TextFormField(
-              controller: _nameArController,
-              decoration: InputDecoration(
-                labelText: t('lineNameAr'),
-                labelStyle: const TextStyle(color: Colors.white70),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.white54),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.white),
-                ),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
-              ),
-              style: const TextStyle(color: Colors.white),
-              validator: (value) =>
-                  value?.isEmpty ?? true ? t('required') : null,
-              textDirection: TextDirection.rtl,
-            ),
-            const SizedBox(height: 16),
-            // English Name Field (Optional)
-            TextFormField(
-              controller: _nameEnController,
-              decoration: InputDecoration(
-                labelText: t('lineNameEn'),
-                labelStyle: const TextStyle(color: Colors.white70),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.white54),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.white),
-                ),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
-              ),
-              style: const TextStyle(color: Colors.white),
-              textDirection: TextDirection.ltr,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _basePriceController,
-                    decoration: InputDecoration(
-                      labelText: t('basePrice'),
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white54),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.1),
-                    ),
-                    style: const TextStyle(color: Colors.white),
-                    keyboardType: TextInputType.number,
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? t('required') : null,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: _additionalPriceController,
-                    decoration: InputDecoration(
-                      labelText: t('additionalPrice'),
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white54),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.1),
-                    ),
-                    style: const TextStyle(color: Colors.white),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _durationController,
-                    decoration: InputDecoration(
-                      labelText: t('duration'),
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white54),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.1),
-                    ),
-                    style: const TextStyle(color: Colors.white),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: _distanceController,
-                    decoration: InputDecoration(
-                      labelText: t('distance'),
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white54),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.white),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.1),
-                    ),
-                    style: const TextStyle(color: Colors.white),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: Text(
-                _active ? t('active') : t('inactive'),
-                style: const TextStyle(color: Colors.white),
-              ),
-              value: _active,
-              onChanged: (value) => setState(() => _active = value),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _resetForm,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white70),
-                    ),
-                    child: Text(t('cancel'),
-                        style: const TextStyle(color: Colors.white)),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _handleSave,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Text(t('save'),
-                        style: const TextStyle(color: Colors.white)),
-                  ),
-                ),
-              ],
-            ),
-          ],
+      title: Text(
+        t('title'),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(
+            _isArabic ? Icons.language : Icons.translate,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            setState(() {
+              _isArabic = !_isArabic;
+              ApiService.saveLanguagePreference(_isArabic);
+            });
+          },
+        ),
+        const SizedBox(width: 8),
+      ],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        style: TextStyle(color: AppTheme.textPrimary),
+        decoration: InputDecoration(
+          hintText: t('search'),
+          hintStyle: TextStyle(color: AppTheme.textSecondary),
+          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textSecondary),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                  onPressed: () {
+                    _searchController.clear();
+                    FocusScope.of(context).unfocus();
+                  },
+                )
+              : null,
         ),
       ),
     );
   }
 
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool isNumber = false,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      style: TextStyle(color: AppTheme.textPrimary),
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: AppTheme.textSecondary),
+        filled: true,
+        fillColor: AppTheme.backgroundColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      validator: validator,
+    );
+  }
+
   Widget _buildLineCard(Map<String, dynamic> line) {
-    // Get line name based on current language
+    
     final lineName = _isArabic
         ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? '')
         : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? '');
 
-    return Card(
-      color: Colors.white.withOpacity(0.05),
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        title: Text(
-          lineName,
-          style:
-              const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+    final isActive = line['active'] == true;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: isActive ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+          width: 1,
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${t('basePrice')}: ${line['baseprice'] ?? 0}',
-              style: const TextStyle(color: Colors.white70),
-            ),
-            if (line['active'] != null)
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (line['active'] == true ? Colors.green : Colors.red)
-                      .withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(4),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () => _openFormDialog(line: line),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.appBarColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.timeline_rounded,
+                        color: AppTheme.appBarColor,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            lineName,
+                            style: TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: (isActive ? Colors.green : Colors.red).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              isActive ? t('active') : t('inactive'),
+                              style: TextStyle(
+                                color: isActive ? Colors.green : Colors.red,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        _buildActionButton(
+                          icon: Icons.edit_rounded,
+                          color: Colors.blueAccent,
+                          onTap: () => _openFormDialog(line: line),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildActionButton(
+                          icon: Icons.delete_outline_rounded,
+                          color: Colors.redAccent,
+                          onTap: () => _handleDelete(line['lineid']),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                child: Text(
-                  line['active'] == true ? t('active') : t('inactive'),
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                const SizedBox(height: 16),
+                Divider(color: AppTheme.borderColor),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildInfoItem(
+                      Icons.attach_money_rounded,
+                      t('basePrice'),
+                      '${line['baseprice'] ?? 0} ${t('currency')}',
+                    ),
+                    _buildInfoItem(
+                      Icons.timer_rounded,
+                      t('duration'),
+                      '${line['estduration'] ?? 0} ${t('min')}',
+                    ),
+                    _buildInfoItem(
+                      Icons.straighten_rounded,
+                      t('distance'),
+                      '${line['distance'] ?? 0} ${t('km')}',
+                    ),
+                  ],
                 ),
-              ),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: () => _openEditForm(line),
+              ],
             ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () => _handleDelete(line['lineid']),
-            ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(IconData icon, String label, String value) {
+    return Column(
+      children: [
+        Icon(icon, size: 20, color: AppTheme.textSecondary),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(
+            icon,
+            size: 20,
+            color: color,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: AppTheme.cardBackground,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.directions_bus_filled_rounded,
+              size: 80,
+              color: AppTheme.textSecondary.withOpacity(0.5),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            t('noLines'),
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

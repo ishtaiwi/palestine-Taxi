@@ -9,6 +9,7 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './docs/swagger.js';
 import { generalLimiter } from './middleware/rateLimit.js';
 import timeRoutes from './routes/timeRoute.js';
+import stripeRoutes from './routes/stripeRoutes.js';
 
 import authRoutes from './routes/authRoutes.js';
 import lineRoutes from './routes/lineRoutes.js';
@@ -24,7 +25,7 @@ import ratingRoutes from './routes/ratingRoutes.js';
 import locationRoutes from './routes/locationRoutes.js';
 
 
-// Background Jobs
+
 import { startTripOpeningJob } from './jobs/tripOpeningJob.js';
 import { startDepartureCheckJob } from './jobs/departureCheckJob.js';
 import { startNoShowCheckJob } from './jobs/noShowCheckJob.js';
@@ -36,6 +37,11 @@ const app = express();
 
 
 app.use(cors(appConfig.cors));
+
+
+app.use('/api/stripe', stripeRoutes);
+
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(i18n);
@@ -123,7 +129,7 @@ app.listen(PORT, async () => {
   if (dbTest.connected) {
     logger.info('✅ Database connection verified');
 
-    // Start background jobs
+    
     logger.info('Starting background jobs...');
     startTripOpeningJob();
     startDepartureCheckJob();
@@ -132,7 +138,7 @@ app.listen(PORT, async () => {
     startPredictionUpdateJob();
     logger.info('✅ All background jobs started');
 
-    // Initialize prediction model in background (non-blocking)
+    
     setImmediate(async () => {
       try {
         await initializeModel();

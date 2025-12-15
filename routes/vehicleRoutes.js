@@ -9,6 +9,7 @@ import {
   assignVehicleToLine,
   getVehicleSeatMap,
   updateBrokenSeats,
+  deleteVehicle,
 } from '../controllers/vehicleController.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireDriver, requireAdmin } from '../middleware/authorization.js';
@@ -26,6 +27,7 @@ router.get('/:vehicleid', getVehicleById);
 
 router.post('/', authenticate, requireAdmin, createVehicle);
 router.put('/:vehicleid', authenticate, requireAdmin, updateVehicle);
+router.delete('/:vehicleid', authenticate, requireAdmin, deleteVehicle);
 router.put('/:vehicleid/assign-line', authenticate, requireAdmin, assignVehicleToLine);
 
 export default router;

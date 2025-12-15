@@ -14,7 +14,9 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   List<Map<String, dynamic>> _filteredUsers = [];
   bool _isLoading = true;
   bool _isArabic = true;
-  String? _selectedRoleFilter; // null = all, 'admin', 'passenger', 'driver'
+  String? _selectedRoleFilter;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -45,7 +47,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       'filterAdmin': 'مدراء',
       'filterDriver': 'سائقون',
       'filterPassenger': 'ركاب',
-      'filterByRole': 'فلترة حسب الدور',
+      'filterByRole': 'تصفية حسب الدور',
+      'search': 'بحث...',
     },
     'en': {
       'title': 'Users Management',
@@ -76,6 +79,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       'filterDriver': 'Drivers',
       'filterPassenger': 'Passengers',
       'filterByRole': 'Filter by Role',
+      'search': 'Search...',
     },
   };
 
@@ -87,6 +91,20 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     AppTheme.init();
     _loadData();
     _loadLanguagePreference();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.toLowerCase();
+      _applyFilter();
+    });
   }
 
   Future<void> _loadLanguagePreference() async {
@@ -116,7 +134,8 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${t('error')}: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -124,81 +143,26 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   }
 
   void _applyFilter() {
-    if (_selectedRoleFilter == null) {
-      _filteredUsers = List.from(_users);
-    } else {
-      _filteredUsers = _users.where((user) {
-        final userRole = user['role']?.toString().toLowerCase();
-        return userRole == _selectedRoleFilter?.toLowerCase();
-      }).toList();
-    }
-  }
+    _filteredUsers = _users.where((user) {
+      final userRole = user['role']?.toString().toLowerCase();
+      final name = user['fullname']?.toString().toLowerCase() ?? '';
+      final email = user['email']?.toString().toLowerCase() ?? '';
 
-  Widget _buildFilterChip({
-    required String label,
-    required IconData icon,
-    required bool isSelected,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(
-                  colors: [color.withOpacity(0.2), color.withOpacity(0.1)],
-                )
-              : null,
-          color: isSelected ? null : AppTheme.getCardBackground(0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? color : AppTheme.getCardBorder(0.3),
-            width: isSelected ? 2 : 1.5,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: color.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? color : AppTheme.textSecondary,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? color : AppTheme.textPrimary,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+      final matchesRole = _selectedRoleFilter == null || userRole == _selectedRoleFilter?.toLowerCase();
+      final matchesSearch = _searchQuery.isEmpty || name.contains(_searchQuery) || email.contains(_searchQuery);
+
+      return matchesRole && matchesSearch;
+    }).toList();
   }
 
   Color _getRoleColor(String? role) {
     switch (role?.toLowerCase()) {
       case 'admin':
-        return Colors.blue;
+        return const Color(0xFF5C6BC0); 
       case 'driver':
-        return Colors.green;
+        return const Color(0xFF66BB6A); 
       case 'passenger':
-        return Colors.orange;
+        return const Color(0xFFFFA726); 
       default:
         return Colors.grey;
     }
@@ -207,14 +171,205 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   IconData _getRoleIcon(String? role) {
     switch (role?.toLowerCase()) {
       case 'admin':
-        return Icons.admin_panel_settings;
+        return Icons.admin_panel_settings_rounded;
       case 'driver':
-        return Icons.local_taxi;
+        return Icons.directions_car_rounded;
       case 'passenger':
-        return Icons.person;
+        return Icons.person_rounded;
       default:
-        return Icons.person_outline;
+        return Icons.person_outline_rounded;
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+
+    return Directionality(
+      textDirection: textDirection,
+      child: Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
+        appBar: _buildAppBar(),
+        body: _isLoading
+            ? Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.appBarColor,
+                ),
+              )
+            : Column(
+                children: [
+                  _buildSearchBar(),
+                  _buildFilterSection(),
+                  Expanded(
+                    child: _filteredUsers.isEmpty
+                        ? _buildEmptyState()
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            itemCount: _filteredUsers.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              return _buildUserCard(_filteredUsers[index]);
+                            },
+                          ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: AppTheme.appBarColor,
+      elevation: 0,
+      centerTitle: true,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Text(
+        t('title'),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(
+            _isArabic ? Icons.language : Icons.translate,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            setState(() {
+              _isArabic = !_isArabic;
+              ApiService.saveLanguagePreference(_isArabic);
+            });
+          },
+        ),
+        const SizedBox(width: 8),
+      ],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        style: TextStyle(color: AppTheme.textPrimary),
+        decoration: InputDecoration(
+          hintText: t('search'),
+          hintStyle: TextStyle(color: AppTheme.textSecondary),
+          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textSecondary),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                  onPressed: () {
+                    _searchController.clear();
+                    FocusScope.of(context).unfocus();
+                  },
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterSection() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildFilterChip(null, t('filterAll'), Icons.people_alt_rounded),
+            const SizedBox(width: 12),
+            _buildFilterChip('admin', t('filterAdmin'), Icons.admin_panel_settings_rounded),
+            const SizedBox(width: 12),
+            _buildFilterChip('driver', t('filterDriver'), Icons.directions_car_rounded),
+            const SizedBox(width: 12),
+            _buildFilterChip('passenger', t('filterPassenger'), Icons.person_rounded),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String? role, String label, IconData icon) {
+    final isSelected = _selectedRoleFilter == role;
+    final color = role == null ? AppTheme.appBarColor : _getRoleColor(role);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _selectedRoleFilter = role;
+            _applyFilter();
+          });
+        },
+        borderRadius: BorderRadius.circular(30),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? color : AppTheme.cardBackground,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: isSelected ? color : AppTheme.textSecondary.withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    )
+                  ]
+                : [],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected ? Colors.white : AppTheme.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : AppTheme.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildUserCard(Map<String, dynamic> user) {
@@ -223,153 +378,77 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     final roleIcon = _getRoleIcon(role);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.getCardBackground(0.1),
-            AppTheme.getCardBackground(0.05),
-          ],
-        ),
+        color: AppTheme.cardBackground,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.getShadowColor(0.08),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(
-          color: roleColor.withOpacity(0.3),
-          width: 1.5,
-        ),
       ),
       child: Material(
         color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
         child: InkWell(
+          onTap: () {}, 
           borderRadius: BorderRadius.circular(16),
-          onTap: () {},
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Avatar with role color
                 Container(
-                  width: 60,
-                  height: 60,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        roleColor,
-                        roleColor.withOpacity(0.7),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: roleColor.withOpacity(0.4),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    color: roleColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(
                     roleIcon,
-                    color: Colors.white,
-                    size: 28,
+                    color: roleColor,
+                    size: 24,
                   ),
                 ),
                 const SizedBox(width: 16),
-                // User info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        user['fullname'] ?? '',
+                        user['fullname'] ?? t('name'),
                         style: TextStyle(
                           color: AppTheme.textPrimary,
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.email,
-                            size: 14,
-                            color: AppTheme.textSecondary,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              user['email'] ?? '',
-                              style: TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: 13,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: roleColor.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: roleColor.withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          children: [
-                            Icon(
-                              roleIcon,
-                              size: 14,
-                              color: roleColor,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              role?.toUpperCase() ?? '',
-                              style: TextStyle(
-                                color: roleColor,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                       const SizedBox(height: 4),
-                      if (user['phone'] != null) ...[
-                        const SizedBox(width: 8),
+                      Text(
+                        user['email'] ?? '',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (user['phone'] != null && user['phone'].toString().isNotEmpty) ...[
+                        const SizedBox(height: 4),
                         Row(
                           children: [
                             Icon(
-                              Icons.phone,
-                              size: 14,
+                              Icons.phone_iphone_rounded,
+                              size: 12,
                               color: AppTheme.textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              user['phone']?.toString() ?? '',
+                              user['phone'].toString(),
                               style: TextStyle(
-                                color: Colors.grey.shade700,
+                                color: AppTheme.textSecondary,
                                 fontSize: 12,
                               ),
                             ),
@@ -379,50 +458,18 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                     ],
                   ),
                 ),
-                // Action buttons
                 Column(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFF57C00), Color(0xFFE65100)],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.orange.withOpacity(0.4),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.edit,
-                            color: Colors.white, size: 20),
-                        onPressed: () => _handleEdit(user),
-                      ),
+                    _buildActionButton(
+                      icon: Icons.edit_rounded,
+                      color: Colors.blueAccent,
+                      onTap: () => _handleEdit(user),
                     ),
                     const SizedBox(height: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.red.shade400, Colors.red.shade600],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.red.withOpacity(0.4),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.delete,
-                            color: Colors.white, size: 20),
-                        onPressed: () => _handleDelete(user['userid']),
-                      ),
+                    _buildActionButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: Colors.redAccent,
+                      onTap: () => _handleDelete(user['userid']),
                     ),
                   ],
                 ),
@@ -430,6 +477,67 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(
+            icon,
+            size: 20,
+            color: color,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: AppTheme.cardBackground,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.people_outline_rounded,
+              size: 80,
+              color: AppTheme.textSecondary.withOpacity(0.5),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            t('noUsers'),
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -445,10 +553,11 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.appBarColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.cardBackground,
         title: Text(
           t('editUser'),
-          style: TextStyle(color: AppTheme.textPrimary),
+          style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
         ),
         content: SingleChildScrollView(
           child: Form(
@@ -457,103 +566,60 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextFormField(
+                _buildTextField(
                   controller: nameController,
-                  style: TextStyle(color: AppTheme.textPrimary),
-                  decoration: InputDecoration(
-                    labelText: t('name'),
-                    labelStyle: TextStyle(color: AppTheme.textSecondary),
-                    enabledBorder: UnderlineInputBorder(
-                      borderSide:
-                          BorderSide(color: AppTheme.getCardBorder(0.5)),
-                    ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.orange),
-                    ),
-                  ),
+                  label: t('name'),
+                  icon: Icons.person_outline_rounded,
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return t('nameRequired');
-                    }
+                    if (value == null || value.isEmpty) return t('nameRequired');
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
+                _buildTextField(
                   controller: emailController,
-                  style: TextStyle(color: AppTheme.textPrimary),
-                  decoration: InputDecoration(
-                    labelText: t('email'),
-                    labelStyle: TextStyle(color: AppTheme.textSecondary),
-                    enabledBorder: UnderlineInputBorder(
-                      borderSide:
-                          BorderSide(color: AppTheme.getCardBorder(0.5)),
-                    ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.orange),
-                    ),
-                  ),
+                  label: t('email'),
+                  icon: Icons.email_outlined,
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return t('emailRequired');
-                    }
-                    if (!value.contains('@')) {
-                      return t('emailInvalid');
-                    }
+                    if (value == null || value.isEmpty) return t('emailRequired');
+                    if (!value.contains('@')) return t('emailInvalid');
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
+                _buildTextField(
                   controller: phoneController,
-                  style: TextStyle(color: AppTheme.textPrimary),
-                  decoration: InputDecoration(
-                    labelText: t('phone'),
-                    labelStyle: TextStyle(color: AppTheme.textSecondary),
-                    enabledBorder: UnderlineInputBorder(
-                      borderSide:
-                          BorderSide(color: AppTheme.getCardBorder(0.5)),
-                    ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.orange),
-                    ),
-                  ),
+                  label: t('phone'),
+                  icon: Icons.phone_iphone_rounded,
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: selectedRole,
-                  style: const TextStyle(color: Colors.white),
-                  dropdownColor: const Color(0xFF1E3A5F),
+                  dropdownColor: AppTheme.cardBackground,
                   decoration: InputDecoration(
                     labelText: t('role'),
-                    labelStyle: const TextStyle(color: Colors.white70),
-                    enabledBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.white54),
+                    prefixIcon: Icon(Icons.badge_outlined, color: AppTheme.textSecondary),
+                    filled: true,
+                    fillColor: AppTheme.backgroundColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
-                    focusedBorder: const UnderlineInputBorder(
-                      borderSide: BorderSide(color: Colors.orange),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
                   ),
-                  items: [
-                    DropdownMenuItem(
-                      value: 'admin',
-                      child: Text('Admin',
-                          style: const TextStyle(color: Colors.white)),
-                    ),
-                    DropdownMenuItem(
-                      value: 'driver',
-                      child: Text('Driver',
-                          style: const TextStyle(color: Colors.white)),
-                    ),
-                    DropdownMenuItem(
-                      value: 'passenger',
-                      child: Text('Passenger',
-                          style: const TextStyle(color: Colors.white)),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    selectedRole = value;
-                  },
+                  items: ['admin', 'driver', 'passenger'].map((role) {
+                    return DropdownMenuItem(
+                      value: role,
+                      child: Text(
+                        role[0].toUpperCase() + role.substring(1),
+                        style: TextStyle(color: AppTheme.textPrimary),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) => selectedRole = value,
                 ),
               ],
             ),
@@ -562,17 +628,19 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(t('cancel'),
-                style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text(t('cancel'), style: TextStyle(color: AppTheme.textSecondary)),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
                 Navigator.pop(context, true);
               }
             },
-            child:
-                Text(t('save'), style: const TextStyle(color: Colors.orange)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.appBarColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(t('save'), style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -580,7 +648,6 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
 
     if (result != true) return;
 
-    // Show loading
     if (mounted) {
       showDialog(
         context: context,
@@ -593,53 +660,72 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       userid: user['userid'],
       fullname: nameController.text.trim(),
       email: emailController.text.trim(),
-      phone: phoneController.text.trim().isEmpty
-          ? null
-          : phoneController.text.trim(),
+      phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
       role: selectedRole,
     );
 
-    // Close loading
     if (mounted) Navigator.pop(context);
 
     if (mounted) {
-      if (updateResult['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t('userUpdated')),
-            backgroundColor: Colors.green,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            updateResult['success'] == true ? t('userUpdated') : (updateResult['message'] ?? t('updateFailed')),
           ),
-        );
-        _loadData();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(updateResult['message'] ?? t('updateFailed')),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+          backgroundColor: updateResult['success'] == true ? Colors.green : Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      if (updateResult['success'] == true) _loadData();
     }
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      style: TextStyle(color: AppTheme.textPrimary),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: AppTheme.textSecondary),
+        filled: true,
+        fillColor: AppTheme.backgroundColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      validator: validator,
+    );
   }
 
   Future<void> _handleDelete(String userid) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.appBarColor,
-        title: Text(
-          t('confirmDelete'),
-          style: TextStyle(color: AppTheme.textPrimary),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.cardBackground,
+        title: Text(t('confirmDelete'), style: TextStyle(color: AppTheme.textPrimary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child:
-                Text(t('no'), style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text(t('no'), style: TextStyle(color: AppTheme.textSecondary)),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(t('yes'), style: const TextStyle(color: Colors.red)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(t('yes'), style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -649,279 +735,14 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
 
     final result = await ApiService.deleteUser(userid);
     if (mounted) {
-      if (result['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? 'User deleted'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _loadData();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? t('error')),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
-
-    return Directionality(
-      textDirection: textDirection,
-      child: Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
-        appBar: AppBar(
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.appBarColor,
-                      AppTheme.appBarColor.withOpacity(0.8)
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child:
-                    Icon(Icons.people, color: AppTheme.textPrimary, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  t('title'),
-                  style: TextStyle(
-                    color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          flexibleSpace: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppTheme.appBarColor,
-                  AppTheme.appBarColor.withOpacity(0.8),
-                  AppTheme.appBarColor,
-                ],
-              ),
-            ),
-          ),
-          elevation: 0,
-          iconTheme: IconThemeData(color: AppTheme.textPrimary),
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: AppTheme.textPrimary),
-            onPressed: () => Navigator.pop(context),
-          ),
-          actions: [
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: IconButton(
-                icon: Icon(
-                  _isArabic ? Icons.language : Icons.translate,
-                  color: Colors.white,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _isArabic = !_isArabic;
-                    ApiService.saveLanguagePreference(_isArabic);
-                  });
-                },
-              ),
-            ),
-          ],
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? (result['success'] == true ? 'User deleted' : t('error'))),
+          backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+          behavior: SnackBarBehavior.floating,
         ),
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  // Filter Section
-                  Container(
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppTheme.getCardBackground(0.1),
-                          AppTheme.getCardBackground(0.05),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.getShadowColor(0.08),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: AppTheme.getCardBorder(0.2),
-                        width: 1,
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFFF57C00),
-                                    Color(0xFFE65100)
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.filter_list,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              t('filterByRole'),
-                              style: const TextStyle(
-                                color: Color(0xFF1E3A5F),
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _buildFilterChip(
-                              label: t('filterAll'),
-                              icon: Icons.all_inclusive,
-                              isSelected: _selectedRoleFilter == null,
-                              color: Colors.grey,
-                              onTap: () {
-                                setState(() {
-                                  _selectedRoleFilter = null;
-                                  _applyFilter();
-                                });
-                              },
-                            ),
-                            _buildFilterChip(
-                              label: t('filterAdmin'),
-                              icon: Icons.admin_panel_settings,
-                              isSelected: _selectedRoleFilter == 'admin',
-                              color: Colors.blue,
-                              onTap: () {
-                                setState(() {
-                                  _selectedRoleFilter =
-                                      _selectedRoleFilter == 'admin'
-                                          ? null
-                                          : 'admin';
-                                  _applyFilter();
-                                });
-                              },
-                            ),
-                            _buildFilterChip(
-                              label: t('filterDriver'),
-                              icon: Icons.local_taxi,
-                              isSelected: _selectedRoleFilter == 'driver',
-                              color: Colors.green,
-                              onTap: () {
-                                setState(() {
-                                  _selectedRoleFilter =
-                                      _selectedRoleFilter == 'driver'
-                                          ? null
-                                          : 'driver';
-                                  _applyFilter();
-                                });
-                              },
-                            ),
-                            _buildFilterChip(
-                              label: t('filterPassenger'),
-                              icon: Icons.person,
-                              isSelected: _selectedRoleFilter == 'passenger',
-                              color: Colors.orange,
-                              onTap: () {
-                                setState(() {
-                                  _selectedRoleFilter =
-                                      _selectedRoleFilter == 'passenger'
-                                          ? null
-                                          : 'passenger';
-                                  _applyFilter();
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Users List
-                  Expanded(
-                    child: _filteredUsers.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(24),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.people_outline,
-                                    size: 64,
-                                    color: Colors.grey.shade400,
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-                                Text(
-                                  t('noUsers'),
-                                  style: TextStyle(
-                                    color: AppTheme.textSecondary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: _filteredUsers.length,
-                            itemBuilder: (context, index) {
-                              final user = _filteredUsers[index];
-                              return _buildUserCard(user);
-                            },
-                          ),
-                  ),
-                ],
-              ),
-      ),
-    );
+      );
+      if (result['success'] == true) _loadData();
+    }
   }
 }

@@ -22,8 +22,8 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   bool _isArabic = true;
-  bool _isDarkMode = false; // Light mode as default
-  String? _profileImagePath; // Local path to profile image
+  bool _isDarkMode = false; 
+  String? _profileImagePath; 
   final ImagePicker _imagePicker = ImagePicker();
 
   final Map<String, Map<String, String>> _texts = {
@@ -163,7 +163,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       );
 
       if (image != null) {
-        // Save the image path locally
+        
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('profile_image_path', image.path);
 
@@ -171,7 +171,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
           _profileImagePath = image.path;
         });
 
-        // Show success message
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -210,20 +210,45 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     );
   }
 
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: AppTheme.appBarColor,
+      elevation: 0,
+      centerTitle: true,
+      automaticallyImplyLeading: false,
+      title: Text(
+        t('title'),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout_rounded, color: Colors.white),
+          onPressed: _handleLogout,
+          tooltip: t('logout'),
+        ),
+        const SizedBox(width: 8),
+      ],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
 
-    // Theme-aware colors
+    
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
-        : const Color.fromARGB(255, 224, 228, 231); // Soft blue-gray background, easy on eyes
-    final appBarColor = _isDarkMode
-        ? const Color(0xFF1E3A5F)
-        : const Color(0xFF2C5F8D);
+        : const Color.fromARGB(255, 224, 228, 231); 
     final cardColor = _isDarkMode
         ? const Color(0xFF1C2541)
-        : const Color(0xFFFAFBFC); // Off-white with slight cool tint
+        : const Color(0xFFFAFBFC); 
     final textPrimaryColor = _isDarkMode
         ? Colors.white
         : const Color(0xFF1E3A5F);
@@ -236,66 +261,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: backgroundColor,
-        appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(70),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: _isDarkMode
-                    ? [
-                        const Color(0xFF1C2541),
-                        const Color(0xFF2C3E50),
-                        const Color(0xFF1C2541),
-                      ]
-                    : [
-                        const Color(0xFF2C5F8D),
-                        const Color(0xFF1E3A5F),
-                        const Color(0xFF2C5F8D),
-                      ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: AppBar(
-              title: Text(
-                t('title'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 22,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              backgroundColor: Colors.transparent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              centerTitle: true,
-              iconTheme: const IconThemeData(color: Colors.white),
-              actionsIconTheme: const IconThemeData(color: Colors.white),
-              actions: [
-                Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.logout_rounded, size: 22),
-                    onPressed: _handleLogout,
-                    tooltip: t('logout'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        appBar: _buildAppBar(),
         body: _isLoading
             ? Center(
                 child: CircularProgressIndicator(
@@ -308,7 +274,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Welcome Card - Professional Design
+                      
                       Container(
                         padding: const EdgeInsets.all(32),
                         decoration: BoxDecoration(
@@ -316,9 +282,9 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Color(0xFF2C5F8D), // Professional blue
-                              Color(0xFF1E3A5F), // Dark navy
-                              Color(0xFF2C5F8D), // Professional blue
+                              Color(0xFF2C5F8D), 
+                              Color(0xFF1E3A5F), 
+                              Color(0xFF2C5F8D), 
                             ],
                             stops: [0.0, 0.5, 1.0],
                           ),
@@ -340,15 +306,15 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Greeting Row with Profile Image
+                            
                             Row(
                               children: [
-                                // Profile Image with Upload
+                                
                                 GestureDetector(
                                   onTap: _pickProfileImage,
                                   child: Stack(
                                     children: [
-                                      // Profile Image Container
+                                      
                                       Container(
                                         width: 80,
                                         height: 80,
@@ -378,7 +344,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                               : _buildDefaultAvatar(),
                                         ),
                                       ),
-                                      // Camera Icon Overlay
+                                      
                                       Positioned(
                                         bottom: 0,
                                         right: 0,
@@ -410,7 +376,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                   ),
                                 ),
                                 const SizedBox(width: 16),
-                                // Greeting Text
+                                
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,7 +391,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      // User name with hello icon
+                                      
                                       Row(
                                         children: [
                                           Flexible(
@@ -456,7 +422,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               ],
                             ),
                             const SizedBox(height: 24),
-                            // Divider
+                            
                             Container(
                               height: 1,
                               decoration: BoxDecoration(
@@ -470,7 +436,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               ),
                             ),
                             const SizedBox(height: 24),
-                            // Taxi System Message
+                            
                             Row(
                               children: [
                                 Container(
@@ -503,7 +469,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               ],
                             ),
                             const SizedBox(height: 20),
-                            // Quick Stats Row
+                            
                             Row(
                               children: [
                                 Expanded(
@@ -528,7 +494,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Quick Actions Section Header
+                      
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
@@ -666,7 +632,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Favorite Trips Section Header
+                      
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
@@ -788,7 +754,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                         ),
                       const SizedBox(height: 28),
 
-                      // Account Info Section
+                      
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
@@ -878,7 +844,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                 ),
               ),
         bottomNavigationBar: PassengerBottomNavBar(
-          currentIndex: 2, // Home is index 2
+          currentIndex: 2, 
           isDarkMode: _isDarkMode,
           isArabic: _isArabic,
           onTap: (index) {
@@ -901,7 +867,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     required bool isDarkMode,
     required VoidCallback onTap,
   }) {
-    // Create a lighter and darker shade for gradient
+    
     final Color lightShade = Color.lerp(color, Colors.white, 0.15)!;
     final Color darkShade = Color.lerp(color, Colors.black, 0.2)!;
 
@@ -923,21 +889,21 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
           ),
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
-            // Main colored shadow
+            
             BoxShadow(
               color: color.withAlpha(128),
               blurRadius: 20,
               spreadRadius: 2,
               offset: const Offset(0, 10),
             ),
-            // Secondary shadow for depth
+            
             BoxShadow(
               color: color.withAlpha(64),
               blurRadius: 30,
               spreadRadius: -5,
               offset: const Offset(0, 15),
             ),
-            // Dark shadow for contrast
+            
             BoxShadow(
               color: Colors.black.withAlpha(51),
               blurRadius: 12,
@@ -948,7 +914,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Icon container with glow effect
+            
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -1229,7 +1195,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     );
   }
 
-  // Welcome Card Stat Widget
+  
   Widget _buildWelcomeStatCard({
     required IconData icon,
     required String label,
@@ -1281,7 +1247,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     );
   }
 
-  // Default Avatar Widget
+  
   Widget _buildDefaultAvatar() {
     const accentColor = Color(0xFFF57C00);
     return Container(

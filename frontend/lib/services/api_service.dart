@@ -150,7 +150,7 @@ class ApiService {
         requestBody['vehicleSeatLayout'] = vehicleSeatLayout.trim();
       }
 
-      // Debug: Log what we're sending
+      
       print('[ApiService.register] 📤 Sending registration data:');
       print('  - fullname: ${requestBody['fullname']}');
       print('  - email: ${requestBody['email']}');
@@ -188,7 +188,7 @@ class ApiService {
         print('  - Vehicle data: ${responseData['vehicle']}');
       }
 
-      // Check for success status (201 or 200) or explicit success field
+      
       final isSuccess = response.statusCode == 201 ||
           response.statusCode == 200 ||
           responseData['success'] == true ||
@@ -196,7 +196,7 @@ class ApiService {
 
       if (isSuccess && responseData['token'] != null) {
         try {
-          // Save token and user data
+          
           if (responseData['token'] != null) {
             await saveToken(responseData['token']);
           }
@@ -213,11 +213,11 @@ class ApiService {
             'message': responseData['message'] ?? 'Registration successful',
             'token': responseData['token'],
             'user': responseData['user'],
-            'vehicle': responseData['vehicle'], // Include vehicle in response
+            'vehicle': responseData['vehicle'], 
           };
         } catch (saveError) {
           print('[ApiService.register] ⚠️ Error saving data: $saveError');
-          // Even if saving fails, return success if registration was successful
+          
           return {
             'success': true,
             'message': responseData['message'] ?? 'Registration successful',
@@ -778,7 +778,7 @@ class ApiService {
     };
   }
 
-  /// Get driver profile
+  
   static Future<Map<String, dynamic>> getDriverProfile() async {
     try {
       final token = await getToken();
@@ -970,9 +970,9 @@ class ApiService {
     };
   }
 
-  // ==================== Passenger APIs ====================
+  
 
-  /// Fetch upcoming trips for passengers
+  
   static Future<List<Map<String, dynamic>>> fetchUpcomingTrips({
     String? lineid,
     String? date,
@@ -1004,7 +1004,7 @@ class ApiService {
     }
   }
 
-  /// Fetch trip by ID with full details
+  
   static Future<Map<String, dynamic>> fetchTripById(String tripId) async {
     try {
       final response = await http.get(
@@ -1024,7 +1024,7 @@ class ApiService {
     }
   }
 
-  /// Create a reservation (supports Future and Instant bookings)
+  
   static Future<Map<String, dynamic>> createReservation({
     String? tripid,
     String? lineid,
@@ -1032,8 +1032,8 @@ class ApiService {
     String? dropoffpoint,
     String? aging,
     String? paymentmethod,
-    String? booking_type, // 'future' or 'instant'
-    String? scheduled_trip_time, // Required for future bookings
+    String? booking_type, 
+    String? scheduled_trip_time, 
   }) async {
     try {
       final token = await getToken();
@@ -1090,7 +1090,7 @@ class ApiService {
     }
   }
 
-  /// Fetch passenger reservations
+  
   static Future<List<Map<String, dynamic>>> fetchPassengerReservations({
     String? status,
   }) async {
@@ -1127,7 +1127,7 @@ class ApiService {
     }
   }
 
-  /// Cancel a reservation
+  
   static Future<Map<String, dynamic>> cancelReservation(
       String bookingId) async {
     try {
@@ -1171,7 +1171,7 @@ class ApiService {
     }
   }
 
-  /// Fetch wallet balance and transactions
+  
   static Future<Map<String, dynamic>> fetchWallet() async {
     try {
       final token = await getToken();
@@ -1214,7 +1214,7 @@ class ApiService {
     }
   }
 
-  /// Add balance to wallet
+  
   static Future<Map<String, dynamic>> addWalletBalance(double amount) async {
     try {
       final token = await getToken();
@@ -1260,9 +1260,53 @@ class ApiService {
     }
   }
 
-  // ==================== Driver APIs (Additional) ====================
+  
+  static Future<Map<String, dynamic>> createStripeWalletTopup(
+      double amount) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
 
-  /// Start a trip (departure)
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/wallets/stripe-topup'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode({'amount': amount})),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return decoded.cast<String, dynamic>();
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to create Stripe top-up',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  
+
+  
   static Future<Map<String, dynamic>> startTrip(String tripId) async {
     try {
       final token = await getToken();
@@ -1305,7 +1349,7 @@ class ApiService {
     }
   }
 
-  /// End a trip
+  
   static Future<Map<String, dynamic>> endTrip(String tripId) async {
     try {
       final token = await getToken();
@@ -1348,7 +1392,7 @@ class ApiService {
     }
   }
 
-  /// Check-in a passenger (via QR code or booking ID)
+  
   static Future<Map<String, dynamic>> checkInReservation(String? bookingId,
       {String? qrData}) async {
     try {
@@ -1399,7 +1443,7 @@ class ApiService {
     }
   }
 
-  /// Get QR Code for a reservation
+  
   static Future<Map<String, dynamic>> getReservationQRCode(
       String bookingId) async {
     try {
@@ -1442,11 +1486,11 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // SCHEDULE TEMPLATES API
-  // ============================================
+  
+  
+  
 
-  /// Fetch all schedule templates
+  
   static Future<List<Map<String, dynamic>>> fetchSchedules(
       {String? lineid, bool? active}) async {
     try {
@@ -1497,7 +1541,7 @@ class ApiService {
     }
   }
 
-  /// Get schedule template by ID
+  
   static Future<Map<String, dynamic>> getScheduleById(String templateid) async {
     try {
       final token = await getToken();
@@ -1536,7 +1580,7 @@ class ApiService {
     }
   }
 
-  /// Create a new schedule template
+  
   static Future<Map<String, dynamic>> createSchedule({
     required String lineid,
     required int startHour,
@@ -1595,7 +1639,7 @@ class ApiService {
     }
   }
 
-  /// Update a schedule template
+  
   static Future<Map<String, dynamic>> updateSchedule(
     String templateid, {
     String? lineid,
@@ -1656,7 +1700,7 @@ class ApiService {
     }
   }
 
-  /// Delete a schedule template
+  
   static Future<Map<String, dynamic>> deleteSchedule(String templateid) async {
     try {
       final token = await getToken();
@@ -1698,7 +1742,7 @@ class ApiService {
     }
   }
 
-  /// Manually create trips for a schedule template
+  
   static Future<Map<String, dynamic>> createTripsForSchedule(
     String templateid, {
     String? targetDate,
@@ -1752,7 +1796,7 @@ class ApiService {
     }
   }
 
-  /// Manually trigger daily trip creation for all schedules
+  
   static Future<Map<String, dynamic>> triggerDailyTripCreation() async {
     try {
       final token = await getToken();
@@ -1795,9 +1839,9 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // ADMIN - Prediction & Recommendation APIs
-  // ============================================
+  
+  
+  
 
   static Future<Map<String, dynamic>> getRushHourPredictionsAdmin({
     required String lineId,
@@ -2021,11 +2065,11 @@ class ApiService {
     };
   }
 
-  // ============================================
-  // ADMIN - LINES API
-  // ============================================
+  
+  
+  
 
-  /// Get all lines (admin)
+  
   static Future<List<Map<String, dynamic>>> getAllLines() async {
     try {
       final response = await http.get(
@@ -2051,11 +2095,11 @@ class ApiService {
     }
   }
 
-  /// Create line (admin)
+  
   static Future<Map<String, dynamic>> createLine({
     String? nameAr,
     String? nameEn,
-    String? linename, // For backward compatibility
+    String? linename, 
     required double baseprice,
     double? additionalprice,
     int? estduration,
@@ -2074,14 +2118,14 @@ class ApiService {
         'active': active,
       };
 
-      // Support both new (name_ar, name_en) and old (linename) format
+      
       if (nameAr != null && nameAr.isNotEmpty) {
         body['name_ar'] = nameAr;
       }
       if (nameEn != null && nameEn.isNotEmpty) {
         body['name_en'] = nameEn;
       }
-      // Fallback to linename for backward compatibility
+      
       if ((nameAr == null || nameAr.isEmpty) &&
           linename != null &&
           linename.isNotEmpty) {
@@ -2115,12 +2159,12 @@ class ApiService {
     }
   }
 
-  /// Update line (admin)
+  
   static Future<Map<String, dynamic>> updateLine(
     String lineid, {
     String? nameAr,
     String? nameEn,
-    String? linename, // For backward compatibility
+    String? linename, 
     double? baseprice,
     double? additionalprice,
     int? estduration,
@@ -2134,7 +2178,7 @@ class ApiService {
       }
 
       final body = <String, dynamic>{};
-      // Support both new (name_ar, name_en) and old (linename) format
+      
       if (nameAr != null && nameAr.isNotEmpty) {
         body['name_ar'] = nameAr;
       }
@@ -2174,7 +2218,7 @@ class ApiService {
     }
   }
 
-  /// Delete line (admin)
+  
   static Future<Map<String, dynamic>> deleteLine(String lineid) async {
     try {
       final token = await getToken();
@@ -2201,11 +2245,11 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // ADMIN - DASHBOARD API
-  // ============================================
+  
+  
+  
 
-  /// Get dashboard statistics (admin)
+  
   static Future<Map<String, dynamic>> getDashboardStats() async {
     try {
       final token = await getToken();
@@ -2232,7 +2276,7 @@ class ApiService {
     }
   }
 
-  /// Get revenue analytics (admin)
+  
   static Future<Map<String, dynamic>> getRevenueAnalytics({
     String? startDate,
     String? endDate,
@@ -2272,11 +2316,11 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // ADMIN - USERS API
-  // ============================================
+  
+  
+  
 
-  /// Get all users (admin)
+  
   static Future<List<Map<String, dynamic>>> getAllUsers() async {
     try {
       final token = await getToken();
@@ -2294,7 +2338,7 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-        // Backend returns array directly or wrapped in object
+        
         if (decoded is List) {
           return decoded.map((u) => Map<String, dynamic>.from(u)).toList();
         } else if (decoded is Map && decoded['users'] is List) {
@@ -2311,7 +2355,7 @@ class ApiService {
     }
   }
 
-  /// Update user (admin)
+  
   static Future<Map<String, dynamic>> updateUser({
     required String userid,
     String? fullname,
@@ -2355,7 +2399,7 @@ class ApiService {
     }
   }
 
-  /// Delete user (admin)
+  
   static Future<Map<String, dynamic>> deleteUser(String userid) async {
     try {
       final token = await getToken();
@@ -2382,11 +2426,11 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // ADMIN - VEHICLES API
-  // ============================================
+  
+  
+  
 
-  /// Get all vehicles (admin)
+  
   static Future<List<Map<String, dynamic>>> getAllVehicles() async {
     try {
       final token = await getToken();
@@ -2416,11 +2460,11 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // ADMIN - TRIPS API
-  // ============================================
+  
+  
+  
 
-  /// Get all trips (admin)
+  
   static Future<List<Map<String, dynamic>>> getAllTrips(
       {String? lineid, String? status}) async {
     try {
@@ -2453,11 +2497,11 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // ADMIN - PAYMENTS API
-  // ============================================
+  
+  
+  
 
-  /// Get all payments (admin)
+  
   static Future<List<Map<String, dynamic>>> getAllPayments({
     String? status,
     String? method,
@@ -2488,7 +2532,7 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-        // Backend returns array directly or wrapped in object
+        
         if (decoded is List) {
           return decoded.map((p) => Map<String, dynamic>.from(p)).toList();
         } else if (decoded is Map && decoded['payments'] is List) {
@@ -2505,11 +2549,11 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // RATINGS API
-  // ============================================
+  
+  
+  
 
-  /// Submit a rating for a completed trip
+  
   static Future<Map<String, dynamic>> submitRating({
     required String bookingid,
     required int rating,
@@ -2549,7 +2593,7 @@ class ApiService {
     }
   }
 
-  /// Update an existing rating
+  
   static Future<Map<String, dynamic>> updateRating({
     required String ratingid,
     int? rating,
@@ -2589,7 +2633,7 @@ class ApiService {
     }
   }
 
-  /// Get rating by booking ID
+  
   static Future<Map<String, dynamic>?> getRatingByBookingId(
       String bookingid) async {
     try {
@@ -2618,7 +2662,7 @@ class ApiService {
     }
   }
 
-  /// Get all ratings for a trip (public)
+  
   static Future<Map<String, dynamic>> getTripRatings(String tripid) async {
     try {
       final response = await http.get(
@@ -2640,7 +2684,7 @@ class ApiService {
     }
   }
 
-  /// Get my ratings
+  
   static Future<List<Map<String, dynamic>>> getMyRatings() async {
     try {
       final token = await getToken();
@@ -2670,15 +2714,15 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // LOCATION TRACKING API
-  // ============================================
+  
+  
+  
 
-  // ============================================
-  // LOCATION TRACKING API
-  // ============================================
+  
+  
+  
 
-  /// Update driver's current location
+  
   static Future<Map<String, dynamic>> updateDriverLocation({
     required double latitude,
     required double longitude,
@@ -2737,7 +2781,7 @@ class ApiService {
     }
   }
 
-  /// Get driver's current location
+  
   static Future<Map<String, dynamic>> getMyLocation() async {
     try {
       final token = await getToken();
@@ -2779,7 +2823,7 @@ class ApiService {
     }
   }
 
-  /// Get all vehicle locations (admin)
+  
   static Future<Map<String, dynamic>> getAllVehicleLocations({
     int? maxAgeMinutes,
     String? lineid,
@@ -2835,7 +2879,7 @@ class ApiService {
     }
   }
 
-  /// Get drivers at base station (admin)
+  
   static Future<Map<String, dynamic>> getDriversAtBaseStation({
     String? stationid,
   }) async {
@@ -2888,11 +2932,11 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // BASE STATION API
-  // ============================================
+  
+  
+  
 
-  /// Get all base stations (admin)
+  
   static Future<Map<String, dynamic>> getAllBaseStations({
     bool? isActive,
     String? lineid,
@@ -2948,7 +2992,7 @@ class ApiService {
     }
   }
 
-  /// Get base station by ID (admin)
+  
   static Future<Map<String, dynamic>> getBaseStationById(
       String stationid) async {
     try {
@@ -2991,7 +3035,7 @@ class ApiService {
     }
   }
 
-  /// Create base station (admin)
+  
   static Future<Map<String, dynamic>> createBaseStation({
     required String name,
     required double latitude,
@@ -3053,7 +3097,7 @@ class ApiService {
     }
   }
 
-  /// Update base station (admin)
+  
   static Future<Map<String, dynamic>> updateBaseStation({
     required String stationid,
     String? name,
@@ -3116,7 +3160,7 @@ class ApiService {
     }
   }
 
-  /// Delete base station (admin)
+  
   static Future<Map<String, dynamic>> deleteBaseStation(
       String stationid) async {
     try {
@@ -3159,11 +3203,11 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // LINE PATH API
-  // ============================================
+  
+  
+  
 
-  /// Get line path
+  
   static Future<Map<String, dynamic>> getLinePath(String lineid) async {
     try {
       final token = await getToken();
@@ -3204,7 +3248,7 @@ class ApiService {
     }
   }
 
-  /// Create or update line path (admin)
+  
   static Future<Map<String, dynamic>> createOrUpdateLinePath({
     required String lineid,
     required List<Map<String, dynamic>> waypoints,
@@ -3260,7 +3304,7 @@ class ApiService {
     }
   }
 
-  /// Delete line path (admin)
+  
   static Future<Map<String, dynamic>> deleteLinePath(String lineid) async {
     try {
       final token = await getToken();

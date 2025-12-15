@@ -69,6 +69,16 @@ class Driver {
     if (error) throw error;
     return data;
   }
+
+  static async delete(driverid) {
+    const { error } = await supabase
+      .from('driver')
+      .delete()
+      .eq('driverid', driverid);
+    
+    if (error) throw error;
+    return true;
+  }
 }
 
 export default Driver;

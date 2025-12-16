@@ -27,24 +27,33 @@ class LocationService {
 
   /// Check and request location permissions
   Future<bool> checkLocationPermission() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return false;
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        print('Location services are disabled');
         return false;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          print('Location permission denied by user');
+          return false;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        print(
+            'Location permission denied forever - user must enable in settings');
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      print('Error checking location permission: $e');
       return false;
     }
-
-    return true;
   }
 
   /// Get current location once
@@ -94,6 +103,12 @@ class LocationService {
         },
         onError: (error) {
           print('Location stream error: $error');
+          // Try to restart tracking if there's a permission or service error
+          if (error.toString().contains('permission') ||
+              error.toString().contains('service')) {
+            _isTracking = false;
+            _saveTrackingState(false);
+          }
         },
       );
 
@@ -141,18 +156,34 @@ class LocationService {
     _positionController.close();
   }
 
-  /// Send location update to server
+  /// Send location update to server with retry logic
   Future<void> _sendLocationToServer(Position position) async {
-    try {
-      await ApiService.updateDriverLocation(
-        latitude: position.latitude,
-        longitude: position.longitude,
-        heading: position.heading,
-        speed: position.speed,
-        accuracy: position.accuracy,
-      );
-    } catch (e) {
-      print('Error sending location to server: $e');
+    int maxRetries = 3;
+    int retryCount = 0;
+    Duration retryDelay = const Duration(seconds: 2);
+
+    while (retryCount < maxRetries) {
+      try {
+        await ApiService.updateDriverLocation(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          heading: position.heading,
+          speed: position.speed,
+          accuracy: position.accuracy,
+        );
+        // Success - reset retry count for next failure
+        return;
+      } catch (e) {
+        retryCount++;
+        if (retryCount >= maxRetries) {
+          print(
+              'Error sending location to server after $maxRetries attempts: $e');
+          // Don't throw - we want tracking to continue even if server updates fail
+          return;
+        }
+        // Exponential backoff: wait longer between retries
+        await Future.delayed(retryDelay * retryCount);
+      }
     }
   }
 

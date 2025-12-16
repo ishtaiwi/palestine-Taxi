@@ -65,6 +65,21 @@ class Payment {
     if (error) throw error;
     return data;
   }
+
+  static async findByStripeIntentId(stripePaymentIntentId) {
+    const { data, error } = await supabase
+      .from('payment')
+      .select('*')
+      .eq('stripe_payment_intent_id', stripePaymentIntentId)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') {
+      
+      throw error;
+    }
+
+    return data || null;
+  }
 }
 
 export default Payment;

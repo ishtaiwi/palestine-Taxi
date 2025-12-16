@@ -11,28 +11,34 @@ class AdminSchedulesPage extends StatefulWidget {
 
 class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   List<Map<String, dynamic>> _schedules = [];
+  List<Map<String, dynamic>> _filteredSchedules = [];
   List<Map<String, dynamic>> _lines = [];
   bool _isLoading = true;
   bool _isArabic = true;
-  bool _showCreateForm = false;
+  
+  
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
-  // Form controllers
+  
   final _formKey = GlobalKey<FormState>();
   String? _selectedLineId;
   int _startHour = 7;
   int _endHour = 19;
   int _intervalMinutes = 60;
   bool _active = true;
+  String? _editingTemplateId;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
       'title': 'إدارة الجداول اليومية',
       'schedules': 'الجداول اليومية',
       'createSchedule': 'إنشاء جدول جديد',
+      'updateSchedule': 'تحديث الجدول',
       'line': 'الخط',
       'selectLine': 'اختر الخط',
-      'startHour': 'ساعة البداية',
-      'endHour': 'ساعة النهاية',
+      'startHour': 'ساعة البداية (0-23)',
+      'endHour': 'ساعة النهاية (0-23)',
       'interval': 'الفترة (بالدقائق)',
       'active': 'نشط',
       'inactive': 'غير نشط',
@@ -43,13 +49,15 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'createTrips': 'إنشاء رحلات',
       'createTripsForDate': 'إنشاء رحلات لتاريخ محدد',
       'createAllTrips': 'إنشاء رحلات لجميع الجداول',
-      'noSchedules': 'لا توجد جداول',
+      'noSchedules': 'لا توجد جداول متاحة',
+      'noSchedulesSub': 'قم بإضافة جدول جديد للبدء',
       'loading': 'جاري التحميل...',
-      'error': 'خطأ',
-      'success': 'نجح',
+      'error': 'حدث خطأ',
+      'success': 'تمت العملية بنجاح',
       'confirmDelete': 'هل أنت متأكد من حذف هذا الجدول؟',
-      'yes': 'نعم',
-      'no': 'لا',
+      'deleteWarning': 'لا يمكن التراجع عن هذا الإجراء',
+      'yes': 'نعم، حذف',
+      'no': 'إلغاء',
       'from': 'من',
       'to': 'إلى',
       'every': 'كل',
@@ -60,18 +68,21 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'scheduleUpdated': 'تم تحديث الجدول بنجاح',
       'scheduleDeleted': 'تم حذف الجدول بنجاح',
       'required': 'مطلوب',
-      'invalidHour': 'الساعة يجب أن تكون بين 0 و 23',
-      'invalidInterval': 'الفترة يجب أن تكون أكبر من 0',
+      'invalidHour': 'يجب أن تكون الساعة بين 0 و 23',
+      'invalidInterval': 'يجب أن تكون الفترة أكبر من 0',
       'endBeforeStart': 'ساعة النهاية يجب أن تكون بعد ساعة البداية',
+      'trips': 'الرحلات',
+      'search': 'بحث عن جدول...',
     },
     'en': {
-      'title': 'Daily Schedules Management',
+      'title': 'Daily Schedules',
       'schedules': 'Daily Schedules',
       'createSchedule': 'Create New Schedule',
+      'updateSchedule': 'Update Schedule',
       'line': 'Line',
       'selectLine': 'Select Line',
-      'startHour': 'Start Hour',
-      'endHour': 'End Hour',
+      'startHour': 'Start Hour (0-23)',
+      'endHour': 'End Hour (0-23)',
       'interval': 'Interval (minutes)',
       'active': 'Active',
       'inactive': 'Inactive',
@@ -81,27 +92,31 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'delete': 'Delete',
       'createTrips': 'Create Trips',
       'createTripsForDate': 'Create Trips for Date',
-      'createAllTrips': 'Create Trips for All Schedules',
+      'createAllTrips': 'Generate All Trips',
       'noSchedules': 'No schedules found',
+      'noSchedulesSub': 'Add a new schedule to get started',
       'loading': 'Loading...',
       'error': 'Error',
       'success': 'Success',
-      'confirmDelete': 'Are you sure you want to delete this schedule?',
-      'yes': 'Yes',
-      'no': 'No',
+      'confirmDelete': 'Delete this schedule?',
+      'deleteWarning': 'This action cannot be undone',
+      'yes': 'Delete',
+      'no': 'Cancel',
       'from': 'From',
       'to': 'To',
       'every': 'Every',
-      'minutes': 'minutes',
-      'hour': 'hour',
+      'minutes': 'min',
+      'hour': 'hr',
       'tripsCreated': 'Trips created successfully',
       'scheduleCreated': 'Schedule created successfully',
       'scheduleUpdated': 'Schedule updated successfully',
       'scheduleDeleted': 'Schedule deleted successfully',
       'required': 'Required',
       'invalidHour': 'Hour must be between 0 and 23',
-      'invalidInterval': 'Interval must be greater than 0',
-      'endBeforeStart': 'End hour must be after start hour',
+      'invalidInterval': 'Interval must be > 0',
+      'endBeforeStart': 'End time must be after start time',
+      'trips': 'Trips',
+      'search': 'Search schedules...',
     },
   };
 
@@ -113,6 +128,20 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     AppTheme.init();
     _loadData();
     _loadLanguagePreference();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.trim().toLowerCase();
+      _applyFilter();
+    });
   }
 
   Future<void> _loadLanguagePreference() async {
@@ -123,10 +152,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   }
 
   Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       final [schedules, lines] = await Future.wait([
         ApiService.fetchSchedules(),
@@ -136,104 +162,85 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       setState(() {
         _schedules = schedules;
         _lines = lines;
+        _applyFilter();
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${t('error')}: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showSnackBar('${t('error')}: ${e.toString()}', isError: true);
       }
     }
   }
 
-  Future<void> _handleCreateSchedule() async {
+  void _applyFilter() {
+    _filteredSchedules = _schedules.where((schedule) {
+      final line = schedule['line'] as Map<String, dynamic>?;
+      final lineNameAr = (line?['name_ar'] ?? '').toString().toLowerCase();
+      final lineNameEn = (line?['name_en'] ?? '').toString().toLowerCase();
+      final lineName = (line?['linename'] ?? '').toString().toLowerCase();
+
+      return _searchQuery.isEmpty ||
+          lineNameAr.contains(_searchQuery) ||
+          lineNameEn.contains(_searchQuery) ||
+          lineName.contains(_searchQuery);
+    }).toList();
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(10),
+      ),
+    );
+  }
+
+  Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedLineId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(t('selectLine')),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      _showSnackBar(t('selectLine'), isError: true);
       return;
     }
 
-    final result = await ApiService.createSchedule(
-      lineid: _selectedLineId!,
-      startHour: _startHour,
-      endHour: _endHour,
-      intervalMinutes: _intervalMinutes,
-      active: _active,
-    );
+    Navigator.pop(context); 
+    setState(() => _isLoading = true);
 
-    if (mounted) {
-      if (result['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t('scheduleCreated')),
-            backgroundColor: Colors.green,
-          ),
+    try {
+      final Map<String, dynamic> result;
+      if (_editingTemplateId != null) {
+        result = await ApiService.updateSchedule(
+          _editingTemplateId!,
+          startHour: _startHour,
+          endHour: _endHour,
+          intervalMinutes: _intervalMinutes,
+          active: _active,
         );
-        setState(() {
-          _showCreateForm = false;
-          _editingTemplateId = null;
-          _selectedLineId = null;
-          _startHour = 7;
-          _endHour = 19;
-          _intervalMinutes = 60;
-          _active = true;
-        });
-        _loadData();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? t('error')),
-            backgroundColor: Colors.red,
-          ),
+        result = await ApiService.createSchedule(
+          lineid: _selectedLineId!,
+          startHour: _startHour,
+          endHour: _endHour,
+          intervalMinutes: _intervalMinutes,
+          active: _active,
         );
       }
-    }
-  }
 
-  Future<void> _handleUpdateSchedule(String templateid) async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final result = await ApiService.updateSchedule(
-      templateid,
-      startHour: _startHour,
-      endHour: _endHour,
-      intervalMinutes: _intervalMinutes,
-      active: _active,
-    );
-
-    if (mounted) {
       if (result['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t('scheduleUpdated')),
-            backgroundColor: Colors.green,
-          ),
-        );
-        setState(() {
-          _showCreateForm = false;
-          _editingTemplateId = null;
-        });
+        _showSnackBar(_editingTemplateId != null 
+            ? t('scheduleUpdated') 
+            : t('scheduleCreated'));
         _loadData();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? t('error')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showSnackBar(result['message'] ?? t('error'), isError: true);
+        setState(() => _isLoading = false);
       }
+    } catch (e) {
+      _showSnackBar('${t('error')}: $e', isError: true);
+      setState(() => _isLoading = false);
     }
   }
 
@@ -241,20 +248,23 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.appBarColor,
-        title: Text(
-          t('confirmDelete'),
-          style: TextStyle(color: AppTheme.textPrimary),
-        ),
+        backgroundColor: AppTheme.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(t('confirmDelete'), style: TextStyle(color: AppTheme.textPrimary)),
+        content: Text(t('deleteWarning'), style: TextStyle(color: AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child:
-                Text(t('no'), style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text(t('no'), style: TextStyle(color: AppTheme.textSecondary)),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(t('yes'), style: const TextStyle(color: Colors.red)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text(t('yes')),
           ),
         ],
       ),
@@ -262,86 +272,262 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
 
     if (confirmed != true) return;
 
-    final result = await ApiService.deleteSchedule(templateid);
-
-    if (mounted) {
+    setState(() => _isLoading = true);
+    try {
+      final result = await ApiService.deleteSchedule(templateid);
       if (result['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t('scheduleDeleted')),
-            backgroundColor: Colors.green,
-          ),
-        );
+        _showSnackBar(t('scheduleDeleted'));
         _loadData();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? t('error')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showSnackBar(result['message'] ?? t('error'), isError: true);
+        setState(() => _isLoading = false);
       }
+    } catch (e) {
+      _showSnackBar('${t('error')}: $e', isError: true);
+      setState(() => _isLoading = false);
     }
   }
 
   Future<void> _handleCreateTrips(String templateid) async {
-    final result = await ApiService.createTripsForSchedule(templateid);
-
-    if (mounted) {
+    setState(() => _isLoading = true);
+    try {
+      final result = await ApiService.createTripsForSchedule(templateid);
       if (result['success'] == true) {
         final created = result['result']?['created'] ?? 0;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${t('tripsCreated')}: $created'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        _showSnackBar('${t('tripsCreated')}: $created');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? t('error')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showSnackBar(result['message'] ?? t('error'), isError: true);
       }
+    } catch (e) {
+      _showSnackBar('${t('error')}: $e', isError: true);
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   Future<void> _handleCreateAllTrips() async {
-    final result = await ApiService.triggerDailyTripCreation();
-
-    if (mounted) {
+    setState(() => _isLoading = true);
+    try {
+      final result = await ApiService.triggerDailyTripCreation();
       if (result['success'] == true) {
         final totalCreated = result['result']?['totalTripsCreated'] ?? 0;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${t('tripsCreated')}: $totalCreated'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        _showSnackBar('${t('tripsCreated')}: $totalCreated');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? t('error')),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showSnackBar(result['message'] ?? t('error'), isError: true);
       }
+    } catch (e) {
+      _showSnackBar('${t('error')}: $e', isError: true);
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
-  String? _editingTemplateId;
+  void _openScheduleForm({Map<String, dynamic>? schedule}) {
+    if (schedule != null) {
+      setState(() {
+        _editingTemplateId = schedule['templateid'] as String;
+        _selectedLineId = schedule['lineid'];
+        _startHour = schedule['start_hour'] ?? 7;
+        _endHour = schedule['end_hour'] ?? 19;
+        _intervalMinutes = schedule['interval_minutes'] ?? 60;
+        _active = schedule['active'] ?? true;
+      });
+    } else {
+      setState(() {
+        _editingTemplateId = null;
+        _selectedLineId = null;
+        _startHour = 7;
+        _endHour = 19;
+        _intervalMinutes = 60;
+        _active = true;
+      });
+    }
 
-  void _openEditForm(Map<String, dynamic> schedule) {
-    setState(() {
-      _showCreateForm = true;
-      _editingTemplateId = schedule['templateid'] as String;
-      _selectedLineId = schedule['lineid'];
-      _startHour = schedule['start_hour'] ?? 7;
-      _endHour = schedule['end_hour'] ?? 19;
-      _intervalMinutes = schedule['interval_minutes'] ?? 60;
-      _active = schedule['active'] ?? true;
-    });
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 16,
+          right: 16,
+          top: 24,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _editingTemplateId != null ? t('updateSchedule') : t('createSchedule'),
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.close, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
+              const Divider(),
+              const SizedBox(height: 16),
+              Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    _buildDropdown(
+                      label: t('line'),
+                      value: _selectedLineId,
+                      items: _lines.map((line) {
+                        final name = _isArabic
+                            ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? 'Unknown')
+                            : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? 'Unknown');
+                        return DropdownMenuItem<String>(
+                          value: line['lineid'],
+                          child: Text(name.toString()),
+                        );
+                      }).toList(),
+                      onChanged: (val) => setState(() => _selectedLineId = val),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildNumberInput(
+                            label: t('startHour'),
+                            value: _startHour,
+                            onChanged: (val) => _startHour = val,
+                            max: 23,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildNumberInput(
+                            label: t('endHour'),
+                            value: _endHour,
+                            onChanged: (val) => _endHour = val,
+                            validator: (val) {
+                              if (val != null && val < _startHour) return t('endBeforeStart');
+                              return null;
+                            },
+                            max: 23,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _buildNumberInput(
+                      label: t('interval'),
+                      value: _intervalMinutes,
+                      onChanged: (val) => _intervalMinutes = val,
+                      min: 1,
+                    ),
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(t('active'), style: TextStyle(color: AppTheme.textPrimary)),
+                      value: _active,
+                      activeColor: Colors.blue.shade600,
+                      onChanged: (val) => setState(() => _active = val),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _handleSave,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.appBarColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 2,
+                        ),
+                        child: Text(
+                          t('save'),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNumberInput({
+    required String label,
+    required int value,
+    required Function(int) onChanged,
+    int min = 0,
+    int max = 9999,
+    String? Function(int?)? validator,
+  }) {
+    return TextFormField(
+      initialValue: value.toString(),
+      keyboardType: TextInputType.number,
+      style: TextStyle(color: AppTheme.textPrimary),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: AppTheme.textSecondary),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppTheme.borderColor),
+        ),
+        filled: true,
+        fillColor: AppTheme.backgroundColor,
+      ),
+      onChanged: (val) => onChanged(int.tryParse(val) ?? value),
+      validator: (val) {
+        final num = int.tryParse(val ?? '');
+        if (num == null) return t('required');
+        if (num < min || num > max) return t('invalidHour');
+        if (validator != null) return validator(num);
+        return null;
+      },
+    );
+  }
+
+  Widget _buildDropdown({
+    required String label,
+    required String? value,
+    required List<DropdownMenuItem<String>> items,
+    required Function(String?) onChanged,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      items: items,
+      onChanged: onChanged,
+      dropdownColor: AppTheme.cardBackground,
+      style: TextStyle(color: AppTheme.textPrimary),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: AppTheme.textSecondary),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppTheme.borderColor),
+        ),
+        filled: true,
+        fillColor: AppTheme.backgroundColor,
+      ),
+      validator: (val) => val == null ? t('required') : null,
+    );
   }
 
   @override
@@ -352,335 +538,155 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        appBar: AppBar(
-          title: Text(
-            t('title'),
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+        appBar: _buildAppBar(),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => _openScheduleForm(),
           backgroundColor: AppTheme.appBarColor,
-          elevation: 2,
-          iconTheme: IconThemeData(
-            color: AppTheme.textPrimary,
-          ),
-          actionsIconTheme: IconThemeData(
-            color: AppTheme.textPrimary,
-          ),
-          leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back,
-              color: AppTheme.textPrimary,
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-          actions: [
-            IconButton(
-              icon: Icon(
-                _isArabic ? Icons.language : Icons.translate,
-                color: AppTheme.textPrimary,
-              ),
-              onPressed: () {
-                setState(() {
-                  _isArabic = !_isArabic;
-                  ApiService.saveLanguagePreference(_isArabic);
-                });
-              },
-            ),
-            if (_schedules.isNotEmpty)
-              PopupMenuButton(
-                icon: Icon(
-                  Icons.more_vert,
-                  color: AppTheme.textPrimary,
-                ),
-                color: AppTheme.appBarColor,
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    child: Text(
-                      t('createAllTrips'),
-                      style: TextStyle(color: AppTheme.textPrimary),
-                    ),
-                    onTap: () => _handleCreateAllTrips(),
-                  ),
-                ],
-              ),
-            IconButton(
-              icon: Icon(
-                _showCreateForm ? Icons.close : Icons.add,
-                color: AppTheme.textPrimary,
-              ),
-              onPressed: () {
-                setState(() {
-                  _showCreateForm = !_showCreateForm;
-                  _editingTemplateId = null;
-                  if (!_showCreateForm) {
-                    _selectedLineId = null;
-                    _startHour = 7;
-                    _endHour = 19;
-                    _intervalMinutes = 60;
-                    _active = true;
-                  }
-                });
-              },
-            ),
-          ],
+          foregroundColor: Colors.white,
+          icon: const Icon(Icons.add),
+          label: Text(t('createSchedule')),
         ),
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  if (_showCreateForm) _buildCreateForm(),
-                  Expanded(
-                    child: _schedules.isEmpty
-                        ? Center(
-                            child: Text(
-                              t('noSchedules'),
-                              style: TextStyle(color: AppTheme.textSecondary),
+            ? Center(child: CircularProgressIndicator(color: AppTheme.appBarColor))
+            : RefreshIndicator(
+                onRefresh: _loadData,
+                color: AppTheme.appBarColor,
+                child: Column(
+                  children: [
+                    _buildSearchBar(),
+                    Expanded(
+                      child: _filteredSchedules.isEmpty
+                          ? _buildEmptyState()
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                              itemCount: _filteredSchedules.length,
+                              itemBuilder: (context, index) => _buildScheduleCard(_filteredSchedules[index]),
                             ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _schedules.length,
-                            itemBuilder: (context, index) {
-                              final schedule = _schedules[index];
-                              return _buildScheduleCard(schedule);
-                            },
-                          ),
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
       ),
     );
   }
 
-  Widget _buildCreateForm() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.getCardBackground(0.05),
-        border: Border(
-          bottom: BorderSide(color: AppTheme.getCardBorder(0.24)),
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: AppTheme.appBarColor,
+      elevation: 0,
+      centerTitle: true,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: Text(
+        t('title'),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
         ),
       ),
-      child: Form(
-        key: _formKey,
+      actions: [
+        IconButton(
+          icon: Icon(
+            _isArabic ? Icons.language : Icons.translate,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            setState(() {
+              _isArabic = !_isArabic;
+              ApiService.saveLanguagePreference(_isArabic);
+            });
+          },
+        ),
+        PopupMenuButton(
+          icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+          color: AppTheme.cardBackground,
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'createAll',
+              child: Row(
+                children: [
+                  Icon(Icons.calendar_today_rounded, color: AppTheme.textPrimary, size: 20),
+                  const SizedBox(width: 12),
+                  Text(t('createAllTrips'), style: TextStyle(color: AppTheme.textPrimary)),
+                ],
+              ),
+            ),
+          ],
+          onSelected: (value) {
+            if (value == 'createAll') _handleCreateAllTrips();
+          },
+        ),
+        const SizedBox(width: 8),
+      ],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        style: TextStyle(color: AppTheme.textPrimary),
+        decoration: InputDecoration(
+          hintText: t('search'),
+          hintStyle: TextStyle(color: AppTheme.textSecondary),
+          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textSecondary),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                  onPressed: () {
+                    _searchController.clear();
+                    FocusScope.of(context).unfocus();
+                  },
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        alignment: Alignment.center,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            DropdownButtonFormField<String>(
-              value: _selectedLineId,
-              decoration: InputDecoration(
-                labelText: t('line'),
-                labelStyle: TextStyle(color: AppTheme.textSecondary),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppTheme.getCardBorder(0.54)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppTheme.textPrimary),
-                ),
-                filled: true,
-                fillColor: AppTheme.getCardBackground(0.1),
+            Icon(Icons.schedule_outlined, size: 80, color: AppTheme.textSecondary.withOpacity(0.5)),
+            const SizedBox(height: 16),
+            Text(
+              t('noSchedules'),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
               ),
-              dropdownColor: AppTheme.getCardBackground(0.1),
-              style: TextStyle(color: AppTheme.textPrimary),
-              iconEnabledColor: AppTheme.textPrimary,
-              items: _lines.map((line) {
-                return DropdownMenuItem<String>(
-                  value: line['lineid'],
-                  child: Text(
-                    _isArabic
-                        ? (line['name_ar']?.toString() ??
-                            line['linename']?.toString() ??
-                            line['name_en']?.toString() ??
-                            'Unknown')
-                        : (line['name_en']?.toString() ??
-                            line['linename']?.toString() ??
-                            line['name_ar']?.toString() ??
-                            'Unknown'),
-                    style: TextStyle(color: AppTheme.textPrimary),
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedLineId = value;
-                });
-              },
-              validator: (value) {
-                if (value == null) return t('required');
-                return null;
-              },
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    initialValue: _startHour.toString(),
-                    decoration: InputDecoration(
-                      labelText: t('startHour'),
-                      labelStyle: TextStyle(color: AppTheme.textSecondary),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            BorderSide(color: AppTheme.getCardBorder(0.54)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: AppTheme.textPrimary),
-                      ),
-                      filled: true,
-                      fillColor: AppTheme.getCardBackground(0.1),
-                    ),
-                    style: TextStyle(color: AppTheme.textPrimary),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      _startHour = int.tryParse(value) ?? 7;
-                    },
-                    validator: (value) {
-                      final hour = int.tryParse(value ?? '');
-                      if (hour == null || hour < 0 || hour > 23) {
-                        return t('invalidHour');
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    initialValue: _endHour.toString(),
-                    decoration: InputDecoration(
-                      labelText: t('endHour'),
-                      labelStyle: TextStyle(color: AppTheme.textSecondary),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            BorderSide(color: AppTheme.getCardBorder(0.54)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: AppTheme.textPrimary),
-                      ),
-                      filled: true,
-                      fillColor: AppTheme.getCardBackground(0.1),
-                    ),
-                    style: TextStyle(color: AppTheme.textPrimary),
-                    keyboardType: TextInputType.number,
-                    onChanged: (value) {
-                      _endHour = int.tryParse(value) ?? 19;
-                    },
-                    validator: (value) {
-                      final hour = int.tryParse(value ?? '');
-                      if (hour == null || hour < 0 || hour > 23) {
-                        return t('invalidHour');
-                      }
-                      if (hour < _startHour) {
-                        return t('endBeforeStart');
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              initialValue: _intervalMinutes.toString(),
-              decoration: InputDecoration(
-                labelText: t('interval'),
-                labelStyle: const TextStyle(color: Colors.white70),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.white54),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Colors.white),
-                ),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
-              ),
-              style: const TextStyle(color: Colors.white),
-              keyboardType: TextInputType.number,
-              onChanged: (value) {
-                _intervalMinutes = int.tryParse(value) ?? 60;
-              },
-              validator: (value) {
-                final interval = int.tryParse(value ?? '');
-                if (interval == null || interval <= 0) {
-                  return t('invalidInterval');
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: Text(
-                _active ? t('active') : t('inactive'),
-                style: TextStyle(color: AppTheme.textPrimary),
-              ),
-              value: _active,
-              onChanged: (value) {
-                setState(() {
-                  _active = value;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      setState(() {
-                        _showCreateForm = false;
-                        _editingTemplateId = null;
-                        _selectedLineId = null;
-                        _startHour = 7;
-                        _endHour = 19;
-                        _intervalMinutes = 60;
-                        _active = true;
-                      });
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.textPrimary,
-                      side: BorderSide(color: AppTheme.getCardBorder(0.7)),
-                    ),
-                    child: Text(t('cancel'),
-                        style: TextStyle(color: AppTheme.textPrimary)),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _editingTemplateId != null
-                        ? () => _handleUpdateSchedule(_editingTemplateId!)
-                        : _handleCreateSchedule,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Text(t('save'),
-                        style: TextStyle(color: AppTheme.textPrimary)),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 8),
+            Text(
+              t('noSchedulesSub'),
+              style: TextStyle(color: AppTheme.textSecondary),
             ),
           ],
         ),
@@ -691,100 +697,133 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   Widget _buildScheduleCard(Map<String, dynamic> schedule) {
     final line = schedule['line'] as Map<String, dynamic>?;
     final lineName = _isArabic
-        ? (line?['name_ar']?.toString() ??
-            line?['linename']?.toString() ??
-            line?['name_en']?.toString() ??
-            'Unknown')
-        : (line?['name_en']?.toString() ??
-            line?['linename']?.toString() ??
-            line?['name_ar']?.toString() ??
-            'Unknown');
+        ? (line?['name_ar'] ?? line?['linename'] ?? line?['name_en'] ?? 'Unknown')
+        : (line?['name_en'] ?? line?['linename'] ?? line?['name_ar'] ?? 'Unknown');
     final startHour = schedule['start_hour'] ?? 0;
     final endHour = schedule['end_hour'] ?? 23;
     final interval = schedule['interval_minutes'] ?? 60;
     final active = schedule['active'] ?? true;
     final templateid = schedule['templateid'] as String;
 
-    return Card(
-      color: AppTheme.getCardBackground(0.05),
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    lineName,
-                    style: TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: AppTheme.borderColor.withOpacity(0.5))),
+                  color: active ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.05),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.directions_bus_rounded,
+                      color: active ? Colors.green.shade700 : Colors.red.shade700,
+                      size: 20,
                     ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: active ? Colors.green : Colors.red,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    active ? t('active') : t('inactive'),
-                    style: TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: 12,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        lineName.toString(),
+                        style: TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '${t('from')} $startHour:00 ${t('to')} $endHour:00',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${t('every')} $interval ${interval == 60 ? t('hour') : t('minutes')}',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _handleCreateTrips(templateid),
-                    icon: Icon(Icons.add_circle_outline,
-                        color: AppTheme.textPrimary),
-                    label: Text(t('createTrips'),
-                        style: TextStyle(color: AppTheme.textPrimary)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.textPrimary,
-                      side: BorderSide(color: AppTheme.getCardBorder(0.7)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: active ? Colors.green.shade600 : Colors.red.shade400,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        active ? t('active') : t('inactive'),
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  color: Colors.blue,
-                  onPressed: () => _openEditForm(schedule),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        _buildInfoItem(Icons.start_rounded, t('startHour'), '$startHour:00'),
+                        _buildInfoItem(Icons.last_page_rounded, t('endHour'), '$endHour:00'),
+                        _buildInfoItem(Icons.timer_rounded, t('interval'), '$interval ${t('minutes')}'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Divider(color: AppTheme.borderColor.withOpacity(0.5)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => _handleCreateTrips(templateid),
+                          icon: Icon(Icons.add_task_rounded, color: AppTheme.appBarColor, size: 20),
+                          label: Text(t('createTrips'), style: TextStyle(color: AppTheme.appBarColor)),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: Icon(Icons.edit_rounded, color: Colors.blue.shade600),
+                          onPressed: () => _openScheduleForm(schedule: schedule),
+                          tooltip: t('edit'),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade600),
+                          onPressed: () => _handleDeleteSchedule(templateid),
+                          tooltip: t('delete'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete),
-                  color: Colors.red,
-                  onPressed: () => _handleDeleteSchedule(templateid),
-                ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(IconData icon, String label, String value) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 20, color: AppTheme.textSecondary),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 10),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }

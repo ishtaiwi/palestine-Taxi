@@ -102,21 +102,23 @@ class DriverQueue {
     return data;
   }
 
-  /**
-   * Remove driver from queue when their trip departs
-   * This moves the driver out of the queue so other drivers move forward
-   * @param {string} driverid - The driver ID
-   * @returns {Promise<object|null>} - The removed queue entry
-   */
+  
   static async removeDriverFromQueue(driverid) {
     return await this.leaveActiveByDriver(driverid);
   }
 
-  /**
-   * Get queue position for a driver
-   * @param {string} driverid - The driver ID
-   * @returns {Promise<number|null>} - Queue position (1-based) or null if not in queue
-   */
+  
+  static async deleteByDriverId(driverid) {
+    const { error } = await supabase
+      .from('driver_queue')
+      .delete()
+      .eq('driverid', driverid);
+    
+    if (error) throw error;
+    return true;
+  }
+
+  
   static async getQueuePosition(driverid) {
     const queueEntry = await this.findActiveByDriver(driverid);
     if (!queueEntry) {

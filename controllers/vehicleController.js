@@ -238,6 +238,33 @@ export const assignVehicleToLine = async (req, res, next) => {
   }
 };
 
+export const deleteVehicle = async (req, res, next) => {
+  try {
+    const { vehicleid } = req.params;
+    
+    
+    const vehicle = await Vehicle.findById(vehicleid);
+    if (!vehicle) {
+      return res.status(404).json({
+        message: req.t('vehicle.not_found') || 'Vehicle not found',
+      });
+    }
+
+    
+    
+    
+
+    await Vehicle.delete(vehicleid);
+
+    res.json({
+      message: req.t('vehicle.deleted') || 'Vehicle deleted successfully',
+      vehicleid,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const ensureDriverOwnsVehicle = async (vehicleid, driverid, t) => {
   const vehicle = await Vehicle.findById(vehicleid);
   if (!vehicle) {

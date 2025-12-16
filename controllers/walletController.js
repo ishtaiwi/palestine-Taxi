@@ -2,6 +2,7 @@ import Wallet from '../models/Wallet.js';
 import Payment from '../models/Payment.js';
 import { v4 as uuidv4 } from 'uuid';
 import { PAYMENT_STATUS, PAYMENT_METHOD } from '../utils/constants.js';
+import { createPaymentIntent, getPaymentIntent } from '../services/stripeService.js';
 
 
 export const getUserWallets = async (req, res, next) => {
@@ -170,6 +171,101 @@ export const addBalanceToMyWallet = async (req, res, next) => {
     res.json({
       message: req.t('wallet.balance_added') || 'Balance added successfully',
       wallet,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+export const createStripeTopUp = async (req, res, next) => {
+  try {
+    const userid = req.user.userid;
+    const { amount, currency = 'ils' } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        message: req.t('wallet.invalid_amount') || 'Invalid amount',
+      });
+    }
+
+    
+    if (amount < 10) {
+      return res.status(400).json({
+        message:
+          req.t('wallet.minimum_amount') || 'Minimum top-up amount is 10 ILS',
+      });
+    }
+
+    
+    const wallets = await Wallet.findByUserId(userid, 'main');
+    let wallet;
+
+    if (!wallets || wallets.length === 0) {
+      wallet = await Wallet.create({
+        walletid: uuidv4(),
+        userid,
+        type: 'main',
+        balance: 0,
+      });
+    } else {
+      wallet = wallets[0];
+    }
+
+    
+    const paymentIntent = await createPaymentIntent(
+      amount,
+      currency,
+      userid,
+      wallet.walletid,
+    );
+
+    
+    const payment = await Payment.create({
+      paymentid: uuidv4(),
+      fromwalletid: null,
+      towalletid: wallet.walletid,
+      amount,
+      method: PAYMENT_METHOD.CARD,
+      type: 'wallet_topup',
+      status: PAYMENT_STATUS.PENDING,
+      stripe_payment_intent_id: paymentIntent.id,
+      external_reference: paymentIntent.id,
+    });
+
+    res.json({
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      paymentId: payment.paymentid,
+      amount,
+      currency,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+export const checkTopUpStatus = async (req, res, next) => {
+  try {
+    const { paymentIntentId } = req.params;
+
+    if (!paymentIntentId) {
+      return res.status(400).json({
+        message: req.t('wallet.invalid_amount') || 'paymentIntentId is required',
+      });
+    }
+
+    const paymentIntent = await getPaymentIntent(paymentIntentId);
+    const paymentRecord = await Payment.findByStripeIntentId(paymentIntentId);
+
+    res.json({
+      success: true,
+      status: paymentIntent.status,
+      payment: paymentRecord,
     });
   } catch (error) {
     next(error);

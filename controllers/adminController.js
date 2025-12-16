@@ -7,6 +7,7 @@ import Reservation from '../models/Reservation.js';
 import Line from '../models/Line.js';
 import Vehicle from '../models/Vehicle.js';
 import Payment from '../models/Payment.js';
+import DriverQueue from '../models/DriverQueue.js';
 import { TRIP_STATUS, RESERVATION_STATUS, VEHICLE_STATUS, USER_ROLES, PAYMENT_STATUS } from '../utils/constants.js';
 import {
   trainModelBulk as trainRushHourModel,
@@ -100,6 +101,36 @@ export const updateUser = async (req, res, next) => {
 export const deleteUser = async (req, res, next) => {
   try {
     const { userid } = req.params;
+
+    
+    const user = await User.findById(userid);
+    if (!user) {
+      return res.status(404).json({
+        message: req.t('user.not_found') || 'User not found'
+      });
+    }
+
+    
+    const driver = await Driver.findByUserId(userid);
+    if (driver) {
+      
+      await DriverQueue.deleteByDriverId(driver.driverid);
+
+      
+      
+      
+      const vehicles = await Vehicle.findByDriverId(driver.driverid);
+      if (vehicles && vehicles.length > 0) {
+        for (const vehicle of vehicles) {
+           await Vehicle.delete(vehicle.vehicleid);
+        }
+      }
+      
+      
+      await Driver.delete(driver.driverid);
+    }
+
+    
     await User.delete(userid);
     
     res.json({

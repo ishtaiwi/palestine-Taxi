@@ -247,6 +247,13 @@ class _DriverHomePageState extends State<DriverHomePage>
     );
   }
 
+  Future<void> _switchLanguage(bool arabic) async {
+    await ApiService.saveLanguagePreference(arabic);
+    setState(() {
+      _isArabic = arabic;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
@@ -311,6 +318,57 @@ class _DriverHomePageState extends State<DriverHomePage>
               iconTheme: const IconThemeData(color: Colors.white),
               actionsIconTheme: const IconThemeData(color: Colors.white),
               actions: [
+                // Tracking status indicator
+                GestureDetector(
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DriverLocationTrackingPage(),
+                      ),
+                    );
+                    // Refresh tracking status when returning from tracking page
+                    if (mounted) {
+                      setState(() {
+                        _isTracking = _locationService.isTracking;
+                      });
+                    }
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.all(8),
+                    child: Stack(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: _isTracking ? Colors.green : Colors.red,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(
+                    _isArabic ? Icons.language : Icons.translate,
+                    color: Colors.white,
+                  ),
+                  onPressed: () => _switchLanguage(!_isArabic),
+                  tooltip: _isArabic ? 'English' : 'العربية',
+                ),
                 Container(
                   margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
@@ -326,69 +384,6 @@ class _DriverHomePageState extends State<DriverHomePage>
               ],
             ),
           ),
-          backgroundColor: const Color(0xFF1E3A5F), // خلفية فاتحة أكثر
-          foregroundColor: Colors.white,
-          elevation: 2,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actionsIconTheme: const IconThemeData(color: Colors.white),
-          actions: [
-            // Tracking status indicator
-            GestureDetector(
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const DriverLocationTrackingPage(),
-                  ),
-                );
-                // Refresh tracking status when returning from tracking page
-                if (mounted) {
-                  setState(() {
-                    _isTracking = _locationService.isTracking;
-                  });
-                }
-              },
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.all(8),
-                child: Stack(
-                  children: [
-                    Icon(
-                      Icons.location_on,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: _isTracking ? Colors.green : Colors.red,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            IconButton(
-              icon: Icon(
-                _isArabic ? Icons.language : Icons.translate,
-                color: Colors.white,
-              ),
-              onPressed: () => _switchLanguage(!_isArabic),
-              tooltip: _isArabic ? 'English' : 'العربية',
-            ),
-            IconButton(
-              icon: const Icon(Icons.logout, color: Colors.white),
-              onPressed: _handleLogout,
-              tooltip: t('logout'),
-            ),
-          ],
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())

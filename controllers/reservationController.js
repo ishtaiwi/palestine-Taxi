@@ -140,6 +140,7 @@ export const createReservation = async (req, res, next) => {
     }
 
     // Check if trip has already departed
+    //TODO: check if this is correct
     const tripDeptime = new Date(trip.deptime);
     const now = new Date();
 
@@ -155,7 +156,11 @@ export const createReservation = async (req, res, next) => {
       const tripOpeningTime = trip.trip_opening_time ? new Date(trip.trip_opening_time) : null;
       const defaultOpeningTime = new Date(tripDeptime.getTime() - 45 * 60 * 1000); // 45 minutes before departure
       const effectiveOpeningTime = tripOpeningTime || defaultOpeningTime;
-
+      console.log("************************************************************");
+      console.log("effectiveOpeningTime: ", effectiveOpeningTime);
+      console.log("now: ", now);
+      console.log("effectiveOpeningTime > now: ${effectiveOpeningTime > now}");
+      console.log("************************************************************");
       if (effectiveOpeningTime > now) {
         return res.status(400).json({
           message: req.t('reservation.trip_not_open') || 'Trip is not yet open for instant bookings'

@@ -67,24 +67,22 @@ export async function applyRecommendation(recommendation) {
             throw new Error('insert_buffer_trip requires deptime in payload');
         }
 
-        // Get vehicle for the line
-        const vehicles = await Vehicle.findAll({ lineid, status: 'active' });
-        if (!vehicles || vehicles.length === 0) {
-            throw new Error(`No active vehicle found for line ${lineid}`);
-        }
-        const vehicle = vehicles[0];
-
         // Calculate trip opening time (45 minutes before departure)
         const deptime = new Date(actionPayload.deptime);
         const openingTime = new Date(deptime.getTime() - 45 * 60 * 1000);
 
+        // Get default vehicle for seat count calculation (optional)
+        // Vehicle will be assigned from driver queue at trip opening time
+        const vehicles = await Vehicle.findAll({ lineid, status: 'active' });
+        const defaultSeats = vehicles && vehicles.length > 0 ? vehicles[0].seatnum : 5;
+
         const tripData = {
             tripid: uuidv4(),
             lineid,
-            vehicleid: vehicle.vehicleid,
+            vehicleid: null, // Will be assigned from driver queue at opening time
             deptime: deptime.toISOString(),
             status: 'scheduled',
-            availableseats: calculateAvailablePassengerSeats(vehicle.seatnum, 0, 0),
+            availableseats: calculateAvailablePassengerSeats(defaultSeats, 0, 0),
             totalbookings: 0,
             trip_opening_time: openingTime.toISOString(),
             auto_departure_enabled: true,

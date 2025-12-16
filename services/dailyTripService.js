@@ -89,7 +89,8 @@ async function createTripsForDate(template, targetDate) {
       return { created: 0, errors: ['Line not found'] };
     }
 
-    // Get vehicle for this line (or use null if none available)
+    // Note: Vehicle will be assigned from driver queue at trip opening time
+    // We still check for a vehicle to get default seat count, but don't require it
     const vehicle = await getVehicleForLine(lineid);
 
     const createdTrips = [];
@@ -125,31 +126,22 @@ async function createTripsForDate(template, targetDate) {
           continue;
         }
 
-        // Use vehicle if available, otherwise skip this trip (vehicle is required)
-        if (!vehicle) {
-          logger.warn('No vehicle available for line, skipping trip creation', {
-            lineid,
-            deptime: deptime.toISOString(),
-          });
-          errors.push({
-            deptime: deptime.toISOString(),
-            error: 'No vehicle available for this line',
-          });
-          continue;
-        }
-
         // Calculate trip_opening_time (45 minutes before departure)
         const openingTime = new Date(deptime.getTime() - 45 * 60 * 1000);
 
-        // Calculate available passenger seats (excluding driver seat only)
-        // Note: broken seats are NOT subtracted - they are handled in seat selection UI
+        // Calculate available passenger seats based on default vehicle size if available
+        // If no vehicle found, use default seats (will be updated when vehicle is assigned)
+        const defaultSeats = vehicle ? vehicle.seatnum : 5; // Default to 4+1 if no vehicle
+        const defaultAvailableSeats = calculateAvailablePassengerSeats(defaultSeats, 0, 0);
+
+        // Create trip with vehicleid = null (will be assigned from driver queue at opening time)
         const tripData = {
           tripid: uuidv4(),
           lineid,
-          vehicleid: vehicle.vehicleid, // Vehicle is required
+          vehicleid: null, // Vehicle will be assigned from driver queue at trip opening
           deptime: deptime.toISOString(),
           status: 'scheduled',
-          availableseats: calculateAvailablePassengerSeats(vehicle.seatnum, 0, 0),
+          availableseats: defaultAvailableSeats,
           totalbookings: 0,
           trip_opening_time: openingTime.toISOString(),
           auto_departure_enabled: true,
@@ -165,7 +157,7 @@ async function createTripsForDate(template, targetDate) {
           tripid: trip.tripid,
           lineid,
           deptime: deptime.toISOString(),
-          vehicleid: vehicle ? vehicle.vehicleid : 'none',
+          vehicleid: null, // Will be assigned from driver queue at opening time
         });
       } catch (error) {
         logger.error('Error creating trip', {

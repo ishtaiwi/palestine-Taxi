@@ -49,14 +49,14 @@ class AppTheme {
 
   static Color getCardBorder([double opacity = 0.15]) {
     return _isDarkMode
-        ? Colors.white.withOpacity(opacity)
-        : Colors.black.withOpacity(opacity * 0.4);
+        ? Colors.white.withValues(alpha: opacity)
+        : Colors.black.withValues(alpha: opacity * 0.4);
   }
 
   static Color getShadowColor([double opacity = 0.3]) {
     return _isDarkMode
-        ? Colors.black.withOpacity(opacity)
-        : Colors.black.withOpacity(opacity * 0.1);
+        ? Colors.black.withValues(alpha: opacity)
+        : Colors.black.withValues(alpha: opacity * 0.1);
   }
 
   /// Lighten a color by adjusting its HSL lightness value

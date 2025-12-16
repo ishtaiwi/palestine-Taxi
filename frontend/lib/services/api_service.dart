@@ -2293,8 +2293,10 @@ class ApiService {
       if (endDate != null) queryParams['endDate'] = endDate;
       if (groupBy != null) queryParams['groupBy'] = groupBy;
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/revenue-timeseries')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri =
+          Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/revenue-timeseries')
+              .replace(
+                  queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       final response = await http.get(
         uri,
@@ -2332,8 +2334,10 @@ class ApiService {
       if (endDate != null) queryParams['endDate'] = endDate;
       if (groupBy != null) queryParams['groupBy'] = groupBy;
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/booking-timeseries')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri =
+          Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/booking-timeseries')
+              .replace(
+                  queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       final response = await http.get(
         uri,
@@ -2369,8 +2373,10 @@ class ApiService {
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/trip-statistics')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri =
+          Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/trip-statistics')
+              .replace(
+                  queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       final response = await http.get(
         uri,
@@ -2409,7 +2415,8 @@ class ApiService {
       if (groupBy != null) queryParams['groupBy'] = groupBy;
 
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/user-growth')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+          .replace(
+              queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       final response = await http.get(
         uri,
@@ -2445,8 +2452,10 @@ class ApiService {
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/vehicle-utilization')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri =
+          Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/vehicle-utilization')
+              .replace(
+                  queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       final response = await http.get(
         uri,
@@ -2482,8 +2491,10 @@ class ApiService {
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
 
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/line-performance')
-          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri =
+          Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/line-performance')
+              .replace(
+                  queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       final response = await http.get(
         uri,
@@ -3525,6 +3536,44 @@ class ApiService {
         'message': decoded is Map && decoded['message'] is String
             ? decoded['message']
             : 'Failed to delete line path',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Get Supabase configuration from server
+  static Future<Map<String, dynamic>> getSupabaseConfig() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/config/supabase'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        if (decoded['success'] == true) {
+          return {
+            'success': true,
+            'url': decoded['url'],
+            'anonKey': decoded['anonKey'],
+          };
+        }
+        return {
+          'success': false,
+          'message': decoded['message'] ?? 'Failed to get Supabase config',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': 'Failed to get Supabase config',
       };
     } catch (exception) {
       return {

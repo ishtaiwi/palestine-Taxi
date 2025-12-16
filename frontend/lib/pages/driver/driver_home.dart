@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
+import '../../services/location_service.dart';
 import '../../screens/auth/login_page.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/driver_bottom_nav_bar.dart';
@@ -10,6 +11,7 @@ import 'driver_queue_page.dart';
 import 'driver_trips_page.dart';
 import 'driver_vehicle_page.dart';
 import 'driver_profile_page.dart';
+import 'driver_location_tracking_page.dart';
 
 class DriverHomePage extends StatefulWidget {
   const DriverHomePage({super.key});
@@ -18,13 +20,16 @@ class DriverHomePage extends StatefulWidget {
   State<DriverHomePage> createState() => _DriverHomePageState();
 }
 
-class _DriverHomePageState extends State<DriverHomePage> {
+class _DriverHomePageState extends State<DriverHomePage>
+    with WidgetsBindingObserver {
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   bool _isArabic = true;
   bool _isDarkMode = false; // Light mode as default
   String? _profileImagePath; // Local path to profile image
   final ImagePicker _imagePicker = ImagePicker();
+  bool _isTracking = false;
+  final LocationService _locationService = LocationService.instance;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -94,8 +99,24 @@ class _DriverHomePageState extends State<DriverHomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUserData();
     _loadProfileImage();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Restart tracking when app resumes
+      _checkAndStartTracking();
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -107,6 +128,31 @@ class _DriverHomePageState extends State<DriverHomePage> {
       _isLoading = false;
       _isArabic = isArabic;
     });
+
+    // Auto-start location tracking for drivers
+    if (userData != null && userData['role'] == 'DRIVER') {
+      await _checkAndStartTracking();
+    }
+  }
+
+  Future<void> _checkAndStartTracking() async {
+    if (!mounted) return;
+
+    // Check if tracking is already active
+    if (_locationService.isTracking) {
+      setState(() {
+        _isTracking = true;
+      });
+      return;
+    }
+
+    // Try to start tracking
+    final started = await _locationService.startLocationTracking();
+    if (mounted) {
+      setState(() {
+        _isTracking = started;
+      });
+    }
   }
 
   Future<void> _loadThemePreference() async {
@@ -115,7 +161,6 @@ class _DriverHomePageState extends State<DriverHomePage> {
       _isDarkMode = AppTheme.isDarkMode;
     });
   }
-
 
   Future<void> _loadProfileImage() async {
     final prefs = await SharedPreferences.getInstance();
@@ -190,8 +235,9 @@ class _DriverHomePageState extends State<DriverHomePage> {
     );
   }
 
-
   Future<void> _handleLogout() async {
+    // Stop location tracking on logout
+    await _locationService.stopLocationTracking();
     await ApiService.clearAuthData();
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
@@ -209,15 +255,12 @@ class _DriverHomePageState extends State<DriverHomePage> {
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
         : const Color.fromARGB(255, 224, 228, 231);
-    final cardColor = _isDarkMode
-        ? const Color(0xFF1C2541)
-        : const Color(0xFFFAFBFC);
-    final textPrimaryColor = _isDarkMode
-        ? Colors.white
-        : const Color(0xFF1E3A5F);
-    final textSecondaryColor = _isDarkMode
-        ? const Color(0xFFB0BEC5)
-        : const Color(0xFF546E7A);
+    final cardColor =
+        _isDarkMode ? const Color(0xFF1C2541) : const Color(0xFFFAFBFC);
+    final textPrimaryColor =
+        _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
+    final textSecondaryColor =
+        _isDarkMode ? const Color(0xFFB0BEC5) : const Color(0xFF546E7A);
     const accentColor = Color(0xFFF57C00);
 
     return Directionality(
@@ -283,6 +326,69 @@ class _DriverHomePageState extends State<DriverHomePage> {
               ],
             ),
           ),
+          backgroundColor: const Color(0xFF1E3A5F), // خلفية فاتحة أكثر
+          foregroundColor: Colors.white,
+          elevation: 2,
+          iconTheme: const IconThemeData(color: Colors.white),
+          actionsIconTheme: const IconThemeData(color: Colors.white),
+          actions: [
+            // Tracking status indicator
+            GestureDetector(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DriverLocationTrackingPage(),
+                  ),
+                );
+                // Refresh tracking status when returning from tracking page
+                if (mounted) {
+                  setState(() {
+                    _isTracking = _locationService.isTracking;
+                  });
+                }
+              },
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.all(8),
+                child: Stack(
+                  children: [
+                    Icon(
+                      Icons.location_on,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: _isTracking ? Colors.green : Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            IconButton(
+              icon: Icon(
+                _isArabic ? Icons.language : Icons.translate,
+                color: Colors.white,
+              ),
+              onPressed: () => _switchLanguage(!_isArabic),
+              tooltip: _isArabic ? 'English' : 'العربية',
+            ),
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.white),
+              onPressed: _handleLogout,
+              tooltip: t('logout'),
+            ),
+          ],
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -355,7 +461,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
                                               ? Image.file(
                                                   File(_profileImagePath!),
                                                   fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) {
+                                                  errorBuilder: (context, error,
+                                                      stackTrace) {
                                                     return _buildDefaultAvatar();
                                                   },
                                                 )
@@ -397,7 +504,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
                                 // Greeting Text
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         _isArabic ? 'مرحباً بك!' : 'Hello!',
@@ -414,7 +522,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
                                         children: [
                                           Flexible(
                                             child: Text(
-                                              _userData?['fullname'] ?? t('driver'),
+                                              _userData?['fullname'] ??
+                                                  t('driver'),
                                               style: const TextStyle(
                                                 color: Colors.white,
                                                 fontSize: 28,
@@ -511,7 +620,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
 
                       // Section Header - Quick Actions
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -635,7 +745,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
 
                       // Section Header - Driver Queue
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -724,7 +835,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
 
                       // Section Header - Statistics
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -896,7 +1008,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
                                 cardColor,
                                 _isDarkMode,
                               ),
-                            if (_userData?['phone'] != null) const SizedBox(height: 14),
+                            if (_userData?['phone'] != null)
+                              const SizedBox(height: 14),
                             _buildInfoRow(
                               Icons.badge_outlined,
                               t('role'),
@@ -1058,7 +1171,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
     );
   }
 
-  Widget _buildStatItem(String label, String value, Color color, IconData icon) {
+  Widget _buildStatItem(
+      String label, String value, Color color, IconData icon) {
     return Column(
       children: [
         // Icon with glow effect
@@ -1130,14 +1244,11 @@ class _DriverHomePageState extends State<DriverHomePage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDarkMode
-            ? Colors.white.withAlpha(13)
-            : const Color(0xFFF8F9FA),
+        color:
+            isDarkMode ? Colors.white.withAlpha(13) : const Color(0xFFF8F9FA),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDarkMode
-              ? Colors.white.withAlpha(25)
-              : Colors.grey.shade200,
+          color: isDarkMode ? Colors.white.withAlpha(25) : Colors.grey.shade200,
           width: 1,
         ),
       ),
@@ -1183,4 +1294,3 @@ class _DriverHomePageState extends State<DriverHomePage> {
     );
   }
 }
-

@@ -10,7 +10,7 @@ export function startDailyTripCreationJob() {
   // Run at 11:00 PM every day
   // Cron format: minute hour day month day-of-week
   // '0 23 * * *' = At 23:00 (11:00 PM) every day
-  const cronExpression = '51 18 * * *';
+  const cronExpression = '09 01 * * *';
 
   logger.info('Starting daily trip creation job', {
     schedule: 'Every day at 11:00 PM',

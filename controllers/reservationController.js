@@ -132,26 +132,29 @@ export const createReservation = async (req, res, next) => {
     }
 
     // Check if trip status allows bookings
-    const validStatuses = [TRIP_STATUS.SCHEDULED, 'open']; // Allow 'open' as well if it exists
+    // Allow bookings for scheduled and delayed trips (delayed trips haven't departed yet)
+    const validStatuses = [TRIP_STATUS.SCHEDULED, TRIP_STATUS.DELAYED, 'open']; // Allow 'open' as well if it exists
     if (!validStatuses.includes(trip.status)) {
       return res.status(400).json({
         message: req.t('reservation.trip_unavailable') || `Trip is ${trip.status} and cannot accept bookings`
       });
     }
 
-    // Check if trip has already departed
+    // Check if trip has already departed (based on status, not just time)
+    // Trips that are in_progress or completed have departed
+    const departedStatuses = [TRIP_STATUS.IN_PROGRESS, TRIP_STATUS.COMPLETED];
+    if (departedStatuses.includes(trip.status)) {
+      return res.status(400).json({
+        message: req.t('reservation.trip_departed') || 'Trip has already departed'
+      });
+    }
+
     const tripDeptime = new Date(trip.deptime);
     const now = new Date();
 
     if (bookingType === BOOKING_TYPE.INSTANT) {
-      // For instant bookings, trip must not have departed
-      if (tripDeptime <= now) {
-        return res.status(400).json({
-          message: req.t('reservation.trip_departed') || 'Trip has already departed'
-        });
-      }
-
-      // Check if trip opening time has passed
+      // For instant bookings, check if trip opening time has passed
+      // Note: Delayed trips can still accept bookings even if scheduled time has passed
       const tripOpeningTime = trip.trip_opening_time ? new Date(trip.trip_opening_time) : null;
       const defaultOpeningTime = new Date(tripDeptime.getTime() - 45 * 60 * 1000); // 45 minutes before departure
       const effectiveOpeningTime = tripOpeningTime || defaultOpeningTime;
@@ -185,12 +188,8 @@ export const createReservation = async (req, res, next) => {
         });
       }
 
-      // Future bookings must be for trips that haven't departed
-      if (tripDeptime <= now) {
-        return res.status(400).json({
-          message: req.t('reservation.trip_departed') || 'Cannot book future reservation for a trip that has already departed'
-        });
-      }
+      // Future bookings must be for trips that haven't departed (status check already done above)
+      // No need to check time again since delayed trips can still accept future bookings
     }
 
 

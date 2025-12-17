@@ -248,14 +248,14 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.cardBackground,
+        backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(t('confirmDelete'), style: TextStyle(color: AppTheme.textPrimary)),
-        content: Text(t('deleteWarning'), style: TextStyle(color: AppTheme.textSecondary)),
+        title: Text(t('confirmDelete'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+        content: Text(t('deleteWarning'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(t('no'), style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text(t('no'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -346,7 +346,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTheme.cardBackground,
+      backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -394,9 +394,72 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                             : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? 'Unknown');
                         return DropdownMenuItem<String>(
                           value: line['lineid'],
-                          child: Text(name.toString()),
+                          child: Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.isDarkMode
+                                  ? Colors.white.withOpacity(0.05)
+                                  : Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppTheme.isDarkMode
+                                    ? Colors.white.withOpacity(0.1)
+                                    : Colors.grey.shade200,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.isDarkMode
+                                        ? Colors.blueAccent.withOpacity(0.2)
+                                        : AppTheme.appBarColor.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.directions_bus_rounded,
+                                    size: 18,
+                                    color: AppTheme.isDarkMode
+                                        ? Colors.blueAccent
+                                        : AppTheme.appBarColor,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    name.toString(),
+                                    style: TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         );
                       }).toList(),
+                      selectedItemBuilder: (context) {
+                        return _lines.map((line) {
+                          final name = _isArabic
+                              ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? 'Unknown')
+                              : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? 'Unknown');
+                          return Text(
+                            name.toString(),
+                            style: TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 15,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        }).toList();
+                      },
                       onChanged: (val) => setState(() => _selectedLineId = val),
                     ),
                     const SizedBox(height: 16),
@@ -435,7 +498,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                     const SizedBox(height: 16),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(t('active'), style: TextStyle(color: AppTheme.textPrimary)),
+                      title: Text(t('active'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
                       value: _active,
                       activeColor: Colors.blue.shade600,
                       onChanged: (val) => setState(() => _active = val),
@@ -480,17 +543,17 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     return TextFormField(
       initialValue: value.toString(),
       keyboardType: TextInputType.number,
-      style: TextStyle(color: AppTheme.textPrimary),
+      style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: AppTheme.textSecondary),
+        labelStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppTheme.borderColor),
+          borderSide: BorderSide(color: AppTheme.isDarkMode ? Colors.white12 : AppTheme.borderColor),
         ),
         filled: true,
-        fillColor: AppTheme.backgroundColor,
+        fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : AppTheme.backgroundColor,
       ),
       onChanged: (val) => onChanged(int.tryParse(val) ?? value),
       validator: (val) {
@@ -508,23 +571,54 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     required String? value,
     required List<DropdownMenuItem<String>> items,
     required Function(String?) onChanged,
+    IconData icon = Icons.alt_route_rounded,
+    List<Widget> Function(BuildContext)? selectedItemBuilder,
   }) {
     return DropdownButtonFormField<String>(
       value: value,
       items: items,
+      selectedItemBuilder: selectedItemBuilder,
       onChanged: onChanged,
-      dropdownColor: AppTheme.cardBackground,
-      style: TextStyle(color: AppTheme.textPrimary),
+      isExpanded: true,
+      itemHeight: null, // Allow variable height for card items
+      dropdownColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      style: TextStyle(
+        color: AppTheme.textPrimary,
+        fontWeight: FontWeight.w500,
+        fontSize: 15,
+      ),
+      icon: Icon(
+        Icons.keyboard_arrow_down_rounded,
+        color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+      ),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(color: AppTheme.textSecondary),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        prefixIcon: Icon(
+          icon,
+          color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppTheme.borderColor),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+            width: 2,
+          ),
         ),
         filled: true,
-        fillColor: AppTheme.backgroundColor,
+        fillColor: AppTheme.isDarkMode
+            ? Colors.white.withOpacity(0.05)
+            : Colors.grey.shade100,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       ),
       validator: (val) => val == null ? t('required') : null,
     );
@@ -541,7 +635,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         appBar: _buildAppBar(),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _openScheduleForm(),
-          backgroundColor: AppTheme.appBarColor,
+          backgroundColor: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
           foregroundColor: Colors.white,
           icon: const Icon(Icons.add),
           label: Text(t('createSchedule')),
@@ -572,7 +666,9 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: AppTheme.appBarColor,
+      backgroundColor: AppTheme.isDarkMode
+          ? const Color(0xFF1C2541) // Dark card color for better integration
+          : AppTheme.appBarColor,
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
@@ -643,16 +739,16 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       ),
       child: TextField(
         controller: _searchController,
-        style: TextStyle(color: AppTheme.textPrimary),
+        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
         decoration: InputDecoration(
           hintText: t('search'),
-          hintStyle: TextStyle(color: AppTheme.textSecondary),
-          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textSecondary),
+          hintStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                  icon: Icon(Icons.close_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
                   onPressed: () {
                     _searchController.clear();
                     FocusScope.of(context).unfocus();
@@ -673,20 +769,24 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.schedule_outlined, size: 80, color: AppTheme.textSecondary.withOpacity(0.5)),
+            Icon(
+              Icons.schedule_outlined, 
+              size: 80, 
+              color: AppTheme.isDarkMode ? Colors.white24 : AppTheme.textSecondary.withOpacity(0.5)
+            ),
             const SizedBox(height: 16),
             Text(
               t('noSchedules'),
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
+                color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               t('noSchedulesSub'),
-              style: TextStyle(color: AppTheme.textSecondary),
+              style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
             ),
           ],
         ),
@@ -704,6 +804,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     final interval = schedule['interval_minutes'] ?? 60;
     final active = schedule['active'] ?? true;
     final templateid = schedule['templateid'] as String;
+    final isDark = AppTheme.isDarkMode;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -717,113 +818,199 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
             offset: const Offset(0, 4),
           ),
         ],
+        border: Border.all(
+          color: active ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+          width: 1,
+        ),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Material(
           color: Colors.transparent,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppTheme.borderColor.withOpacity(0.5))),
-                  color: active ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.05),
-                ),
-                child: Row(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Icon(
-                      Icons.directions_bus_rounded,
-                      color: active ? Colors.green.shade700 : Colors.red.shade700,
-                      size: 20,
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? (isDark ? Colors.greenAccent.withOpacity(0.1) : Colors.green.shade50)
+                            : (isDark ? Colors.redAccent.withOpacity(0.1) : Colors.red.shade50),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.schedule_rounded,
+                        color: active
+                            ? (isDark ? Colors.greenAccent : Colors.green.shade700)
+                            : (isDark ? Colors.redAccent : Colors.red.shade700),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            lineName.toString(),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : AppTheme.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: active
+                                  ? (isDark ? Colors.greenAccent.withOpacity(0.1) : Colors.green.shade100)
+                                  : (isDark ? Colors.redAccent.withOpacity(0.1) : Colors.red.shade100),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              active ? t('active') : t('inactive'),
+                              style: TextStyle(
+                                color: active
+                                    ? (isDark ? Colors.greenAccent : Colors.green.shade800)
+                                    : (isDark ? Colors.redAccent : Colors.red.shade800),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Divider(color: isDark ? Colors.white12 : AppTheme.borderColor.withOpacity(0.5)),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _buildInfoItem(
+                      Icons.start_rounded, 
+                      t('startHour'), 
+                      '$startHour:00',
+                      isDark,
+                    ),
+                    _buildInfoItem(
+                      Icons.last_page_rounded, 
+                      t('endHour'), 
+                      '$endHour:00',
+                      isDark,
+                    ),
+                    _buildInfoItem(
+                      Icons.timer_rounded, 
+                      t('interval'), 
+                      '$interval ${t('minutes')}',
+                      isDark,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Divider(color: isDark ? Colors.white12 : AppTheme.borderColor.withOpacity(0.5)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: () => _handleCreateTrips(templateid),
+                        icon: Icon(
+                          Icons.add_task_rounded,
+                          color: isDark ? Colors.blueAccent : AppTheme.appBarColor,
+                          size: 20,
+                        ),
+                        label: Text(
+                          t('createTrips'),
+                          style: TextStyle(
+                            color: isDark ? Colors.blueAccent : AppTheme.appBarColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: isDark 
+                              ? Colors.blueAccent.withOpacity(0.1) 
+                              : AppTheme.appBarColor.withOpacity(0.05),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _buildActionButton(
+                      icon: Icons.edit_rounded,
+                      color: Colors.blueAccent,
+                      onTap: () => _openScheduleForm(schedule: schedule),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        lineName.toString(),
-                        style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: active ? Colors.green.shade600 : Colors.red.shade400,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        active ? t('active') : t('inactive'),
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
+                    _buildActionButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: Colors.redAccent,
+                      onTap: () => _handleDeleteSchedule(templateid),
                     ),
                   ],
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        _buildInfoItem(Icons.start_rounded, t('startHour'), '$startHour:00'),
-                        _buildInfoItem(Icons.last_page_rounded, t('endHour'), '$endHour:00'),
-                        _buildInfoItem(Icons.timer_rounded, t('interval'), '$interval ${t('minutes')}'),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Divider(color: AppTheme.borderColor.withOpacity(0.5)),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton.icon(
-                          onPressed: () => _handleCreateTrips(templateid),
-                          icon: Icon(Icons.add_task_rounded, color: AppTheme.appBarColor, size: 20),
-                          label: Text(t('createTrips'), style: TextStyle(color: AppTheme.appBarColor)),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: Icon(Icons.edit_rounded, color: Colors.blue.shade600),
-                          onPressed: () => _openScheduleForm(schedule: schedule),
-                          tooltip: t('edit'),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade600),
-                          onPressed: () => _handleDeleteSchedule(templateid),
-                          tooltip: t('delete'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoItem(IconData icon, String label, String value) {
+  Widget _buildInfoItem(IconData icon, String label, String value, bool isDark) {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, size: 20, color: AppTheme.textSecondary),
-          const SizedBox(height: 4),
+          Icon(icon, size: 20, color: isDark ? Colors.blueAccent : AppTheme.textSecondary),
+          const SizedBox(height: 6),
           Text(
-            label,
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 10),
-            textAlign: TextAlign.center,
+            value,
+            style: TextStyle(
+              color: isDark ? Colors.white : AppTheme.textPrimary,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
-            value,
-            style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600),
+            label,
+            style: TextStyle(
+              color: isDark ? Colors.white70 : AppTheme.textSecondary, 
+              fontSize: 11,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: AppTheme.isDarkMode ? color.withOpacity(0.2) : color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Icon(
+            icon,
+            size: 20,
+            color: color,
+          ),
+        ),
       ),
     );
   }

@@ -287,13 +287,16 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: AppTheme.cardBackground,
-        title: Text(
-          line == null ? t('createLine') : t('edit'),
-          style: TextStyle(
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.bold,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+        title: Center(
+          child: Text(
+            line == null ? t('createLine') : t('edit'),
+            style: TextStyle(
+              color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
+            ),
           ),
         ),
         content: SingleChildScrollView(
@@ -369,7 +372,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                     builder: (context, setState) => SwitchListTile(
                       title: Text(
                         _active ? t('active') : t('inactive'),
-                        style: TextStyle(color: AppTheme.textPrimary),
+                        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
                       ),
                       value: _active,
                       activeColor: Colors.green,
@@ -385,15 +388,27 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(t('cancel'), style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text(
+              t('cancel'),
+              style: TextStyle(
+                color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: _handleSave,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.appBarColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              backgroundColor: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 4,
             ),
-            child: Text(t('save'), style: const TextStyle(color: Colors.white)),
+            child: Text(
+              t('save'),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
           ),
         ],
       ),
@@ -405,15 +420,15 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: AppTheme.cardBackground,
+        backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
         title: Text(
           t('confirmDelete'),
-          style: TextStyle(color: AppTheme.textPrimary),
+          style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(t('no'), style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text(t('no'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -463,7 +478,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
         appBar: _buildAppBar(),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _openFormDialog(),
-          backgroundColor: AppTheme.appBarColor,
+          backgroundColor: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
           icon: const Icon(Icons.add_rounded, color: Colors.white),
           label: Text(t('createLine'), style: const TextStyle(color: Colors.white)),
         ),
@@ -497,7 +512,9 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: AppTheme.appBarColor,
+      backgroundColor: AppTheme.isDarkMode
+          ? const Color(0xFF1C2541) // Dark card color for better integration
+          : AppTheme.appBarColor,
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
@@ -549,16 +566,16 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       ),
       child: TextField(
         controller: _searchController,
-        style: TextStyle(color: AppTheme.textPrimary),
+        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
         decoration: InputDecoration(
           hintText: t('search'),
-          hintStyle: TextStyle(color: AppTheme.textSecondary),
-          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textSecondary),
+          hintStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                  icon: Icon(Icons.close_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
                   onPressed: () {
                     _searchController.clear();
                     FocusScope.of(context).unfocus();
@@ -579,21 +596,44 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
   }) {
     return TextFormField(
       controller: controller,
-      style: TextStyle(color: AppTheme.textPrimary),
+      style: TextStyle(
+        color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+        fontWeight: FontWeight.w500,
+        fontSize: 16,
+      ),
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: AppTheme.textSecondary),
+        labelStyle: TextStyle(
+          color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+          fontWeight: FontWeight.w500,
+        ),
+        prefixIcon: Icon(
+          icon,
+          color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+        ),
         filled: true,
-        fillColor: AppTheme.backgroundColor,
+        fillColor: AppTheme.isDarkMode
+            ? Colors.white.withOpacity(0.05)
+            : Colors.grey.shade50,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: AppTheme.isDarkMode ? Colors.white10 : Colors.grey.shade200,
+          ),
         ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+            width: 2,
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       ),
       validator: validator,
     );
@@ -639,12 +679,12 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppTheme.appBarColor.withOpacity(0.1),
+                        color: AppTheme.isDarkMode ? Colors.blueAccent.withOpacity(0.1) : AppTheme.appBarColor.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.timeline_rounded,
-                        color: AppTheme.appBarColor,
+                        color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
                         size: 24,
                       ),
                     ),
@@ -656,7 +696,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                           Text(
                             lineName,
                             style: TextStyle(
-                              color: AppTheme.textPrimary,
+                              color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -698,7 +738,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Divider(color: AppTheme.borderColor),
+                Divider(color: AppTheme.isDarkMode ? Colors.white12 : AppTheme.borderColor),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -731,12 +771,16 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
   Widget _buildInfoItem(IconData icon, String label, String value) {
     return Column(
       children: [
-        Icon(icon, size: 20, color: AppTheme.textSecondary),
+        Icon(
+          icon, 
+          size: 20, 
+          color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.textSecondary
+        ),
         const SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(
-            color: AppTheme.textPrimary,
+            color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
@@ -744,7 +788,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
         Text(
           label,
           style: TextStyle(
-            color: AppTheme.textSecondary,
+            color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
             fontSize: 11,
           ),
         ),
@@ -758,7 +802,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: color.withOpacity(0.1),
+      color: AppTheme.isDarkMode ? color.withOpacity(0.2) : color.withOpacity(0.1),
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
@@ -796,14 +840,14 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
             child: Icon(
               Icons.directions_bus_filled_rounded,
               size: 80,
-              color: AppTheme.textSecondary.withOpacity(0.5),
+              color: AppTheme.isDarkMode ? Colors.white24 : AppTheme.textSecondary.withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 20),
           Text(
             t('noLines'),
             style: TextStyle(
-              color: AppTheme.textPrimary,
+              color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),

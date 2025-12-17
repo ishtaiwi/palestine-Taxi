@@ -199,7 +199,9 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: AppTheme.appBarColor,
+      backgroundColor: AppTheme.isDarkMode
+          ? const Color(0xFF1C2541) // Dark card color for better integration
+          : AppTheme.appBarColor,
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
@@ -369,10 +371,18 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: AppTheme.appBarColor.withOpacity(0.1),
+                      color: AppTheme.isDarkMode
+                          ? Colors.blueAccent.withOpacity(0.2)
+                          : AppTheme.appBarColor.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.payments_rounded, color: AppTheme.appBarColor, size: 24),
+                    child: Icon(
+                      Icons.payments_rounded,
+                      color: AppTheme.isDarkMode
+                          ? Colors.blueAccent
+                          : AppTheme.appBarColor,
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(

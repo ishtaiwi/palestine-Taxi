@@ -88,10 +88,15 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   @override
   void initState() {
     super.initState();
-    AppTheme.init();
+    _loadThemePreference();
     _loadData();
     _loadLanguagePreference();
     _searchController.addListener(_onSearchChanged);
+  }
+
+  Future<void> _loadThemePreference() async {
+    await AppTheme.init();
+    if (mounted) setState(() {});
   }
 
   @override
@@ -156,13 +161,25 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   }
 
   Color _getRoleColor(String? role) {
+    if (AppTheme.isDarkMode) {
+      switch (role?.toLowerCase()) {
+        case 'admin':
+          return const Color(0xFF7986CB); // Lighter Indigo
+        case 'driver':
+          return const Color(0xFF81C784); // Lighter Green
+        case 'passenger':
+          return const Color(0xFFFFB74D); // Lighter Orange
+        default:
+          return Colors.grey.shade400;
+      }
+    }
     switch (role?.toLowerCase()) {
       case 'admin':
-        return const Color(0xFF5C6BC0); 
+        return const Color(0xFF5C6BC0);
       case 'driver':
-        return const Color(0xFF66BB6A); 
+        return const Color(0xFF66BB6A);
       case 'passenger':
-        return const Color(0xFFFFA726); 
+        return const Color(0xFFFFA726);
       default:
         return Colors.grey;
     }
@@ -221,7 +238,9 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: AppTheme.appBarColor,
+      backgroundColor: AppTheme.isDarkMode
+          ? const Color(0xFF1C2541) // Dark card color for better integration
+          : AppTheme.appBarColor,
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
@@ -316,7 +335,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
 
   Widget _buildFilterChip(String? role, String label, IconData icon) {
     final isSelected = _selectedRoleFilter == role;
-    final color = role == null ? AppTheme.appBarColor : _getRoleColor(role);
+    // Use BlueAccent for 'All' in dark mode for better visibility
+    final color = role == null
+        ? (AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor)
+        : _getRoleColor(role);
 
     return Material(
       color: Colors.transparent,
@@ -332,16 +354,24 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? color : AppTheme.cardBackground,
+            color: isSelected
+                ? color
+                : (AppTheme.isDarkMode
+                    ? Colors.white.withOpacity(0.05)
+                    : AppTheme.cardBackground),
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: isSelected ? color : AppTheme.textSecondary.withOpacity(0.3),
+              color: isSelected
+                  ? color
+                  : (AppTheme.isDarkMode
+                      ? Colors.white.withOpacity(0.1)
+                      : AppTheme.textSecondary.withOpacity(0.3)),
               width: 1.5,
             ),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: color.withOpacity(0.3),
+                      color: color.withOpacity(0.4),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     )
@@ -354,13 +384,21 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
               Icon(
                 icon,
                 size: 18,
-                color: isSelected ? Colors.white : AppTheme.textSecondary,
+                color: isSelected
+                    ? Colors.white
+                    : (AppTheme.isDarkMode
+                        ? Colors.white
+                        : AppTheme.textSecondary),
               ),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : AppTheme.textSecondary,
+                  color: isSelected
+                      ? Colors.white
+                      : (AppTheme.isDarkMode
+                          ? Colors.white
+                          : AppTheme.textSecondary),
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),
@@ -383,11 +421,16 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: AppTheme.isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
+        border: AppTheme.isDarkMode
+            ? Border.all(color: Colors.white.withOpacity(0.1))
+            : null,
       ),
       child: Material(
         color: Colors.transparent,
@@ -429,7 +472,9 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                       Text(
                         user['email'] ?? '',
                         style: TextStyle(
-                          color: AppTheme.textSecondary,
+                          color: AppTheme.isDarkMode
+                              ? Colors.white.withOpacity(0.9)
+                              : AppTheme.textSecondary,
                           fontSize: 13,
                         ),
                         maxLines: 1,
@@ -442,13 +487,17 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                             Icon(
                               Icons.phone_iphone_rounded,
                               size: 12,
-                              color: AppTheme.textSecondary,
+                              color: AppTheme.isDarkMode
+                                  ? Colors.blueAccent.shade100
+                                  : AppTheme.textSecondary,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               user['phone'].toString(),
                               style: TextStyle(
-                                color: AppTheme.textSecondary,
+                                color: AppTheme.isDarkMode
+                                    ? Colors.blueAccent.shade100
+                                    : AppTheme.textSecondary,
                                 fontSize: 12,
                               ),
                             ),
@@ -487,7 +536,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: color.withOpacity(0.1),
+      color: AppTheme.isDarkMode ? color.withOpacity(0.2) : color.withOpacity(0.1),
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
@@ -554,10 +603,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: AppTheme.cardBackground,
+        backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
         title: Text(
           t('editUser'),
-          style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
+          style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary, fontWeight: FontWeight.bold),
         ),
         content: SingleChildScrollView(
           child: Form(
@@ -595,12 +644,16 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: selectedRole,
-                  dropdownColor: AppTheme.cardBackground,
+                  dropdownColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
+                  style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
+                  isExpanded: true,
+                  itemHeight: null,
                   decoration: InputDecoration(
                     labelText: t('role'),
-                    prefixIcon: Icon(Icons.badge_outlined, color: AppTheme.textSecondary),
+                    labelStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                    prefixIcon: Icon(Icons.badge_outlined, color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.textSecondary),
                     filled: true,
-                    fillColor: AppTheme.backgroundColor,
+                    fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : AppTheme.backgroundColor,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -609,17 +662,69 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
+                  selectedItemBuilder: (context) {
+                    return ['admin', 'driver', 'passenger'].map((role) {
+                      return Text(
+                        role[0].toUpperCase() + role.substring(1),
+                        style: TextStyle(
+                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      );
+                    }).toList();
+                  },
                   items: ['admin', 'driver', 'passenger'].map((role) {
+                    final roleColor = _getRoleColor(role);
+                    final isSelected = selectedRole == role;
                     return DropdownMenuItem(
                       value: role,
-                      child: Text(
-                        role[0].toUpperCase() + role.substring(1),
-                        style: TextStyle(color: AppTheme.textPrimary),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: roleColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected ? roleColor : roleColor.withOpacity(0.3),
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: roleColor.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _getRoleIcon(role),
+                                color: roleColor,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              role[0].toUpperCase() + role.substring(1),
+                              style: TextStyle(
+                                color: isSelected 
+                                    ? roleColor 
+                                    : (AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }).toList(),
-                  onChanged: (value) => selectedRole = value,
+                  onChanged: (value) {
+                     // Need to trigger rebuild to update the selected item styling in dropdown
+                     (context as Element).markNeedsBuild();
+                     selectedRole = value;
+                  },
                 ),
               ],
             ),
@@ -628,7 +733,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(t('cancel'), style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text(t('cancel'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -637,7 +742,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.appBarColor,
+              backgroundColor: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(t('save'), style: const TextStyle(color: Colors.white)),
@@ -688,12 +793,13 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   }) {
     return TextFormField(
       controller: controller,
-      style: TextStyle(color: AppTheme.textPrimary),
+      style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: AppTheme.textSecondary),
+        labelStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+        prefixIcon: Icon(icon, color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.textSecondary),
         filled: true,
-        fillColor: AppTheme.backgroundColor,
+        fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : AppTheme.backgroundColor,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -712,12 +818,12 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: AppTheme.cardBackground,
-        title: Text(t('confirmDelete'), style: TextStyle(color: AppTheme.textPrimary)),
+        backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
+        title: Text(t('confirmDelete'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(t('no'), style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text(t('no'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),

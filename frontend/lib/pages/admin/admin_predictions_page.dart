@@ -385,20 +385,31 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       appBar: AppBar(
         title: Text(
           'AI Predictions',
-          style: TextStyle(
-              color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
         ),
-        backgroundColor: AppTheme.appBarColor,
-        iconTheme: IconThemeData(color: AppTheme.textPrimary),
+        backgroundColor: AppTheme.isDarkMode
+            ? const Color(0xFF1C2541)
+            : AppTheme.appBarColor,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        ),
         actions: [
           IconButton(
             onPressed: _isRetraining ? null : _triggerRetrain,
             tooltip: 'Retrain model',
+            color: Colors.white,
             icon: _isRetraining
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
                 : const Icon(Icons.refresh),
           ),
@@ -425,36 +436,129 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                         Row(
                           children: [
                             Expanded(
-                              child: DropdownButtonFormField<String>(
-                                value: _selectedLineId,
-                                decoration: InputDecoration(
-                                  labelText: 'Line',
-                                  filled: true,
-                                  fillColor: AppTheme.getCardBackground(0.1),
-                                  labelStyle:
-                                      TextStyle(color: AppTheme.textSecondary),
-                                  border: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                        color: AppTheme.getCardBorder(0.2)),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.isDarkMode ? AppTheme.cardBackground : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
                                   ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
                                 ),
-                                dropdownColor: AppTheme.getCardBackground(0.9),
-                                items: _lines
-                                    .map(
-                                      (line) => DropdownMenuItem<String>(
-                                        value: line['lineid'] as String?,
-                                        child: Text(
-                                          line['name_en'] ??
-                                              line['linename'] ??
-                                              'Line',
-                                          style: TextStyle(
-                                            color: AppTheme.textPrimary,
+                                child: DropdownButtonFormField<String>(
+                                  value: _selectedLineId,
+                                  decoration: InputDecoration(
+                                    labelText: 'Line',
+                                    filled: true,
+                                    fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+                                    labelStyle: TextStyle(
+                                      color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.directions_bus_rounded,
+                                      color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+                                    ),
+                                  ),
+                                  dropdownColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+                                  isExpanded: true,
+                                  selectedItemBuilder: (context) {
+                                    return _lines.map((line) {
+                                      return Text(
+                                        line['name_en'] ?? line['linename'] ?? 'Line',
+                                        style: TextStyle(
+                                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      );
+                                    }).toList();
+                                  },
+                                  items: _lines.map((line) {
+                                    final isSelected = line['lineid'] == _selectedLineId;
+                                    // Generate a deterministic color based on line ID hash
+                                    final int colorValue = (line['lineid'].hashCode & 0xFFFFFF) | 0xFF000000;
+                                    final Color lineAccentColor = Color(colorValue).withOpacity(1.0);
+                                    
+                                    return DropdownMenuItem<String>(
+                                      value: line['lineid'] as String?,
+                                      child: Container(
+                                        width: double.infinity,
+                                        margin: const EdgeInsets.symmetric(vertical: 4),
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: isSelected 
+                                              ? (AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade100)
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: isSelected 
+                                                ? lineAccentColor 
+                                                : Colors.transparent,
+                                            width: 1.5,
                                           ),
                                         ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 4,
+                                              height: 24,
+                                              decoration: BoxDecoration(
+                                                color: lineAccentColor,
+                                                borderRadius: BorderRadius.circular(2),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                line['name_en'] ?? line['linename'] ?? 'Line',
+                                                style: TextStyle(
+                                                  color: isSelected 
+                                                      ? (AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)
+                                                      : (AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (isSelected)
+                                              Icon(
+                                                Icons.check_rounded,
+                                                color: lineAccentColor,
+                                                size: 20,
+                                              ),
+                                          ],
+                                        ),
                                       ),
-                                    )
-                                    .toList(),
-                                onChanged: _onLineChanged,
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    // Trigger rebuild to update selected state styling
+                                    (context as Element).markNeedsBuild();
+                                    _onLineChanged(value);
+                                  },
+                                ),
                               ),
                             ),
                           ],
@@ -481,36 +585,66 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       child: predictions.isEmpty
           ? Text(
               'No rush hour predictions available.',
-              style: TextStyle(color: AppTheme.textSecondary),
+              style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
             )
           : ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemBuilder: (context, index) {
                 final prediction = predictions[index] as Map<String, dynamic>;
-                return ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(
-                    Icons.trending_up,
-                    color: Colors.orangeAccent,
-                  ),
-                  title: Text(
-                    '${prediction['date']} • ${_formatHour(prediction['hour'])}',
-                    style: TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
                     ),
                   ),
-                  subtitle: Text(
-                    'Expected bookings: ${prediction['expectedBookings']?.toStringAsFixed(1) ?? prediction['expectedBookings']}\n'
-                    'Confidence: ${(((prediction['confidence'] ?? 0) as num) * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(color: AppTheme.textSecondary),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.orangeAccent.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.trending_up_rounded,
+                          color: Colors.orangeAccent,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${prediction['date']} • ${_formatHour(prediction['hour'])}',
+                              style: TextStyle(
+                                color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Expected bookings: ${prediction['expectedBookings']?.toStringAsFixed(1) ?? prediction['expectedBookings']}\n'
+                              'Confidence: ${(((prediction['confidence'] ?? 0) as num) * 100).toStringAsFixed(0)}%',
+                              style: TextStyle(
+                                color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },
-              separatorBuilder: (_, __) =>
-                  Divider(color: AppTheme.getCardBorder(0.12)),
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemCount: predictions.length.clamp(0, 5),
             ),
     );
@@ -527,14 +661,14 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
         children: [
           // Date/Time Filter UI
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.getCardBackground(0.2),
-              borderRadius: BorderRadius.circular(8),
+              color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: _isFilterActive
-                    ? Colors.orange.withOpacity(0.7)
-                    : AppTheme.getCardBorder(0.3),
+                    ? Colors.orange.withOpacity(0.5)
+                    : (AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200),
               ),
             ),
             child: Column(
@@ -543,15 +677,15 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                 Row(
                   children: [
                     Icon(
-                      Icons.filter_alt,
-                      size: 18,
-                      color: AppTheme.textSecondary,
+                      Icons.filter_list_rounded,
+                      size: 20,
+                      color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Filter by Date & Time',
                       style: TextStyle(
-                        color: AppTheme.textPrimary,
+                        color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -560,19 +694,19 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                     if (_isFilterActive)
                       TextButton.icon(
                         onPressed: _clearFilters,
-                        icon: const Icon(Icons.clear, size: 16),
+                        icon: const Icon(Icons.clear_rounded, size: 16),
                         label: const Text('Clear'),
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.orange,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                            horizontal: 12,
+                            vertical: 6,
                           ),
                         ),
                       ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -580,73 +714,76 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                     // Start Date
                     OutlinedButton.icon(
                       onPressed: _selectStartDate,
-                      icon: const Icon(Icons.calendar_today, size: 16),
+                      icon: Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textPrimary),
                       label: Text(
                         _filterStartDate != null
-                            ? DateFormat('MMM dd, yyyy')
-                                .format(_filterStartDate!)
+                            ? DateFormat('MMM dd, yyyy').format(_filterStartDate!)
                             : 'Start Date',
+                        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.textPrimary,
                         side: BorderSide(
-                          color: AppTheme.getCardBorder(0.3),
+                          color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.2) : Colors.grey.shade300,
                         ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                     // End Date
                     OutlinedButton.icon(
                       onPressed: _selectEndDate,
-                      icon: const Icon(Icons.calendar_today, size: 16),
+                      icon: Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textPrimary),
                       label: Text(
                         _filterEndDate != null
                             ? DateFormat('MMM dd, yyyy').format(_filterEndDate!)
                             : 'End Date',
+                        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.textPrimary,
                         side: BorderSide(
-                          color: AppTheme.getCardBorder(0.3),
+                          color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.2) : Colors.grey.shade300,
                         ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                     // Start Time
                     OutlinedButton.icon(
                       onPressed: _selectStartTime,
-                      icon: const Icon(Icons.access_time, size: 16),
+                      icon: Icon(Icons.access_time_rounded, size: 16, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textPrimary),
                       label: Text(
                         _filterStartTime != null
                             ? _filterStartTime!.format(context)
                             : 'Start Time',
+                        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.textPrimary,
                         side: BorderSide(
-                          color: AppTheme.getCardBorder(0.3),
+                          color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.2) : Colors.grey.shade300,
                         ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                     // End Time
                     OutlinedButton.icon(
                       onPressed: _selectEndTime,
-                      icon: const Icon(Icons.access_time, size: 16),
+                      icon: Icon(Icons.access_time_rounded, size: 16, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textPrimary),
                       label: Text(
                         _filterEndTime != null
                             ? _filterEndTime!.format(context)
                             : 'End Time',
+                        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.textPrimary,
                         side: BorderSide(
-                          color: AppTheme.getCardBorder(0.3),
+                          color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.2) : Colors.grey.shade300,
                         ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
                     // Quick filters
                     PopupMenuButton<String>(
-                      icon: const Icon(Icons.today, size: 16),
+                      icon: Icon(Icons.tune_rounded, size: 20, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
                       tooltip: 'Quick Filters',
-                      color: AppTheme.getCardBackground(),
+                      color: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
                       onSelected: (value) {
                         final now = DateTime.now();
                         final today = DateTime(now.year, now.month, now.day);
@@ -679,21 +816,21 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                         });
                       },
                       itemBuilder: (context) => [
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'today',
-                          child: Text('Today'),
+                          child: Text('Today', style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'tomorrow',
-                          child: Text('Tomorrow'),
+                          child: Text('Tomorrow', style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'next7days',
-                          child: Text('Next 7 Days'),
+                          child: Text('Next 7 Days', style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'next30days',
-                          child: Text('Next 30 Days'),
+                          child: Text('Next 30 Days', style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
                         ),
                       ],
                     ),
@@ -704,7 +841,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                   Text(
                     'Showing ${displayRecommendations.length} of ${_recommendations.length} recommendations',
                     style: TextStyle(
-                      color: AppTheme.textSecondary,
+                      color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
                       fontSize: 12,
                     ),
                   ),
@@ -715,45 +852,75 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
           const SizedBox(height: 16),
           // Recommendations List
           if (displayRecommendations.isEmpty)
-            Text(
-              _recommendations.isEmpty
-                  ? 'No active recommendations. Model will suggest changes once demand spikes are detected.'
-                  : 'No recommendations match the selected date/time filter.',
-              style: TextStyle(color: AppTheme.textSecondary),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                _recommendations.isEmpty
+                    ? 'No active recommendations. Model will suggest changes once demand spikes are detected.'
+                    : 'No recommendations match the selected date/time filter.',
+                style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+              ),
             )
           else
             ...displayRecommendations.map((rec) {
               final recId = rec['id']?.toString() ?? '';
-              return Card(
-                color: AppTheme.getCardBackground(0.1),
-                margin: const EdgeInsets.only(bottom: 12),
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppTheme.isDarkMode ? Colors.orange.withOpacity(0.3) : Colors.orange.withOpacity(0.1),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.lightbulb_rounded,
+                              color: Colors.orange,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               rec['summary'] ?? 'Recommendation',
                               style: TextStyle(
-                                color: AppTheme.textPrimary,
+                                color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
                                 fontWeight: FontWeight.bold,
+                                fontSize: 16,
                               ),
                             ),
                           ),
                           if (rec['targetDate'] != null || rec['hour'] != null)
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                                horizontal: 10,
+                                vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(6),
+                                color: Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: Colors.orange.withOpacity(0.5),
+                                  color: Colors.orange.withOpacity(0.3),
                                 ),
                               ),
                               child: Text(
@@ -771,60 +938,35 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                             ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 12),
                       Text(
                         rec['details'] ?? '',
-                        style: TextStyle(color: AppTheme.textSecondary),
+                        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          Chip(
-                            label: Text(
-                              'Confidence ${(rec['confidence'] ?? rec['priority'] ?? 0).toStringAsFixed(2)}',
-                              style: const TextStyle(color: Colors.orange),
-                            ),
-                            backgroundColor: Colors.black,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: const BorderSide(color: Colors.orange),
-                            ),
+                          _buildTag(
+                            'Confidence ${(rec['confidence'] ?? rec['priority'] ?? 0).toStringAsFixed(2)}',
+                            Colors.orange,
                           ),
-                          const Spacer(),
-                          Chip(
-                            label: Text(
-                              'Utilization ${(rec['utilization'] ?? 0).toStringAsFixed(2)}',
-                              style: const TextStyle(color: Colors.orange),
-                            ),
-                            backgroundColor: Colors.black,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: const BorderSide(color: Colors.orange),
-                            ),
+                          _buildTag(
+                            'Utilization ${(rec['utilization'] ?? 0).toStringAsFixed(2)}',
+                            Colors.blueAccent,
                           ),
                           if (rec['totalAvailableSeats'] != null)
-                            Chip(
-                              label: Text(
-                                'Available: ${rec['totalAvailableSeats']}',
-                                style: const TextStyle(color: Colors.lightBlue),
-                              ),
-                              backgroundColor: Colors.black,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                side: const BorderSide(color: Colors.lightBlue),
-                              ),
+                            _buildTag(
+                              'Available: ${rec['totalAvailableSeats']}',
+                              Colors.green,
                             ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
-                        child: FilledButton.icon(
+                        child: ElevatedButton.icon(
                           onPressed: _applyingRecommendationId == recId
                               ? null
                               : () => _applyRecommendation(rec),
@@ -837,16 +979,19 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Icon(Icons.check_circle),
+                              : const Icon(Icons.check_circle_rounded, size: 18),
                           label: Text(
                             _applyingRecommendationId == recId
                                 ? 'Applying...'
                                 : 'Accept Recommendation',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          style: FilledButton.styleFrom(
+                          style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.orange,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
                           ),
                         ),
                       ),
@@ -860,6 +1005,25 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     );
   }
 
+  Widget _buildTag(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   Widget _buildInsightsSection() {
     final topLines = (_insights?['topLines'] as List<dynamic>?) ?? [];
 
@@ -868,24 +1032,60 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       child: topLines.isEmpty
           ? Text(
               'No demand insights yet.',
-              style: TextStyle(color: AppTheme.textSecondary),
+              style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
             )
           : Column(
               children: topLines.map((line) {
                 final data = line as Map<String, dynamic>;
-                return ListTile(
-                  dense: true,
-                  leading: const Icon(
-                    Icons.directions_transit,
-                    color: Colors.lightBlueAccent,
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
+                    ),
                   ),
-                  title: Text(
-                    data['lineid'] ?? '',
-                    style: TextStyle(color: AppTheme.textPrimary),
-                  ),
-                  subtitle: Text(
-                    'Avg utilization ${(data['avgUtilization'] ?? 0).toStringAsFixed(2)}',
-                    style: TextStyle(color: AppTheme.textSecondary),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.lightBlueAccent.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.directions_transit_rounded,
+                          color: Colors.lightBlueAccent,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              data['lineid'] ?? '',
+                              style: TextStyle(
+                                color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Avg utilization ${(data['avgUtilization'] ?? 0).toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 );
               }).toList(),
@@ -896,11 +1096,20 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
   Widget _buildPanel({required String title, required Widget child}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.getCardBackground(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.getCardBorder(0.1)),
+        color: AppTheme.isDarkMode ? AppTheme.cardBackground : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -908,12 +1117,12 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
           Text(
             title,
             style: TextStyle(
-              color: AppTheme.textPrimary,
+              color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
               fontWeight: FontWeight.bold,
-              fontSize: 16,
+              fontSize: 18,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           child,
         ],
       ),

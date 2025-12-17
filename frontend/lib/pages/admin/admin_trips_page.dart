@@ -240,7 +240,9 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: AppTheme.appBarColor,
+      backgroundColor: AppTheme.isDarkMode
+          ? const Color(0xFF1C2541) // Dark card color for better integration
+          : AppTheme.appBarColor,
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
@@ -292,16 +294,16 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
       ),
       child: TextField(
         controller: _searchController,
-        style: TextStyle(color: AppTheme.textPrimary),
+        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
         decoration: InputDecoration(
           hintText: t('search'),
-          hintStyle: TextStyle(color: AppTheme.textSecondary),
-          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textSecondary),
+          hintStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                  icon: Icon(Icons.close_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
                   onPressed: () {
                     _searchController.clear();
                     FocusScope.of(context).unfocus();
@@ -338,6 +340,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
   Widget _buildFilterChip(String? status, String label, {Color? color}) {
     final isSelected = _statusFilter == status;
     final activeColor = color ?? AppTheme.appBarColor;
+    final isDark = AppTheme.isDarkMode;
 
     return GestureDetector(
       onTap: () {
@@ -350,16 +353,20 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor : AppTheme.cardBackground,
+          color: isSelected 
+              ? (isDark && status == null ? Colors.blueAccent : activeColor) 
+              : AppTheme.cardBackground,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? activeColor : AppTheme.textSecondary.withOpacity(0.3),
+            color: isSelected 
+                ? (isDark && status == null ? Colors.blueAccent : activeColor) 
+                : (isDark ? Colors.white.withOpacity(0.1) : AppTheme.textSecondary.withOpacity(0.3)),
             width: 1.5,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: activeColor.withOpacity(0.3),
+                    color: (isDark && status == null ? Colors.blueAccent : activeColor).withOpacity(0.3),
                     blurRadius: 6,
                     offset: const Offset(0, 3),
                   )
@@ -369,7 +376,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : AppTheme.textSecondary,
+            color: isSelected ? Colors.white : (isDark ? Colors.white : AppTheme.textSecondary),
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
@@ -395,6 +402,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
 
     final status = trip['status']?.toString();
     final statusColor = _getStatusColor(status);
+    final isDark = AppTheme.isDarkMode;
 
     return Container(
       decoration: BoxDecoration(
@@ -407,9 +415,9 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border(
-          right: _isArabic ? BorderSide(color: statusColor, width: 4) : BorderSide.none,
-          left: !_isArabic ? BorderSide(color: statusColor, width: 4) : BorderSide.none,
+        border: Border.all(
+          color: statusColor.withOpacity(0.3),
+          width: 1,
         ),
       ),
       child: Material(
@@ -421,8 +429,20 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.route_rounded,
+                      color: statusColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,7 +450,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                         Text(
                           lineName.isNotEmpty ? lineName : 'Unknown Line',
                           style: TextStyle(
-                            color: AppTheme.textPrimary,
+                            color: isDark ? Colors.white : AppTheme.textPrimary,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -438,12 +458,12 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(Icons.calendar_today_rounded, size: 14, color: AppTheme.textSecondary),
+                            Icon(Icons.calendar_today_rounded, size: 14, color: isDark ? Colors.white70 : AppTheme.textSecondary),
                             const SizedBox(width: 4),
                             Text(
                               _formatDate(trip['deptime']),
                               style: TextStyle(
-                                color: AppTheme.textSecondary,
+                                color: isDark ? Colors.white70 : AppTheme.textSecondary,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -458,6 +478,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: statusColor.withOpacity(0.2)),
                     ),
                     child: Text(
                       _getStatusText(status),
@@ -470,9 +491,9 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              Divider(color: isDark ? Colors.white12 : AppTheme.textSecondary.withOpacity(0.1)),
               const SizedBox(height: 12),
-              Divider(color: AppTheme.textSecondary.withOpacity(0.1)),
-              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -489,15 +510,16 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
   }
 
   Widget _buildInfoColumn(IconData icon, String label, String value) {
+    final isDark = AppTheme.isDarkMode;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Icon(icon, size: 20, color: AppTheme.textSecondary),
-        const SizedBox(height: 4),
+        Icon(icon, size: 20, color: isDark ? Colors.blueAccent : AppTheme.textSecondary),
+        const SizedBox(height: 6),
         Text(
           value,
           style: TextStyle(
-            color: AppTheme.textPrimary,
+            color: isDark ? Colors.white : AppTheme.textPrimary,
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
@@ -505,7 +527,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
         Text(
           label,
           style: TextStyle(
-            color: AppTheme.textSecondary,
+            color: isDark ? Colors.white70 : AppTheme.textSecondary,
             fontSize: 11,
           ),
         ),
@@ -534,14 +556,14 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
             child: Icon(
               Icons.directions_bus_outlined,
               size: 80,
-              color: AppTheme.textSecondary.withOpacity(0.5),
+              color: AppTheme.isDarkMode ? Colors.white24 : AppTheme.textSecondary.withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 20),
           Text(
             t('noTrips'),
             style: TextStyle(
-              color: AppTheme.textPrimary,
+              color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),

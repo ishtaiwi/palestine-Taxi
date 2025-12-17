@@ -153,13 +153,25 @@ class _AdminMapPageState extends State<AdminMapPage> {
       appBar: AppBar(
         title: Text(
           'Vehicle Tracking Map',
-          style: TextStyle(color: AppTheme.textPrimary),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
         ),
-        backgroundColor: AppTheme.appBarColor,
-        iconTheme: IconThemeData(color: AppTheme.textPrimary),
+        backgroundColor: AppTheme.isDarkMode
+            ? const Color(0xFF1C2541)
+            : AppTheme.appBarColor,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
+            color: Colors.white,
             onPressed: _loadData,
             tooltip: 'Refresh',
           ),

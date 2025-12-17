@@ -274,35 +274,44 @@ class _AdminReportsPageState extends State<AdminReportsPage>
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        appBar: AppBar(
-          title: Text(
-            t('title'),
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          backgroundColor: AppTheme.appBarColor,
-          elevation: 2,
-          iconTheme: IconThemeData(
-            color: AppTheme.textPrimary,
-          ),
-          bottom: TabBar(
-            controller: _tabController,
-            isScrollable: true,
-            labelColor: AppTheme.textPrimary,
-            unselectedLabelColor: AppTheme.textSecondary,
-            indicatorColor: Colors.blue,
-            tabs: [
-              Tab(text: t('revenue')),
-              Tab(text: t('bookings')),
-              Tab(text: t('trips')),
-              Tab(text: t('users')),
-              Tab(text: t('vehicles')),
-              Tab(text: t('lines')),
-            ],
+      appBar: AppBar(
+        title: Text(
+          t('title'),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
           ),
         ),
+        backgroundColor: AppTheme.isDarkMode
+            ? const Color(0xFF1C2541)
+            : AppTheme.appBarColor,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          indicatorColor: Colors.white,
+          indicatorWeight: 3,
+          indicatorSize: TabBarIndicatorSize.label,
+          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 15),
+          tabs: [
+            Tab(text: t('revenue')),
+            Tab(text: t('bookings')),
+            Tab(text: t('trips')),
+            Tab(text: t('users')),
+            Tab(text: t('vehicles')),
+            Tab(text: t('lines')),
+          ],
+        ),
+      ),
         body: Column(
           children: [
             Padding(
@@ -340,6 +349,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
         children: [
           ChartCard(
             title: _isArabic ? 'الإيرادات بمرور الوقت' : 'Revenue Over Time',
+            icon: Icons.trending_up_rounded,
             isLoading: _revenueLoading,
             errorMessage: _revenueError,
             onRetry: _loadRevenueData,
@@ -353,6 +363,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           const SizedBox(height: 16),
           ChartCard(
             title: _isArabic ? 'الإيرادات حسب الخط' : 'Revenue by Line',
+            icon: Icons.pie_chart_rounded,
             isLoading: _revenueLoading,
             errorMessage: _revenueError,
             onRetry: _loadRevenueData,
@@ -375,6 +386,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
         children: [
           ChartCard(
             title: _isArabic ? 'الحجوزات بمرور الوقت' : 'Bookings Over Time',
+            icon: Icons.calendar_month_rounded,
             isLoading: _bookingLoading,
             errorMessage: _bookingError,
             onRetry: _loadBookingData,
@@ -388,6 +400,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           const SizedBox(height: 16),
           ChartCard(
             title: _isArabic ? 'الحجوزات حسب الحالة' : 'Bookings by Status',
+            icon: Icons.donut_large_rounded,
             isLoading: _bookingLoading,
             errorMessage: _bookingError,
             onRetry: _loadBookingData,
@@ -410,6 +423,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
         children: [
           ChartCard(
             title: _isArabic ? 'الرحلات بمرور الوقت' : 'Trips Over Time',
+            icon: Icons.route_rounded,
             isLoading: _tripLoading,
             errorMessage: _tripError,
             onRetry: _loadTripData,
@@ -423,6 +437,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           const SizedBox(height: 16),
           ChartCard(
             title: _isArabic ? 'حالة الرحلات' : 'Trip Status',
+            icon: Icons.data_usage_rounded,
             isLoading: _tripLoading,
             errorMessage: _tripError,
             onRetry: _loadTripData,
@@ -436,6 +451,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           const SizedBox(height: 16),
           ChartCard(
             title: _isArabic ? 'متوسط الاستخدام' : 'Average Utilization',
+            icon: Icons.speed_rounded,
             isLoading: _tripLoading,
             errorMessage: _tripError,
             onRetry: _loadTripData,
@@ -458,6 +474,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
         children: [
           ChartCard(
             title: _isArabic ? 'نمو المستخدمين' : 'User Growth',
+            icon: Icons.group_add_rounded,
             isLoading: _userLoading,
             errorMessage: _userError,
             onRetry: _loadUserData,
@@ -471,6 +488,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           const SizedBox(height: 16),
           ChartCard(
             title: _isArabic ? 'المستخدمين حسب الدور' : 'Users by Role',
+            icon: Icons.people_alt_rounded,
             isLoading: _userLoading,
             errorMessage: _userError,
             onRetry: _loadUserData,
@@ -493,6 +511,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
         children: [
           ChartCard(
             title: _isArabic ? 'استخدام المركبات' : 'Vehicle Utilization',
+            icon: Icons.directions_bus_rounded,
             isLoading: _vehicleLoading,
             errorMessage: _vehicleError,
             onRetry: _loadVehicleData,
@@ -506,6 +525,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           const SizedBox(height: 16),
           ChartCard(
             title: _isArabic ? 'حالة المركبات' : 'Vehicle Status',
+            icon: Icons.local_shipping_rounded,
             isLoading: _vehicleLoading,
             errorMessage: _vehicleError,
             onRetry: _loadVehicleData,
@@ -528,6 +548,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
         children: [
           ChartCard(
             title: _isArabic ? 'الإيرادات حسب الخط' : 'Revenue by Line',
+            icon: Icons.show_chart_rounded,
             isLoading: _lineLoading,
             errorMessage: _lineError,
             onRetry: _loadLineData,
@@ -542,6 +563,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           const SizedBox(height: 16),
           ChartCard(
             title: _isArabic ? 'الحجوزات حسب الخط' : 'Bookings by Line',
+            icon: Icons.bar_chart_rounded,
             isLoading: _lineLoading,
             errorMessage: _lineError,
             onRetry: _loadLineData,
@@ -556,6 +578,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           const SizedBox(height: 16),
           ChartCard(
             title: _isArabic ? 'الاستخدام حسب الخط' : 'Utilization by Line',
+            icon: Icons.stacked_line_chart_rounded,
             isLoading: _lineLoading,
             errorMessage: _lineError,
             onRetry: _loadLineData,

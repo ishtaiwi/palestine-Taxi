@@ -158,13 +158,13 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: AppTheme.cardBackground,
-        title: Text(t('delete'), style: TextStyle(color: AppTheme.textPrimary)),
-        content: Text(t('deleteConfirm'), style: TextStyle(color: AppTheme.textSecondary)),
+        backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
+        title: Text(t('delete'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+        content: Text(t('deleteConfirm'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(t('no'), style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text(t('no'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -294,10 +294,10 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        backgroundColor: AppTheme.cardBackground,
+        backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
         title: Text(
           t('editVehicle'),
-          style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold),
+          style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary, fontWeight: FontWeight.bold),
         ),
         content: SingleChildScrollView(
           child: Form(
@@ -308,12 +308,13 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
               children: [
                 TextFormField(
                   controller: plateController,
-                  style: TextStyle(color: AppTheme.textPrimary),
+                  style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
                   decoration: InputDecoration(
                     labelText: t('plateNumber'),
-                    prefixIcon: Icon(Icons.confirmation_number_rounded, color: AppTheme.textSecondary),
+                    labelStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                    prefixIcon: Icon(Icons.confirmation_number_rounded, color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.textSecondary),
                     filled: true,
-                    fillColor: AppTheme.backgroundColor,
+                    fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : AppTheme.backgroundColor,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -325,13 +326,14 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: status,
-                  dropdownColor: AppTheme.cardBackground,
-                  style: TextStyle(color: AppTheme.textPrimary),
+                  dropdownColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
+                  style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
                   decoration: InputDecoration(
                     labelText: t('status'),
-                    prefixIcon: Icon(Icons.info_outline_rounded, color: AppTheme.textSecondary),
+                    labelStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                    prefixIcon: Icon(Icons.info_outline_rounded, color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.textSecondary),
                     filled: true,
-                    fillColor: AppTheme.backgroundColor,
+                    fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : AppTheme.backgroundColor,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -340,11 +342,11 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                   items: [
                     DropdownMenuItem(
                       value: 'active',
-                      child: Text(t('active')),
+                      child: Text(t('active'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
                     ),
                     DropdownMenuItem(
                       value: 'inactive',
-                      child: Text(t('inactive')),
+                      child: Text(t('inactive'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
                     ),
                   ],
                   onChanged: (value) {
@@ -358,7 +360,7 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(t('cancel'), style: TextStyle(color: AppTheme.textSecondary)),
+            child: Text(t('cancel'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -370,7 +372,7 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.appBarColor,
+              backgroundColor: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(t('save'), style: const TextStyle(color: Colors.white)),
@@ -420,7 +422,9 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: AppTheme.appBarColor,
+      backgroundColor: AppTheme.isDarkMode
+          ? const Color(0xFF1C2541) // Dark card color for better integration
+          : AppTheme.appBarColor,
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
@@ -472,16 +476,16 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
       ),
       child: TextField(
         controller: _searchController,
-        style: TextStyle(color: AppTheme.textPrimary),
+        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
         decoration: InputDecoration(
           hintText: t('search'),
-          hintStyle: TextStyle(color: AppTheme.textSecondary),
-          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textSecondary),
+          hintStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                  icon: Icon(Icons.close_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
                   onPressed: () {
                     _searchController.clear();
                     FocusScope.of(context).unfocus();
@@ -511,6 +515,7 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
   Widget _buildFilterChip(String? status, String label, {Color? color}) {
     final isSelected = _statusFilter == status;
     final activeColor = color ?? AppTheme.appBarColor;
+    final isDark = AppTheme.isDarkMode;
 
     return GestureDetector(
       onTap: () {
@@ -523,16 +528,20 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor : AppTheme.cardBackground,
+          color: isSelected 
+              ? (isDark && status == null ? Colors.blueAccent : activeColor) 
+              : AppTheme.cardBackground,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? activeColor : AppTheme.textSecondary.withOpacity(0.3),
+            color: isSelected 
+                ? (isDark && status == null ? Colors.blueAccent : activeColor) 
+                : (isDark ? Colors.white.withOpacity(0.1) : AppTheme.textSecondary.withOpacity(0.3)),
             width: 1.5,
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: activeColor.withOpacity(0.3),
+                    color: (isDark && status == null ? Colors.blueAccent : activeColor).withOpacity(0.3),
                     blurRadius: 6,
                     offset: const Offset(0, 3),
                   )
@@ -542,7 +551,7 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : AppTheme.textSecondary,
+            color: isSelected ? Colors.white : (isDark ? Colors.white : AppTheme.textSecondary),
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
@@ -581,12 +590,12 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.appBarColor.withOpacity(0.1),
+                  color: AppTheme.isDarkMode ? Colors.blueAccent.withOpacity(0.1) : AppTheme.appBarColor.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.directions_car_rounded,
-                  color: AppTheme.appBarColor,
+                  color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
                   size: 28,
                 ),
               ),
@@ -598,7 +607,7 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                     Text(
                       vehicle['plateno'] ?? 'No Plate',
                       style: TextStyle(
-                        color: AppTheme.textPrimary,
+                        color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -606,11 +615,11 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        Icon(Icons.event_seat_rounded, size: 14, color: AppTheme.textSecondary),
+                        Icon(Icons.event_seat_rounded, size: 14, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
                         const SizedBox(width: 4),
                         Text(
                           '${t('seats')}: ${vehicle['seatnum'] ?? 0}',
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                          style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary, fontSize: 13),
                         ),
                         const SizedBox(width: 12),
                         Container(
@@ -661,7 +670,7 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: color.withOpacity(0.1),
+      color: AppTheme.isDarkMode ? color.withOpacity(0.2) : color.withOpacity(0.1),
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
@@ -699,14 +708,14 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
             child: Icon(
               Icons.directions_car_outlined,
               size: 80,
-              color: AppTheme.textSecondary.withOpacity(0.5),
+              color: AppTheme.isDarkMode ? Colors.white24 : AppTheme.textSecondary.withOpacity(0.5),
             ),
           ),
           const SizedBox(height: 20),
           Text(
             t('noVehicles'),
             style: TextStyle(
-              color: AppTheme.textPrimary,
+              color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
               fontSize: 18,
               fontWeight: FontWeight.w600,
             ),

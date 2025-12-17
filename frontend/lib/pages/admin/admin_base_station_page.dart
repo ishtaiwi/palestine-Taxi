@@ -390,13 +390,25 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
       appBar: AppBar(
         title: Text(
           'Base Stations',
-          style: TextStyle(color: AppTheme.textPrimary),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
         ),
-        backgroundColor: AppTheme.appBarColor,
-        iconTheme: IconThemeData(color: AppTheme.textPrimary),
+        backgroundColor: AppTheme.isDarkMode
+            ? const Color(0xFF1C2541)
+            : AppTheme.appBarColor,
+        elevation: 0,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        ),
         actions: [
           IconButton(
             icon: Icon(_showMap ? Icons.list : Icons.map),
+            color: Colors.white,
             onPressed: () {
               setState(() {
                 _showMap = !_showMap;
@@ -406,6 +418,7 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
           ),
           IconButton(
             icon: const Icon(Icons.add),
+            color: Colors.white,
             onPressed: () => _createOrUpdateStation(),
             tooltip: 'Add Base Station',
           ),

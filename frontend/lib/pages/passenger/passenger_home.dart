@@ -212,7 +212,9 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: AppTheme.appBarColor,
+      backgroundColor: _isDarkMode
+          ? const Color(0xFF1C2541)
+          : AppTheme.appBarColor,
       elevation: 0,
       centerTitle: true,
       automaticallyImplyLeading: false,

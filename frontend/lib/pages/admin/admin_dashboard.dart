@@ -27,6 +27,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   bool _isArabic = true;
+  bool _isDarkMode = false;
   Map<String, dynamic>? _predictionInsights;
   bool _insightsLoading = true;
 
@@ -51,7 +52,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'lines': 'الخطوط',
       'vehicles': 'المركبات',
       'trips': 'الرحلات',
-      'schedules': 'الجداول ',
+      'schedules': 'الجداول',
       'payments': 'المدفوعات',
       'reports': 'التقارير',
       'generalStats': 'الإحصائيات العامة',
@@ -62,6 +63,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'role': 'الدور',
       'admin': 'المدير',
       'logout': 'تسجيل الخروج',
+      'aiPredictions': 'توقعات الذكاء الاصطناعي',
+      'vehicleMap': 'خريطة المركبات',
+      'baseStations': 'محطات القاعدة',
+      'analytics': 'التحليلات',
+      'map': 'الخريطة',
     },
     'en': {
       'title': 'Admin Dashboard',
@@ -83,22 +89,32 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'role': 'Role',
       'admin': 'Admin',
       'logout': 'Logout',
+      'aiPredictions': 'AI Predictions',
+      'vehicleMap': 'Vehicle Map',
+      'baseStations': 'Base Stations',
+      'analytics': 'Analytics',
+      'map': 'Map',
     },
   };
 
-  String t(String key) => _texts[_isArabic ? 'ar' : 'en']![key]!;
+  String t(String key) => _texts[_isArabic ? 'ar' : 'en']![key] ?? key;
 
   @override
   void initState() {
     super.initState();
-    AppTheme.init().then((_) {
-      if (mounted) setState(() {});
-    });
+    _loadThemePreference();
     _loadUserData();
     _loadPredictionInsights();
     _loadMapData();
     _subscribeToRealtimeUpdates();
     _loadDashboardStats();
+  }
+
+  Future<void> _loadThemePreference() async {
+    await AppTheme.init();
+    setState(() {
+      _isDarkMode = AppTheme.isDarkMode;
+    });
   }
 
   @override
@@ -152,7 +168,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         }
       }
     } catch (e) {
-      print('Error loading map data: $e');
+      debugPrint('Error loading map data: $e');
     } finally {
       setState(() {
         _mapLoading = false;
@@ -193,7 +209,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         _statsLoading = false;
       });
     } catch (e) {
-      print('Error loading dashboard stats: $e');
+      debugPrint('Error loading dashboard stats: $e');
       setState(() {
         _statsLoading = false;
       });
@@ -208,15 +224,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     try {
       final insights = await ApiService.getPredictionInsightsAdmin(limit: 3);
 
-      debugPrint('[AdminDashboard] getPredictionInsightsAdmin => $insights');
-
       if (insights['success'] == true) {
         setState(() {
           _predictionInsights = insights['data'] ?? insights;
           _insightsLoading = false;
         });
       } else {
-        // Normalize a predictable structure so UI can show an empty state + error
         setState(() {
           _predictionInsights = {
             'topLines': [],
@@ -225,12 +238,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           };
           _insightsLoading = false;
         });
-
-        debugPrint(
-            '[AdminDashboard] prediction insights failed: ${insights['message']}');
       }
-    } catch (error, stack) {
-      debugPrint('[AdminDashboard] exception loading insights: $error\n$stack');
+    } catch (error) {
       setState(() {
         _predictionInsights = {
           'topLines': [],
@@ -259,416 +268,424 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: AppTheme.isDarkMode
+          ? const Color(0xFF1C2541) // Dark card color for better integration
+          : AppTheme.appBarColor,
+      elevation: 0,
+      centerTitle: true,
+      automaticallyImplyLeading: false,
+      title: Text(
+        t('title'),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(
+            AppTheme.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+            color: Colors.white,
+          ),
+          onPressed: () async {
+            await AppTheme.toggleTheme();
+            setState(() {
+              _isDarkMode = AppTheme.isDarkMode;
+            });
+          },
+          tooltip: _isDarkMode ? 'Light Mode' : 'Dark Mode',
+        ),
+        IconButton(
+          icon: Icon(
+            _isArabic ? Icons.language : Icons.translate,
+            color: Colors.white,
+          ),
+          onPressed: () => _switchLanguage(!_isArabic),
+          tooltip: _isArabic ? 'English' : 'العربية',
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout_rounded, color: Colors.white),
+          onPressed: _handleLogout,
+          tooltip: t('logout'),
+        ),
+        const SizedBox(width: 8),
+      ],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
 
+    // Theme-aware colors
+    final backgroundColor = _isDarkMode
+        ? const Color(0xFF0A0E21)
+        : const Color.fromARGB(255, 224, 228, 231);
+    final cardColor =
+        _isDarkMode ? const Color(0xFF1C2541) : const Color(0xFFFAFBFC);
+    final textPrimaryColor =
+        _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
+    final textSecondaryColor =
+        _isDarkMode ? const Color(0xFFB0BEC5) : const Color(0xFF546E7A);
+    const adminPrimaryColor = Color(0xFF7B1FA2); // Purple for Admin
+
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
-        appBar: AppBar(
-          title: Text(
-            t('title'),
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          backgroundColor: AppTheme.appBarColor,
-          elevation: 2,
-          iconTheme: IconThemeData(
-            color: AppTheme.textPrimary,
-          ),
-          actionsIconTheme: IconThemeData(
-            color: AppTheme.textPrimary,
-          ),
-          actions: [
-            IconButton(
-              icon: Icon(
-                AppTheme.isDarkMode ? Icons.light_mode : Icons.dark_mode,
-                color: AppTheme.textPrimary,
-              ),
-              onPressed: () async {
-                await AppTheme.toggleTheme();
-                if (mounted) setState(() {});
-              },
-              tooltip: AppTheme.isDarkMode ? 'Light Mode' : 'Dark Mode',
-            ),
-            IconButton(
-              icon: Icon(
-                _isArabic ? Icons.language : Icons.translate,
-                color: AppTheme.textPrimary,
-              ),
-              onPressed: () => _switchLanguage(!_isArabic),
-              tooltip: _isArabic ? 'English' : 'العربية',
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.logout,
-                color: AppTheme.textPrimary,
-              ),
-              onPressed: _handleLogout,
-              tooltip: t('logout'),
-            ),
-          ],
-        ),
+        backgroundColor: backgroundColor,
+        appBar: _buildAppBar(),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : SafeArea(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Gradient Header
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(32),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF9C27B0), Color(0xFF7B1FA2)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF8E24AA), // Purple 600
+                              Color(0xFF4A148C), // Purple 900
+                              Color(0xFF8E24AA),
+                            ],
+                            stops: [0.0, 0.5, 1.0],
                           ),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${t('welcome')}, ${_userData?['fullname'] ?? t('admin')}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    t('manageSystem'),
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF7B1FA2).withAlpha(102),
+                              blurRadius: 24,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 12),
                             ),
-                            const Icon(
-                              Icons.admin_panel_settings,
-                              color: Colors.white,
-                              size: 48,
+                            BoxShadow(
+                              color: Colors.black.withAlpha(51),
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
                             ),
                           ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        t('systemManagement'),
-                        style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.people,
-                              title: t('users'),
-                              color: Colors.blue,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AdminUsersPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.route,
-                              title: t('lines'),
-                              color: Colors.green,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AdminLinesPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.directions_car,
-                              title: t('vehicles'),
-                              color: Colors.orange,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AdminVehiclesPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.directions_bus,
-                              title: t('trips'),
-                              color: Colors.purple,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AdminTripsPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.schedule,
-                              title: t('schedules'),
-                              color: Colors.indigo,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AdminSchedulesPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.payment,
-                              title: t('payments'),
-                              color: Colors.teal,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AdminPaymentsPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.bar_chart,
-                              title: t('reports'),
-                              color: Colors.red,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const AdminReportsPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.trending_up,
-                              title: _isArabic
-                                  ? 'توقعات الذكاء الاصطناعي'
-                                  : 'AI Predictions',
-                              color: Colors.deepOrange,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AdminPredictionsPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.map,
-                              title:
-                                  _isArabic ? 'خريطة المركبات' : 'Vehicle Map',
-                              color: Colors.cyan,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const AdminMapPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.location_city,
-                              title:
-                                  _isArabic ? 'محطات القاعدة' : 'Base Stations',
-                              color: Colors.brown,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const AdminBaseStationPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white24),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              t('generalStats'),
-                              style: TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            GridView.count(
-                              crossAxisCount: 2,
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                              childAspectRatio: 2,
+                            Row(
                               children: [
-                                _buildStatCard(
-                                  t('users'),
-                                  _statsLoading
-                                      ? '-'
-                                      : (_dashboardStats?['totalUsers']
-                                              ?.toString() ??
-                                          '0'),
-                                  Icons.people,
-                                  Colors.blue,
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 3,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withAlpha(77),
+                                        blurRadius: 16,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        Colors.white.withAlpha(50),
+                                        Colors.white.withAlpha(20),
+                                      ],
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.admin_panel_settings_rounded,
+                                    color: Colors.white,
+                                    size: 40,
+                                  ),
                                 ),
-                                _buildStatCard(
-                                  t('trips'),
-                                  _statsLoading
-                                      ? '-'
-                                      : (_dashboardStats?['totalTrips']
-                                              ?.toString() ??
-                                          '0'),
-                                  Icons.directions_bus,
-                                  Colors.green,
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        t('welcome'),
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _userData?['fullname'] ?? t('admin'),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.3,
+                                          height: 1.2,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        t('manageSystem'),
+                                        style: const TextStyle(
+                                          color: Colors.white60,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                _buildStatCard(
-                                  t('reservations'),
-                                  _statsLoading
-                                      ? '-'
-                                      : (_dashboardStats?['totalReservations']
-                                              ?.toString() ??
-                                          '0'),
-                                  Icons.book_online,
-                                  Colors.orange,
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            // Stats Row
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildWelcomeStatCard(
+                                    icon: Icons.people_rounded,
+                                    label: t('users'),
+                                    value: _statsLoading
+                                        ? '-'
+                                        : (_dashboardStats?['totalUsers']
+                                                ?.toString() ??
+                                            '0'),
+                                  ),
                                 ),
-                                _buildStatCard(
-                                  t('revenue'),
-                                  _statsLoading
-                                      ? '-'
-                                      : _formatRevenue(
-                                          _revenueStats?['totalRevenue']),
-                                  Icons.attach_money,
-                                  Colors.purple,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildWelcomeStatCard(
+                                    icon: Icons.directions_bus_rounded,
+                                    label: t('trips'),
+                                    value: _statsLoading
+                                        ? '-'
+                                        : (_dashboardStats?['totalTrips']
+                                                ?.toString() ??
+                                            '0'),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildWelcomeStatCard(
+                                    icon: Icons.attach_money_rounded,
+                                    label: t('revenue'),
+                                    value: _statsLoading
+                                        ? '-'
+                                        : _formatRevenue(
+                                            _revenueStats?['totalRevenue']),
+                                  ),
                                 ),
                               ],
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      _buildVehicleTrackingMap(),
-                      const SizedBox(height: 16),
-                      _buildPredictionSummaryCard(),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white24),
-                        ),
+                      const SizedBox(height: 32),
+
+                      // System Management Card
+                      _buildSectionCard(
+                        title: t('systemManagement'),
+                        icon: Icons.dashboard_rounded,
+                        color: adminPrimaryColor,
+                        cardColor: cardColor,
+                        textPrimaryColor: textPrimaryColor,
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              t('accountInfo'),
-                              style: TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildActionCard(
+                                    icon: Icons.people_outline_rounded,
+                                    title: t('users'),
+                                    color: Colors.blue,
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminUsersPage())),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildActionCard(
+                                    icon: Icons.route_rounded,
+                                    title: t('lines'),
+                                    color: Colors.green,
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminLinesPage())),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildActionCard(
+                                    icon: Icons.directions_car_filled_rounded,
+                                    title: t('vehicles'),
+                                    color: Colors.orange,
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminVehiclesPage())),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildActionCard(
+                                    icon: Icons.directions_bus_filled_rounded,
+                                    title: t('trips'),
+                                    color: Colors.purple,
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminTripsPage())),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildActionCard(
+                                    icon: Icons.schedule_rounded,
+                                    title: t('schedules'),
+                                    color: Colors.indigo,
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminSchedulesPage())),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildActionCard(
+                                    icon: Icons.payment_rounded,
+                                    title: t('payments'),
+                                    color: Colors.teal,
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminPaymentsPage())),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildActionCard(
+                                    icon: Icons.bar_chart_rounded,
+                                    title: t('reports'),
+                                    color: Colors.red,
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminReportsPage())),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildActionCard(
+                                    icon: Icons.trending_up_rounded,
+                                    title: t('aiPredictions'),
+                                    color: Colors.deepOrange,
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminPredictionsPage())),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildActionCard(
+                                    icon: Icons.location_city_rounded,
+                                    title: t('baseStations'),
+                                    color: Colors.brown,
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminBaseStationPage())),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      // Map Section
+                      _buildVehicleTrackingMap(
+                          cardColor, textPrimaryColor, textSecondaryColor),
+
+                      const SizedBox(height: 32),
+
+                      // Analytics Section
+                      _buildPredictionSummaryCard(
+                          cardColor, textPrimaryColor, textSecondaryColor),
+
+                      const SizedBox(height: 32),
+
+                      // Account Info
+                      _buildSectionCard(
+                        title: t('accountInfo'),
+                        icon: Icons.person_outline_rounded,
+                        color: adminPrimaryColor,
+                        cardColor: cardColor,
+                        textPrimaryColor: textPrimaryColor,
+                        child: Column(
+                          children: [
                             _buildInfoRow(
-                              Icons.email,
+                              Icons.email_outlined,
                               t('email'),
                               _userData?['email'] ?? '',
+                              adminPrimaryColor,
+                              textPrimaryColor,
+                              textSecondaryColor,
+                              cardColor,
+                              _isDarkMode,
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 14),
                             _buildInfoRow(
-                              Icons.badge,
+                              Icons.badge_outlined,
                               t('role'),
                               _userData?['role'] ?? 'ADMIN',
+                              adminPrimaryColor,
+                              textPrimaryColor,
+                              textSecondaryColor,
+                              cardColor,
+                              _isDarkMode,
                             ),
                           ],
                         ),
@@ -681,35 +698,134 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required Color cardColor,
+    required Color textPrimaryColor,
+    required Widget child,
+    Widget? headerAction,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _isDarkMode ? Colors.white.withAlpha(38) : Colors.grey.shade200,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(20),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: color.withAlpha(51),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: color,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: textPrimaryColor,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              if (headerAction != null) headerAction,
+            ],
+          ),
+          const SizedBox(height: 24),
+          child,
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionCard({
     required IconData icon,
     required String title,
     required Color color,
     required VoidCallback onTap,
   }) {
+    // Determine background color based on theme
+    final bgColor = _isDarkMode ? const Color(0xFF1C2541) : Colors.white;
+    final borderColor =
+        _isDarkMode ? Colors.white.withAlpha(25) : Colors.grey.shade200;
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          color: bgColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: color.withAlpha(20),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.black.withAlpha(10),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withAlpha(25),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: color.withAlpha(50),
+                  width: 1,
+                ),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: 12),
             Text(
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppTheme.textPrimary,
+                color: _isDarkMode ? Colors.white : AppTheme.textPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -717,37 +833,109 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildStatCard(
-      String label, String value, IconData icon, Color color) {
+  Widget _buildWelcomeStatCard({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: Colors.white.withAlpha(38),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withAlpha(77),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            color: Colors.white,
+            size: 24,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withAlpha(217),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.2,
+              height: 1.2,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value,
+    Color accentColor,
+    Color textPrimaryColor,
+    Color textSecondaryColor,
+    Color cardColor,
+    bool isDarkMode,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.white.withAlpha(13) : const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDarkMode ? Colors.white.withAlpha(25) : Colors.grey.shade200,
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: accentColor.withAlpha(38),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: accentColor, size: 22),
+          ),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
                 Text(
                   label,
                   style: TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 11,
+                    color: textSecondaryColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: textPrimaryColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
                   ),
                 ),
               ],
@@ -758,30 +946,173 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildPredictionSummaryCard() {
-    final model = _predictionInsights?['model'] as Map<String, dynamic>?;
-    final topLines = (_predictionInsights?['topLines'] as List<dynamic>?) ?? [];
+  Widget _buildVehicleTrackingMap(
+      Color cardColor, Color textPrimary, Color textSecondary) {
+    // Determine center point
+    LatLng center = _baseStations.isNotEmpty
+        ? LatLng(
+            _baseStations[0]['latitude']?.toDouble() ?? 31.9522,
+            _baseStations[0]['longitude']?.toDouble() ?? 35.2332,
+          )
+        : _vehicleLocations.isNotEmpty
+            ? LatLng(
+                _vehicleLocations[0]['latitude']?.toDouble() ?? 31.9522,
+                _vehicleLocations[0]['longitude']?.toDouble() ?? 35.2332,
+              )
+            : const LatLng(31.9522, 35.2332);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.getCardBackground(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.getCardBorder(0.15)),
+    return _buildSectionCard(
+      title: _isArabic ? 'تتبع المركبات' : 'Vehicle Tracking',
+      icon: Icons.map_rounded,
+      color: Colors.cyan,
+      cardColor: cardColor,
+      textPrimaryColor: textPrimary,
+      headerAction: IconButton(
+        icon: Icon(
+          Icons.open_in_full,
+          color: textSecondary,
+          size: 20,
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AdminMapPage(),
+            ),
+          );
+        },
+        tooltip: _isArabic ? 'عرض كامل' : 'Full View',
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _isArabic ? 'تحليلات الطلب' : 'AI Demand Insights',
-            style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+          Container(
+            height: 320,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isDarkMode
+                    ? Colors.white.withAlpha(25)
+                    : Colors.grey.shade300,
+                width: 1,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: _mapLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: center,
+                        initialZoom: 12.0,
+                        interactionOptions: const InteractionOptions(
+                          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                        ),
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName:
+                              'com.example.taxi_palestine_app',
+                        ),
+                        // Base station markers
+                        MarkerLayer(
+                          markers: _baseStations.map((station) {
+                            final lat = station['latitude']?.toDouble() ?? 0.0;
+                            final lng = station['longitude']?.toDouble() ?? 0.0;
+                            return Marker(
+                              point: LatLng(lat, lng),
+                              width: 45,
+                              height: 45,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withAlpha(230),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.blue.withAlpha(128),
+                                      blurRadius: 8,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.location_city,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        // Vehicle markers
+                        MarkerLayer(
+                          markers: _vehicleLocations.map((location) {
+                            final lat = location['latitude']?.toDouble() ?? 0.0;
+                            final lng =
+                                location['longitude']?.toDouble() ?? 0.0;
+                            final isAtStation =
+                                location['is_at_station'] == true;
+                            final markerColor =
+                                isAtStation ? Colors.green : Colors.red;
+                            return Marker(
+                              point: LatLng(lat, lng),
+                              width: 50,
+                              height: 50,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: markerColor.withAlpha(230),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: markerColor.withAlpha(153),
+                                      blurRadius: 10,
+                                      spreadRadius: 3,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.local_taxi,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
             ),
           ),
-          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPredictionSummaryCard(
+      Color cardColor, Color textPrimary, Color textSecondary) {
+    final model = _predictionInsights?['model'] as Map<String, dynamic>?;
+    final topLines = (_predictionInsights?['topLines'] as List<dynamic>?) ?? [];
+
+    return _buildSectionCard(
+      title: _isArabic ? 'تحليلات الطلب' : 'AI Demand Insights',
+      icon: Icons.trending_up_rounded,
+      color: Colors.deepOrange,
+      cardColor: cardColor,
+      textPrimaryColor: textPrimary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           if (_insightsLoading)
             const Center(
               child: CircularProgressIndicator(),
@@ -791,7 +1122,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               _isArabic
                   ? 'لا توجد بيانات كافية بعد لتوليد التوقعات'
                   : 'No demand signals yet. Predictions will appear after bookings accumulate.',
-              style: TextStyle(color: AppTheme.textSecondary),
+              style: TextStyle(color: textSecondary),
             )
           else
             Column(
@@ -801,20 +1132,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     ((data['avgUtilization'] ?? 0) as num).toStringAsFixed(2);
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.directions_transit,
-                      color: Colors.lightBlueAccent),
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.deepOrange.withAlpha(26),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.directions_transit,
+                        color: Colors.deepOrange),
+                  ),
                   title: Text(
                     ((data['buckets'] as List?)?.isNotEmpty == true)
                         ? (data['buckets'][0]['line']?['linename'] ?? 'Line')
                         : 'Line',
                     style: TextStyle(
-                      color: AppTheme.textPrimary,
+                      color: textPrimary,
                       fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
                   ),
                   subtitle: Text(
                     '${_isArabic ? 'نسبة الإشغال' : 'Avg utilization'} $utilization',
-                    style: TextStyle(color: AppTheme.textSecondary),
+                    style: TextStyle(color: textSecondary),
                   ),
                 );
               }).toList(),
@@ -824,7 +1163,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             Text(
               '${_isArabic ? 'آخر تدريب' : 'Last trained'}: ${_formatTimestamp(model['lastTrainedAt'])}',
               style: TextStyle(
-                  color: AppTheme.textSecondary.withOpacity(0.7), fontSize: 12),
+                  color: textSecondary.withOpacity(0.7), fontSize: 12),
             ),
         ],
       ),
@@ -849,340 +1188,5 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       return '${(amount / 1000).toStringAsFixed(1)}K';
     }
     return amount.toStringAsFixed(0);
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: AppTheme.textSecondary, size: 20),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: AppTheme.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-              Text(
-                value,
-                style: TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildVehicleTrackingMap() {
-    // Determine center point
-    LatLng center = _baseStations.isNotEmpty
-        ? LatLng(
-            _baseStations[0]['latitude']?.toDouble() ?? 31.9522,
-            _baseStations[0]['longitude']?.toDouble() ?? 35.2332,
-          )
-        : _vehicleLocations.isNotEmpty
-            ? LatLng(
-                _vehicleLocations[0]['latitude']?.toDouble() ?? 31.9522,
-                _vehicleLocations[0]['longitude']?.toDouble() ?? 35.2332,
-              )
-            : const LatLng(31.9522, 35.2332);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.getCardBackground(0.08),
-            AppTheme.getCardBackground(0.03),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.getCardBorder(0.15),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.getShadowColor(0.3),
-            blurRadius: 10,
-            spreadRadius: 2,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.cyan.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.map,
-                        color: Colors.cyan,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        _isArabic ? 'تتبع المركبات' : 'Vehicle Tracking',
-                        style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(width: 6),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.2),
-                      ),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.open_in_full,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AdminMapPage(),
-                          ),
-                        );
-                      },
-                      tooltip: _isArabic ? 'عرض كامل' : 'Full View',
-                      padding: const EdgeInsets.all(8),
-                      constraints: const BoxConstraints(),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            height: 320,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppTheme.getCardBorder(0.2),
-                width: 2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.getShadowColor(0.5),
-                  blurRadius: 15,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: _mapLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: center,
-                        initialZoom: 12.0,
-                        interactionOptions: const InteractionOptions(
-                          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                        ),
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName:
-                              'com.example.taxi_palestine_app',
-                        ),
-                        // Base station markers with better styling
-                        MarkerLayer(
-                          markers: _baseStations.map((station) {
-                            final lat = station['latitude']?.toDouble() ?? 0.0;
-                            final lng = station['longitude']?.toDouble() ?? 0.0;
-                            return Marker(
-                              point: LatLng(lat, lng),
-                              width: 45,
-                              height: 45,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withValues(alpha: 0.9),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.blue.withValues(alpha: 0.5),
-                                      blurRadius: 8,
-                                      spreadRadius: 2,
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  Icons.location_city,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        // Vehicle markers with better styling
-                        MarkerLayer(
-                          markers: _vehicleLocations.map((location) {
-                            final lat = location['latitude']?.toDouble() ?? 0.0;
-                            final lng =
-                                location['longitude']?.toDouble() ?? 0.0;
-                            final isAtStation =
-                                location['is_at_station'] == true;
-                            final markerColor =
-                                isAtStation ? Colors.green : Colors.red;
-                            return Marker(
-                              point: LatLng(lat, lng),
-                              width: 50,
-                              height: 50,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: markerColor.withValues(alpha: 0.9),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: markerColor.withValues(alpha: 0.6),
-                                      blurRadius: 10,
-                                      spreadRadius: 3,
-                                    ),
-                                  ],
-                                ),
-                                child: Icon(
-                                  Icons.local_taxi,
-                                  color: Colors.white,
-                                  size: 28,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Improved legend
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppTheme.getCardBackground(0.05),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: AppTheme.getCardBorder(0.1),
-              ),
-            ),
-            child: Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildMapLegendItem(
-                  Icons.local_taxi,
-                  Colors.red,
-                  _isArabic ? 'في الطريق' : 'On Route',
-                ),
-                Container(
-                  width: 1,
-                  height: 20,
-                  color: Colors.white.withValues(alpha: 0.2),
-                ),
-                _buildMapLegendItem(
-                  Icons.local_taxi,
-                  Colors.green,
-                  _isArabic ? 'في المحطة' : 'At Station',
-                ),
-                Container(
-                  width: 1,
-                  height: 20,
-                  color: Colors.white.withValues(alpha: 0.2),
-                ),
-                _buildMapLegendItem(
-                  Icons.location_city,
-                  Colors.blue,
-                  _isArabic ? 'محطة' : 'Station',
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMapLegendItem(IconData icon, Color color, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Icon(icon, color: color, size: 14),
-        ),
-        const SizedBox(width: 4),
-        Flexible(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-        ),
-      ],
-    );
   }
 }

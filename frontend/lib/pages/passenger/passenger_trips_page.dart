@@ -285,94 +285,263 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                 child: Column(
                   children: [
                     // Line Filter
-                    DropdownButtonFormField<String>(
-                      value: _selectedLineId,
-                      dropdownColor: cardColor,
-                      decoration: InputDecoration(
-                        labelText: t('filterByLine'),
-                        labelStyle: TextStyle(color: textSecondary),
-                        filled: true,
-                        fillColor: _isDarkMode
+                    Container(
+                      decoration: BoxDecoration(
+                        color: _isDarkMode
                             ? const Color(0xFF1E3A5F).withAlpha(77)
-                            : Colors.grey.shade50,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: _isDarkMode
-                                ? const Color(0xFF2C5F8D)
-                                : Colors.grey.shade300,
-                          ),
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _isDarkMode
+                              ? const Color(0xFF2C5F8D)
+                              : Colors.grey.shade300,
+                          width: 1.5,
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: _isDarkMode
-                                ? const Color(0xFF2C5F8D)
-                                : Colors.grey.shade300,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
+                        ],
+                      ),
+                      child: DropdownButtonFormField<String>(
+                        value: _selectedLineId,
+                        dropdownColor: cardColor,
+                        decoration: InputDecoration(
+                          labelText: t('filterByLine'),
+                          labelStyle: TextStyle(
+                            color: textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          filled: false,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          prefixIcon: Icon(
+                            Icons.directions_bus_rounded,
                             color: _isDarkMode
                                 ? const Color(0xFF64B5F6)
                                 : const Color(0xFF1E3A5F),
-                            width: 2,
                           ),
                         ),
-                      ),
-                      style: TextStyle(
-                          color: textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500),
-                      iconEnabledColor: textPrimary,
-                      iconSize: 24,
-                      menuMaxHeight: 300,
-                      isExpanded: true,
-                      items: [
-                        DropdownMenuItem<String>(
-                          value: null,
-                          child: Text(
-                            t('allLines'),
-                            style: TextStyle(
-                              color: textPrimary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
+                        style: TextStyle(
+                            color: textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
+                        icon: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: _isDarkMode
+                                ? const Color(0xFF2C5F8D).withOpacity(0.5)
+                                : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: textPrimary,
+                            size: 20,
                           ),
                         ),
-                        ..._lines.map((line) {
-                          // Get line name based on current language
-                          final lineName = _isArabic
-                              ? (line['name_ar']?.toString() ??
-                                  line['linename']?.toString() ??
-                                  line['name_en']?.toString() ??
-                                  '')
-                              : (line['name_en']?.toString() ??
-                                  line['linename']?.toString() ??
-                                  line['name_ar']?.toString() ??
-                                  '');
-                          return DropdownMenuItem<String>(
-                            value: line['lineid']?.toString(),
-                            child: Text(
-                              lineName.isEmpty
-                                  ? (_isArabic ? 'غير معروف' : 'Unknown')
-                                  : lineName,
-                              style: TextStyle(
-                                color: textPrimary,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
+                        iconSize: 24,
+                        menuMaxHeight: 350,
+                        isExpanded: true,
+                        borderRadius: BorderRadius.circular(16),
+                        elevation: 4,
+                        items: [
+                          DropdownMenuItem<String>(
+                            value: null,
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _selectedLineId == null
+                                    ? (_isDarkMode
+                                        ? const Color(0xFF2C5F8D).withOpacity(0.3)
+                                        : const Color(0xFFE3F2FD))
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: _selectedLineId == null
+                                          ? (_isDarkMode
+                                              ? const Color(0xFF64B5F6)
+                                              : const Color(0xFF1E3A5F))
+                                          : textSecondary.withOpacity(0.5),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    t('allLines'),
+                                    style: TextStyle(
+                                      color: _selectedLineId == null
+                                          ? (_isDarkMode
+                                              ? Colors.white
+                                              : const Color(0xFF1E3A5F))
+                                          : textPrimary,
+                                      fontSize: 16,
+                                      fontWeight: _selectedLineId == null
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (_selectedLineId == null)
+                                    Icon(
+                                      Icons.check_circle_rounded,
+                                      color: _isDarkMode
+                                          ? const Color(0xFF64B5F6)
+                                          : const Color(0xFF1E3A5F),
+                                      size: 20,
+                                    ),
+                                ],
                               ),
                             ),
-                          );
-                        }),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedLineId = value;
-                        });
-                        _loadTrips();
-                      },
+                          ),
+                          ..._lines.map((line) {
+                            // Get line name based on current language
+                            final lineName = _isArabic
+                                ? (line['name_ar']?.toString() ??
+                                    line['linename']?.toString() ??
+                                    line['name_en']?.toString() ??
+                                    '')
+                                : (line['name_en']?.toString() ??
+                                    line['linename']?.toString() ??
+                                    line['name_ar']?.toString() ??
+                                    '');
+                            final isSelected =
+                                _selectedLineId == line['lineid']?.toString();
+
+                            return DropdownMenuItem<String>(
+                              value: line['lineid']?.toString(),
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? (_isDarkMode
+                                          ? const Color(0xFF2C5F8D).withOpacity(0.3)
+                                          : const Color(0xFFE3F2FD))
+                                      : (_isDarkMode
+                                          ? Colors.white.withOpacity(0.05)
+                                          : Colors.grey.withOpacity(0.05)),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? (_isDarkMode
+                                            ? const Color(0xFF64B5F6)
+                                            : const Color(0xFF1E3A5F))
+                                        : Colors.transparent,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? (_isDarkMode
+                                                ? const Color(0xFF64B5F6)
+                                                : const Color(0xFF1E3A5F))
+                                            : textSecondary.withOpacity(0.5),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        lineName.isEmpty
+                                            ? (_isArabic
+                                                ? 'غير معروف'
+                                                : 'Unknown')
+                                            : lineName,
+                                        style: TextStyle(
+                                          color: isSelected
+                                              ? (_isDarkMode
+                                                  ? Colors.white
+                                                  : const Color(0xFF1E3A5F))
+                                              : textPrimary,
+                                          fontSize: 16,
+                                          fontWeight: isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.w500,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      Icon(
+                                        Icons.check_circle_rounded,
+                                        color: _isDarkMode
+                                            ? const Color(0xFF64B5F6)
+                                            : const Color(0xFF1E3A5F),
+                                        size: 20,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedLineId = value;
+                          });
+                          _loadTrips();
+                        },
+                        selectedItemBuilder: (BuildContext context) {
+                          return [
+                            DropdownMenuItem<String>(
+                              value: null,
+                              child: Text(
+                                t('allLines'),
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            ..._lines.map<DropdownMenuItem<String>>((line) {
+                              final lineName = _isArabic
+                                  ? (line['name_ar']?.toString() ??
+                                      line['linename']?.toString() ??
+                                      line['name_en']?.toString() ??
+                                      '')
+                                  : (line['name_en']?.toString() ??
+                                      line['linename']?.toString() ??
+                                      line['name_ar']?.toString() ??
+                                      '');
+                              return DropdownMenuItem<String>(
+                                value: line['lineid']?.toString(),
+                                child: Text(
+                                  lineName.isEmpty
+                                      ? (_isArabic ? 'غير معروف' : 'Unknown')
+                                      : lineName,
+                                  style: TextStyle(
+                                    color: textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }),
+                          ];
+                        },
+                      ),
                     ),
                     const SizedBox(height: 12),
                     // Date Filter

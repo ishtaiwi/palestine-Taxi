@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import '../../services/api_service.dart';
 import '../../services/stripe_service.dart';
@@ -20,7 +21,10 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
   String? _error;
   Map<String, dynamic>? _wallet;
   final TextEditingController _amountController = TextEditingController();
-  CardFieldInputDetails? _cardDetails;
+  final TextEditingController _cardNumberController = TextEditingController();
+  final TextEditingController _expiryController = TextEditingController();
+  final TextEditingController _cvcController = TextEditingController();
+  // CardFieldInputDetails? _cardDetails;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -65,7 +69,10 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
     },
   };
 
-  String t(String key) => _texts[_isArabic ? 'ar' : 'en']![key]!;
+  String t(String key) {
+    final lang = _isArabic ? 'ar' : 'en';
+    return _texts[lang]?[key] ?? key;
+  }
 
   @override
   void initState() {
@@ -76,6 +83,9 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
   @override
   void dispose() {
     _amountController.dispose();
+    _cardNumberController.dispose();
+    _expiryController.dispose();
+    _cvcController.dispose();
     super.dispose();
   }
 
@@ -156,7 +166,9 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
       return;
     }
 
-    if (_cardDetails == null || !_cardDetails!.complete) {
+    if (_cardNumberController.text.length < 16 ||
+        _expiryController.text.length < 5 ||
+        _cvcController.text.length < 3) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -171,7 +183,21 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
     }
 
     try {
+      final expiryParts = _expiryController.text.split('/');
+      if (expiryParts.length != 2) throw Exception('Invalid expiry date');
       
+      final month = int.tryParse(expiryParts[0]) ?? 0;
+      final year = int.tryParse(expiryParts[1]) ?? 0;
+      // Convert 2-digit year to 4-digit
+      final fullYear = year < 100 ? 2000 + year : year;
+
+      await Stripe.instance.dangerouslyUpdateCardDetails(CardDetails(
+        number: _cardNumberController.text.replaceAll(' ', ''),
+        cvc: _cvcController.text,
+        expirationMonth: month,
+        expirationYear: fullYear,
+      ));
+
       final result = await StripeService.topUpWalletWithCard(amount: amount);
       if (!mounted) return;
 
@@ -212,7 +238,10 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
 
   Future<void> _showAddBalanceSheet() async {
     _amountController.clear();
-    _cardDetails = null;
+    _cardNumberController.clear();
+    _expiryController.clear();
+    _cvcController.clear();
+    // _cardDetails = null;
 
     final isDarkMode = _isDarkMode;
     final backgroundColor = isDarkMode ? const Color(0xFF1C2541) : Colors.white;
@@ -341,6 +370,7 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
               ),
             ),
             const SizedBox(height: 8),
+            // Card Number
             Container(
               decoration: BoxDecoration(
                 color: inputFill,
@@ -348,18 +378,99 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                 border: Border.all(color: border),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: CardField(
-                onCardChanged: (card) {
-                  setState(() {
-                    _cardDetails = card;
-                  });
-                },
+              child: TextField(
+                controller: _cardNumberController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(16),
+                ],
                 style: TextStyle(color: textPrimary, fontSize: 16),
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   hintText: '0000 0000 0000 0000',
+                  labelText: _isArabic ? 'رقم البطاقة' : 'Card Number',
+                  labelStyle: TextStyle(color: textSecondary),
                   hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+                  icon: Icon(Icons.credit_card, color: textSecondary),
                 ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                // Expiry Date
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: inputFill,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: border),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: TextField(
+                      controller: _expiryController,
+                      keyboardType: TextInputType.datetime,
+                      inputFormatters: [
+                        LengthLimitingTextInputFormatter(5),
+                      ],
+                      onChanged: (value) {
+                        if (value.length == 2 && !_expiryController.text.contains('/')) {
+                          _expiryController.text = '$value/';
+                          _expiryController.selection = TextSelection.fromPosition(
+                              TextPosition(offset: _expiryController.text.length));
+                        }
+                      },
+                      style: TextStyle(color: textPrimary, fontSize: 16),
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        hintText: 'MM/YY',
+                        labelText: _isArabic ? 'التاريخ' : 'Expiry',
+                        labelStyle: TextStyle(color: textSecondary),
+                        hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // CVC
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: inputFill,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: border),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: TextField(
+                      controller: _cvcController,
+                      keyboardType: TextInputType.number,
+                      obscureText: true,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(4),
+                      ],
+                      style: TextStyle(color: textPrimary, fontSize: 16),
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        hintText: '123',
+                        labelText: 'CVC',
+                        labelStyle: TextStyle(color: textSecondary),
+                        hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+                        suffixIcon: Icon(Icons.lock_outline, size: 18, color: textSecondary),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // Hidden CardField to ensure Stripe SDK is happy if needed
+            Offstage(
+              offstage: true,
+              child: CardField(
+                onCardChanged: (card) {
+                  // _cardDetails = card;
+                },
               ),
             ),
             const SizedBox(height: 32),
@@ -426,154 +537,172 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
     final cardColor = _isDarkMode ? const Color(0xFF1C2541) : Colors.white;
     final textPrimary = _isDarkMode ? const Color(0xFFE8EAF6) : const Color(0xFF1E3A5F);
     final textSecondary = _isDarkMode ? const Color(0xFFB0BEC5) : const Color(0xFF64748B);
+    final borderColor = _isDarkMode ? const Color(0xFF2C3E50) : Colors.grey.shade200;
 
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: backgroundColor,
-        body: Stack(
-          children: [
-            
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 280,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: _isDarkMode
-                        ? [const Color(0xFF1C2541), const Color(0xFF0A0E21)]
-                        : [const Color(0xFF2C5F8D), const Color(0xFF1E3A5F)],
-                  ),
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(70),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: _isDarkMode
+                    ? [
+                        const Color(0xFF1C2541),
+                        const Color(0xFF2C3E50),
+                        const Color(0xFF1C2541),
+                      ]
+                    : [
+                        const Color(0xFF2C5F8D),
+                        const Color(0xFF1E3A5F),
+                        const Color(0xFF2C5F8D),
+                      ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: -50,
-                      right: -50,
-                      child: CircleAvatar(
-                        radius: 100,
-                        backgroundColor: Colors.white.withOpacity(0.05),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: -20,
-                      left: -20,
-                      child: CircleAvatar(
-                        radius: 80,
-                        backgroundColor: Colors.white.withOpacity(0.05),
-                      ),
-                    ),
-                  ],
+              ],
+            ),
+            child: AppBar(
+              leading: Container(
+                margin: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PassengerHomePage(),
+                        ),
+                      );
+                    }
+                  },
                 ),
               ),
-            ),
-            
-            
-            SafeArea(
-              child: Column(
-                children: [
-                  
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: IconButton(
-                            icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.white),
-                            onPressed: () {
-                              if (Navigator.canPop(context)) {
-                                Navigator.pop(context);
-                              } else {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const PassengerHomePage()),
-                                );
-                              }
-                            },
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            t('title'),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: IconButton(
-                            icon: const Icon(Icons.refresh_rounded, size: 24, color: Colors.white),
-                            onPressed: _loadWallet,
-                          ),
-                        ),
-                      ],
-                    ),
+              title: Text(
+                t('title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: true,
+              iconTheme: const IconThemeData(color: Colors.white),
+              actionsIconTheme: const IconThemeData(color: Colors.white),
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-
-                  Expanded(
-                    child: RefreshIndicator(
-                      onRefresh: _loadWallet,
-                      child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const SizedBox(height: 20),
-                            
-                            Container(
-                              height: 200,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(24),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF2E7D32).withOpacity(0.3),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    onPressed: _loadWallet,
+                    tooltip: t('refresh'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _loadWallet,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 20),
+                        
+                        Container(
+                          height: 220,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: _isDarkMode
+                                  ? [const Color(0xFF1C2541), const Color(0xFF2C3E50)]
+                                  : [const Color(0xFF2C5F8D), const Color(0xFF1E3A5F)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (_isDarkMode ? const Color(0xFF000000) : const Color(0xFF1E3A5F))
+                                    .withOpacity(0.3),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
                               ),
-                              child: Stack(
-                                children: [
-                                  Positioned(
-                                    right: -20,
-                                    top: -20,
-                                    child: Icon(
-                                      Icons.account_balance_wallet,
-                                      size: 150,
-                                      color: Colors.white.withOpacity(0.1),
-                                    ),
+                            ],
+                          ),
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                right: -30,
+                                top: -30,
+                                child: Icon(
+                                  Icons.account_balance_wallet,
+                                  size: 180,
+                                  color: Colors.white.withOpacity(0.05),
+                                ),
+                              ),
+                              Positioned(
+                                left: -20,
+                                bottom: -20,
+                                child: Container(
+                                  width: 100,
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white.withOpacity(0.05),
                                   ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(24),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withOpacity(0.2),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: const Icon(Icons.account_balance_wallet_outlined,
+                                                  color: Colors.white, size: 20),
+                                            ),
+                                            const SizedBox(width: 12),
                                             Text(
                                               t('balance'),
                                               style: TextStyle(
@@ -582,47 +711,74 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
-                                            Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white.withOpacity(0.2),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(Icons.credit_card, color: Colors.white, size: 20),
-                                            ),
                                           ],
                                         ),
-                                        Text(
-                                          '${balance.toStringAsFixed(2)} ₪',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 40,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 1,
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(
+                                                color: Colors.white.withOpacity(0.2)),
                                           ),
-                                        ),
-                                        SizedBox(
-                                          width: double.infinity,
-                                          child: ElevatedButton.icon(
-                                            onPressed: _showAddBalanceSheet,
-                                            icon: const Icon(Icons.add, size: 20),
-                                            label: Text(t('addBalance')),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.white,
-                                              foregroundColor: const Color(0xFF2E7D32),
-                                              padding: const EdgeInsets.symmetric(vertical: 12),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(12),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 8,
+                                                height: 8,
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.greenAccent,
+                                                  shape: BoxShape.circle,
+                                                ),
                                               ),
-                                            ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                t('available'),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ],
+                                    const Spacer(),
+                                    Text(
+                                      '${balance.toStringAsFixed(2)} ₪',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 42,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        onPressed: _showAddBalanceSheet,
+                                        icon: const Icon(Icons.add_card, size: 20),
+                                        label: Text(t('addBalance')),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white,
+                                          foregroundColor: const Color(0xFF1E3A5F),
+                                          padding: const EdgeInsets.symmetric(vertical: 14),
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
+                          ),
+                        ),
                             
                             const SizedBox(height: 32),
                             
@@ -658,14 +814,19 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                   ),
                                 ),
                               )
-                            else if (_wallet?['transactions'] != null && (_wallet!['transactions'] as List).isNotEmpty)
+                            else if (_wallet != null && 
+                                     _wallet!['transactions'] != null && 
+                                     (_wallet!['transactions'] as List).isNotEmpty)
                               ListView.separated(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 itemCount: (_wallet!['transactions'] as List).length,
                                 separatorBuilder: (context, index) => const SizedBox(height: 12),
                                 itemBuilder: (context, index) {
-                                  final transaction = (_wallet!['transactions'] as List)[index];
+                                  final transactions = _wallet!['transactions'] as List;
+                                  if (index >= transactions.length) return const SizedBox();
+                                  
+                                  final transaction = transactions[index];
                                   final amount = (transaction['amount'] ?? 0.0).toDouble();
                                   final type = transaction['type']?.toString().toLowerCase() ?? '';
                                   final status = transaction['status']?.toString().toLowerCase() ?? '';
@@ -714,11 +875,15 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                     decoration: BoxDecoration(
                                       color: cardColor,
                                       borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: borderColor,
+                                        width: 1,
+                                      ),
                                       boxShadow: [
                                         BoxShadow(
                                           color: Colors.black.withOpacity(0.05),
                                           blurRadius: 10,
-                                          offset: const Offset(0, 2),
+                                          offset: const Offset(0, 4),
                                         ),
                                       ],
                                     ),
@@ -814,8 +979,6 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                 ],
               ),
             ),
-          ],
-        ),
         bottomNavigationBar: PassengerBottomNavBar(
           currentIndex: 3,
           isDarkMode: _isDarkMode,

@@ -158,7 +158,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
           )
           .toList();
       
-      // Debug: Log seat statuses
       print('[DriverVehiclePage] Seat map loaded:');
       for (var row in seatRows) {
         for (var seat in row) {
@@ -218,7 +217,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result['message']?.toString() ?? 'Error')),
       );
-      // revert on failure
       setState(() {
         if (currentStatus == 'broken') {
           updatedSeats.add(seatId);
@@ -236,7 +234,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
     
-    // Theme-aware colors
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
         : const Color.fromARGB(255, 224, 228, 231);
@@ -417,7 +414,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Section
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -554,7 +550,8 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
           ),
           const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
               color: _isDarkMode
                   ? Colors.white.withOpacity(0.05)
@@ -566,54 +563,26 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                     : Colors.grey.shade200,
               ),
             ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                dropdownColor: _isDarkMode
-                    ? const Color(0xFF1C2541)
-                    : const Color(0xFFFAFBFC),
-                value: _selectedVehicle?['vehicleid']?.toString(),
-                icon: Icon(
-                  Icons.keyboard_arrow_down_rounded,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.directions_car_rounded,
                   color: Colors.orange,
-                  size: 28,
+                  size: 20,
                 ),
-                style: TextStyle(
-                  color: textPrimaryColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '${t('plate')}: ${_selectedVehicle?['plateno'] ?? t('unknown')}',
+                    style: TextStyle(
+                      color: textPrimaryColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                items: _vehicles
-                    .map(
-                      (vehicle) => DropdownMenuItem<String>(
-                        value: vehicle['vehicleid']?.toString(),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.directions_car_rounded,
-                              color: Colors.orange,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              '${t('plate')}: ${vehicle['plateno'] ?? t('unknown')}',
-                              style: TextStyle(color: textPrimaryColor),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  final vehicle = _vehicles.firstWhere(
-                    (item) => item['vehicleid']?.toString() == value,
-                  );
-                  setState(() {
-                    _selectedVehicle = vehicle;
-                  });
-                  _loadSeatMap(vehicle['vehicleid']?.toString() ?? '');
-                },
-              ),
+              ],
             ),
           ),
         ],
@@ -765,7 +734,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       );
     }
 
-    // Get vehicle layout type
     final seatLayout = _selectedVehicle?['seatlayout']?.toString() ?? '4+1';
     final is4Plus1 = seatLayout == '4+1';
 
@@ -844,10 +812,8 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
           ),
           child: Column(
             children: [
-              // Front row (driver + passenger)
               _buildFrontRow(),
               const SizedBox(height: 20),
-              // Back rows
               if (is4Plus1)
                 _buildBackRow4Plus1()
               else
@@ -862,8 +828,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
   }
 
   Widget _buildFrontRow() {
-    // Front row: Driver (left) + Passenger (right)
-    // Find seats 1 and 2
     Map<String, dynamic>? seat1;
     Map<String, dynamic>? seat2;
     
@@ -878,13 +842,11 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Driver seat (left)
         if (seat1 != null)
           _buildSeatWidget(seat1, isDriver: true)
         else
           _buildEmptySeat(),
         const SizedBox(width: 40),
-        // Passenger seat (right)
         if (seat2 != null)
           _buildSeatWidget(seat2, isDriver: false)
         else
@@ -894,7 +856,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
   }
 
   Widget _buildBackRow4Plus1() {
-    // Back row: 3 seats (seats 3, 4, 5)
     List<Map<String, dynamic>> backSeats = [];
     
     for (var row in _seatRows) {
@@ -906,7 +867,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       }
     }
     
-    // Sort by seat number
     backSeats.sort((a, b) {
       final numA = int.tryParse(a['number']?.toString() ?? '0') ?? 0;
       final numB = int.tryParse(b['number']?.toString() ?? '0') ?? 0;
@@ -926,8 +886,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
   }
 
   Widget _buildBackRows7Plus1() {
-    // First back row: 3 seats (seats 3, 4, 5)
-    // Second back row: 3 seats (seats 6, 7, 8)
     List<Map<String, dynamic>> firstRow = [];
     List<Map<String, dynamic>> secondRow = [];
     
@@ -942,7 +900,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       }
     }
     
-    // Sort by seat number
     firstRow.sort((a, b) {
       final numA = int.tryParse(a['number']?.toString() ?? '0') ?? 0;
       final numB = int.tryParse(b['number']?.toString() ?? '0') ?? 0;
@@ -957,7 +914,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
 
     return Column(
       children: [
-        // First back row
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -969,7 +925,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
           ],
         ),
         const SizedBox(height: 16),
-        // Second back row
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -989,7 +944,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     final seatNumber = seat['number']?.toString() ?? '--';
     final seatId = seat['id']?.toString() ?? '';
     
-    // Also check if seat is in broken seats set
     final seatIdLower = seatId.toLowerCase();
     final isBroken = _brokenSeats.contains(seatIdLower) || 
                      _brokenSeats.contains(seatId);
@@ -998,8 +952,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     Color textColor;
     IconData? seatIcon;
     
-    // Priority: broken > reserved > available
-    // Improved colors for better visibility
     if (isBroken || status == 'broken') {
       seatColor = const Color(0xFF2C2C2C); // Dark gray instead of pure black
       textColor = Colors.white;

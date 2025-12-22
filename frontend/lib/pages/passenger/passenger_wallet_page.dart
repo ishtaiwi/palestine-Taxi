@@ -24,7 +24,6 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
   final TextEditingController _cardNumberController = TextEditingController();
   final TextEditingController _expiryController = TextEditingController();
   final TextEditingController _cvcController = TextEditingController();
-  // CardFieldInputDetails? _cardDetails;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -188,7 +187,6 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
       
       final month = int.tryParse(expiryParts[0]) ?? 0;
       final year = int.tryParse(expiryParts[1]) ?? 0;
-      // Convert 2-digit year to 4-digit
       final fullYear = year < 100 ? 2000 + year : year;
 
       await Stripe.instance.dangerouslyUpdateCardDetails(CardDetails(
@@ -241,7 +239,6 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
     _cardNumberController.clear();
     _expiryController.clear();
     _cvcController.clear();
-    // _cardDetails = null;
 
     final isDarkMode = _isDarkMode;
     final backgroundColor = isDarkMode ? const Color(0xFF1C2541) : Colors.white;
@@ -370,7 +367,6 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
               ),
             ),
             const SizedBox(height: 8),
-            // Card Number
             Container(
               decoration: BoxDecoration(
                 color: inputFill,
@@ -399,7 +395,6 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
             const SizedBox(height: 16),
             Row(
               children: [
-                // Expiry Date
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
@@ -433,7 +428,6 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // CVC
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
@@ -464,12 +458,10 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                 ),
               ],
             ),
-            // Hidden CardField to ensure Stripe SDK is happy if needed
             Offstage(
               offstage: true,
               child: CardField(
                 onCardChanged: (card) {
-                  // _cardDetails = card;
                 },
               ),
             ),
@@ -836,27 +828,36 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                                     transaction['fromwalletid'] != null;
                                   final isOutgoing = transaction['fromwalletid'] == _wallet!['walletid'];
                                   
-                                  
                                   String typeLabel = t('transfer');
+                                  String typeDescription = '';
                                   IconData typeIcon = Icons.swap_horiz;
                                   Color iconColor = Colors.blue;
                                   Color iconBgColor = Colors.blue.withOpacity(0.1);
                                   
-                                  if (type == 'deposit' || (isIncoming && type == 'transfer')) {
-                                    typeLabel = t('deposit');
+                                  if (type == 'wallet_topup' || type == 'deposit' || (isIncoming && type == 'transfer')) {
+                                    typeLabel = _isArabic ? 'شحن رصيد' : 'Top Up';
+                                    typeDescription = _isArabic ? 'إضافة رصيد للمحفظة بالبطاقة' : 'Wallet top-up via card';
                                     typeIcon = Icons.arrow_downward_rounded;
                                     iconColor = Colors.green;
                                     iconBgColor = Colors.green.withOpacity(0.1);
-                                  } else if (type == 'payment' || isOutgoing) {
-                                    typeLabel = t('payment');
+                                  } else if (type == 'reservation' || (type == 'payment' && isOutgoing)) {
+                                    typeLabel = _isArabic ? 'حجز رحلة' : 'Trip Booking';
+                                    typeDescription = _isArabic ? 'دفع مقابل حجز رحلة' : 'Payment for trip reservation';
                                     typeIcon = Icons.arrow_upward_rounded;
                                     iconColor = Colors.red;
                                     iconBgColor = Colors.red.withOpacity(0.1);
                                   } else if (type == 'refund') {
                                     typeLabel = t('refund');
+                                    typeDescription = _isArabic ? 'استرداد مبلغ من حجز ملغي' : 'Refund from cancelled booking';
                                     typeIcon = Icons.refresh;
                                     iconColor = Colors.green;
                                     iconBgColor = Colors.green.withOpacity(0.1);
+                                  } else if (type == 'payment' && isOutgoing) {
+                                    typeLabel = t('payment');
+                                    typeDescription = _isArabic ? 'دفع' : 'Payment';
+                                    typeIcon = Icons.arrow_upward_rounded;
+                                    iconColor = Colors.red;
+                                    iconBgColor = Colors.red.withOpacity(0.1);
                                   }
 
                                   
@@ -910,6 +911,16 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                                   fontSize: 16,
                                                 ),
                                               ),
+                                              if (typeDescription.isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  typeDescription,
+                                                  style: TextStyle(
+                                                    color: textSecondary,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
                                               const SizedBox(height: 4),
                                               Text(
                                                 dateStr,

@@ -11,6 +11,7 @@ import {
   adminResetPassword,
 } from '../controllers/authController.js';
 import { authenticate } from '../middleware/auth.js';
+import upload from '../middleware/upload.js';
 import {
   validateRegister,
   validateLogin,
@@ -69,6 +70,46 @@ router.post('/check-user', async (req, res, next) => {
 });
 router.get('/profile', authenticate, getProfile);
 router.put('/profile', authenticate, updateProfile);
+
+router.post(
+  '/profile/avatar',
+  authenticate,
+  upload.single('avatar'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No image file provided',
+        });
+      }
+
+      const User = (await import('../models/User.js')).default;
+      const logger = (await import('../utils/logger.js')).default;
+
+      const avatarUrl = `/uploads/profiles/${req.file.filename}`;
+
+      const user = await User.update(req.user.userid, { avatar_url: avatarUrl });
+      if (user && user.password) {
+        delete user.password;
+      }
+
+      logger.info('Profile avatar uploaded', {
+        userid: req.user.userid,
+        avatarUrl,
+      });
+
+      return res.json({
+        success: true,
+        message: 'Avatar uploaded successfully',
+        avatarUrl,
+        user,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
 router.put('/change-password', authenticate, validateChangePassword, changePassword);
 router.post('/password/reset/request', passwordResetLimiter, validatePasswordResetRequest, requestPasswordReset);
 router.post('/password/reset/verify', passwordResetLimiter, validateVerifyResetCode, verifyResetCode);

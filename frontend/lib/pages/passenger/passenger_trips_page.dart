@@ -20,8 +20,12 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
   String? _error;
   List<Map<String, dynamic>> _trips = [];
   List<Map<String, dynamic>> _lines = [];
+  bool _isLineDropdownOpen = false;
   String? _selectedLineId;
   DateTime? _selectedDate;
+
+  final TextEditingController _lineSearchController = TextEditingController();
+  String _lineSearchQuery = '';
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -31,6 +35,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'filterByLine': 'فلترة حسب الخط',
       'filterByDate': 'فلترة حسب التاريخ',
       'allLines': 'جميع الخطوط',
+      'searchLine': 'بحث باسم الخط',
       'departure': 'موعد الانطلاق',
       'availableSeats': 'المقاعد المتاحة',
       'available': 'متاح',
@@ -51,6 +56,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'filterByLine': 'Filter by Line',
       'filterByDate': 'Filter by Date',
       'allLines': 'All Lines',
+      'searchLine': 'Search by line name',
       'departure': 'Departure Time',
       'availableSeats': 'Available Seats',
       'available': 'Available',
@@ -72,6 +78,12 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
   void initState() {
     super.initState();
     _initialize();
+  }
+
+  @override
+  void dispose() {
+    _lineSearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _initialize() async {
@@ -100,7 +112,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
         });
       }
     } catch (e) {
-      // Ignore error, lines are optional
     }
   }
 
@@ -153,11 +164,32 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     }
   }
 
+  String _getLineNameById(String lineId) {
+    try {
+      final line = _lines.firstWhere(
+        (l) => l['lineid']?.toString() == lineId,
+        orElse: () => {},
+      );
+      if (line.isEmpty) return _isArabic ? 'غير معروف' : 'Unknown';
+
+      return _isArabic
+          ? (line['name_ar']?.toString() ??
+              line['linename']?.toString() ??
+              line['name_en']?.toString() ??
+              (_isArabic ? 'غير معروف' : 'Unknown'))
+          : (line['name_en']?.toString() ??
+              line['linename']?.toString() ??
+              line['name_ar']?.toString() ??
+              (_isArabic ? 'غير معروف' : 'Unknown'));
+    } catch (_) {
+      return _isArabic ? 'غير معروف' : 'Unknown';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
 
-    // Theme-aware colors
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
         : const Color(0xFFECF0F3); // Soft blue-gray background
@@ -179,6 +211,22 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
         : const Color(0xFF2C5F8D); // Professional blue
 
     const accentColor = Color(0xFFF57C00); // Orange accent
+
+    final List<Map<String, dynamic>> filteredLines = _lines.where((line) {
+      if (_lineSearchQuery.isEmpty) return true;
+
+      final lineName = _isArabic
+          ? (line['name_ar']?.toString() ??
+              line['linename']?.toString() ??
+              line['name_en']?.toString() ??
+              '')
+          : (line['name_en']?.toString() ??
+              line['linename']?.toString() ??
+              line['name_ar']?.toString() ??
+              '');
+
+      return lineName.toLowerCase().contains(_lineSearchQuery.toLowerCase());
+    }).toList();
 
     return Directionality(
       textDirection: textDirection,
@@ -269,7 +317,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
         body: SafeArea(
           child: Column(
             children: [
-              // Filters
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -284,267 +331,322 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                 ),
                 child: Column(
                   children: [
-                    // Line Filter
-                    Container(
-                      decoration: BoxDecoration(
-                        color: _isDarkMode
-                            ? const Color(0xFF1E3A5F).withAlpha(77)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _isDarkMode
-                              ? const Color(0xFF2C5F8D)
-                              : Colors.grey.shade300,
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedLineId,
-                        dropdownColor: cardColor,
-                        decoration: InputDecoration(
-                          labelText: t('filterByLine'),
-                          labelStyle: TextStyle(
-                            color: textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          filled: false,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
-                          ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          prefixIcon: Icon(
-                            Icons.directions_bus_rounded,
-                            color: _isDarkMode
-                                ? const Color(0xFF64B5F6)
-                                : const Color(0xFF1E3A5F),
-                          ),
-                        ),
-                        style: TextStyle(
-                            color: textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold),
-                        icon: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: _isDarkMode
-                                ? const Color(0xFF2C5F8D).withOpacity(0.5)
-                                : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: textPrimary,
-                            size: 20,
-                          ),
-                        ),
-                        iconSize: 24,
-                        menuMaxHeight: 350,
-                        isExpanded: true,
-                        borderRadius: BorderRadius.circular(16),
-                        elevation: 4,
-                        items: [
-                          DropdownMenuItem<String>(
-                            value: null,
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 4),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: _selectedLineId == null
-                                    ? (_isDarkMode
-                                        ? const Color(0xFF2C5F8D).withOpacity(0.3)
-                                        : const Color(0xFFE3F2FD))
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
+                    Column(
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            setState(() {
+                              _isLineDropdownOpen = !_isLineDropdownOpen;
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _isDarkMode
+                                  ? const Color(0xFF1E3A5F).withAlpha(77)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: _isDarkMode
+                                    ? const Color(0xFF2C5F8D)
+                                    : Colors.grey.shade300,
+                                width: 1.5,
                               ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: _selectedLineId == null
-                                          ? (_isDarkMode
-                                              ? const Color(0xFF64B5F6)
-                                              : const Color(0xFF1E3A5F))
-                                          : textSecondary.withOpacity(0.5),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    t('allLines'),
-                                    style: TextStyle(
-                                      color: _selectedLineId == null
-                                          ? (_isDarkMode
-                                              ? Colors.white
-                                              : const Color(0xFF1E3A5F))
-                                          : textPrimary,
-                                      fontSize: 16,
-                                      fontWeight: _selectedLineId == null
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  if (_selectedLineId == null)
-                                    Icon(
-                                      Icons.check_circle_rounded,
-                                      color: _isDarkMode
-                                          ? const Color(0xFF64B5F6)
-                                          : const Color(0xFF1E3A5F),
-                                      size: 20,
-                                    ),
-                                ],
-                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ),
-                          ..._lines.map((line) {
-                            // Get line name based on current language
-                            final lineName = _isArabic
-                                ? (line['name_ar']?.toString() ??
-                                    line['linename']?.toString() ??
-                                    line['name_en']?.toString() ??
-                                    '')
-                                : (line['name_en']?.toString() ??
-                                    line['linename']?.toString() ??
-                                    line['name_ar']?.toString() ??
-                                    '');
-                            final isSelected =
-                                _selectedLineId == line['lineid']?.toString();
-
-                            return DropdownMenuItem<String>(
-                              value: line['lineid']?.toString(),
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(vertical: 4),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? (_isDarkMode
-                                          ? const Color(0xFF2C5F8D).withOpacity(0.3)
-                                          : const Color(0xFFE3F2FD))
-                                      : (_isDarkMode
-                                          ? Colors.white.withOpacity(0.05)
-                                          : Colors.grey.withOpacity(0.05)),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? (_isDarkMode
-                                            ? const Color(0xFF64B5F6)
-                                            : const Color(0xFF1E3A5F))
-                                        : Colors.transparent,
-                                    width: 1,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.directions_bus_rounded,
+                                  color: _isDarkMode
+                                      ? const Color(0xFF64B5F6)
+                                      : const Color(0xFF1E3A5F),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        t('filterByLine'),
+                                        style: TextStyle(
+                                          color: textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _selectedLineId == null
+                                            ? t('allLines')
+                                            : _getLineNameById(
+                                                _selectedLineId!),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: textPrimary,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? (_isDarkMode
-                                                ? const Color(0xFF64B5F6)
-                                                : const Color(0xFF1E3A5F))
-                                            : textSecondary.withOpacity(0.5),
-                                        shape: BoxShape.circle,
-                                      ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: _isDarkMode
+                                        ? const Color(0xFF2C5F8D)
+                                            .withOpacity(0.5)
+                                        : Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    _isLineDropdownOpen
+                                        ? Icons.keyboard_arrow_up_rounded
+                                        : Icons.keyboard_arrow_down_rounded,
+                                    color: textPrimary,
+                                    size: 20,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_isLineDropdownOpen) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: _isDarkMode
+                                  ? const Color(0xFF1E3A5F).withAlpha(200)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: _isDarkMode
+                                    ? const Color(0xFF2C5F8D)
+                                    : Colors.grey.shade300,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  child: TextField(
+                                    controller: _lineSearchController,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _lineSearchQuery = value.trim();
+                                      });
+                                    },
+                                    style: TextStyle(
+                                      color: textPrimary,
+                                      fontSize: 14,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        lineName.isEmpty
-                                            ? (_isArabic
-                                                ? 'غير معروف'
-                                                : 'Unknown')
-                                            : lineName,
-                                        style: TextStyle(
-                                          color: isSelected
-                                              ? (_isDarkMode
-                                                  ? Colors.white
-                                                  : const Color(0xFF1E3A5F))
-                                              : textPrimary,
-                                          fontSize: 16,
-                                          fontWeight: isSelected
-                                              ? FontWeight.bold
-                                              : FontWeight.w500,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
+                                    decoration: InputDecoration(
+                                      hintText: t('searchLine'),
+                                      hintStyle: TextStyle(
+                                        color: textSecondary.withOpacity(0.8),
+                                        fontSize: 14,
                                       ),
-                                    ),
-                                    if (isSelected)
-                                      Icon(
-                                        Icons.check_circle_rounded,
+                                      prefixIcon: Icon(
+                                        Icons.search,
                                         color: _isDarkMode
                                             ? const Color(0xFF64B5F6)
                                             : const Color(0xFF1E3A5F),
                                         size: 20,
                                       ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedLineId = value;
-                          });
-                          _loadTrips();
-                        },
-                        selectedItemBuilder: (BuildContext context) {
-                          return [
-                            DropdownMenuItem<String>(
-                              value: null,
-                              child: Text(
-                                t('allLines'),
-                                style: TextStyle(
-                                  color: textPrimary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            ..._lines.map<DropdownMenuItem<String>>((line) {
-                              final lineName = _isArabic
-                                  ? (line['name_ar']?.toString() ??
-                                      line['linename']?.toString() ??
-                                      line['name_en']?.toString() ??
-                                      '')
-                                  : (line['name_en']?.toString() ??
-                                      line['linename']?.toString() ??
-                                      line['name_ar']?.toString() ??
-                                      '');
-                              return DropdownMenuItem<String>(
-                                value: line['lineid']?.toString(),
-                                child: Text(
-                                  lineName.isEmpty
-                                      ? (_isArabic ? 'غير معروف' : 'Unknown')
-                                      : lineName,
-                                  style: TextStyle(
-                                    color: textPrimary,
-                                    fontWeight: FontWeight.bold,
+                                      isDense: true,
+                                      filled: true,
+                                      fillColor: _isDarkMode
+                                          ? const Color(0xFF1C2541)
+                                          : Colors.grey.shade50,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: _isDarkMode
+                                              ? const Color(0xFF2C5F8D)
+                                              : Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: _isDarkMode
+                                              ? const Color(0xFF64B5F6)
+                                              : const Color(0xFF1E3A5F),
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      suffixIcon: _lineSearchQuery.isNotEmpty
+                                          ? IconButton(
+                                              icon: Icon(
+                                                Icons.clear,
+                                                color: textSecondary,
+                                                size: 18,
+                                              ),
+                                              onPressed: () {
+                                                setState(() {
+                                                  _lineSearchQuery = '';
+                                                  _lineSearchController.clear();
+                                                });
+                                              },
+                                            )
+                                          : null,
+                                    ),
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              );
-                            }),
-                          ];
-                        },
-                      ),
+                                const Divider(height: 1),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxHeight: 260, // fits under button
+                                  ),
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    padding: EdgeInsets.zero,
+                                    itemCount: filteredLines.length + 1,
+                                    itemBuilder: (context, index) {
+                                      if (index == 0) {
+                                        final isSelected =
+                                            _selectedLineId == null;
+                                        return ListTile(
+                                          leading: Icon(
+                                            Icons.all_inclusive,
+                                            color: isSelected
+                                                ? (_isDarkMode
+                                                    ? const Color(0xFF64B5F6)
+                                                    : const Color(0xFF1E3A5F))
+                                                : textSecondary,
+                                          ),
+                                          title: Text(
+                                            t('allLines'),
+                                            style: TextStyle(
+                                              fontWeight: isSelected
+                                                  ? FontWeight.bold
+                                                  : FontWeight.w500,
+                                              color: isSelected
+                                                  ? (_isDarkMode
+                                                      ? Colors.white
+                                                      : const Color(
+                                                          0xFF1E3A5F))
+                                                  : textPrimary,
+                                            ),
+                                          ),
+                                          trailing: isSelected
+                                              ? Icon(
+                                                  Icons.check_circle_rounded,
+                                                  color: _isDarkMode
+                                                      ? const Color(0xFF64B5F6)
+                                                      : const Color(
+                                                          0xFF1E3A5F),
+                                                )
+                                              : null,
+                                          onTap: () {
+                                            setState(() {
+                                              _selectedLineId = null;
+                                              _isLineDropdownOpen = false;
+                                              _lineSearchQuery = '';
+                                              _lineSearchController.clear();
+                                            });
+                                            _loadTrips();
+                                          },
+                                        );
+                                      }
+
+                                      final line =
+                                          filteredLines[index - 1]; // offset
+                                      final lineId =
+                                          line['lineid']?.toString();
+                                      final lineName = _isArabic
+                                          ? (line['name_ar']?.toString() ??
+                                              line['linename']?.toString() ??
+                                              line['name_en']?.toString() ??
+                                              '')
+                                          : (line['name_en']?.toString() ??
+                                              line['linename']?.toString() ??
+                                              line['name_ar']?.toString() ??
+                                              '');
+                                      final isSelected =
+                                          _selectedLineId == lineId;
+
+                                      return ListTile(
+                                        leading: Icon(
+                                          Icons.directions_bus,
+                                          color: isSelected
+                                              ? (_isDarkMode
+                                                  ? const Color(0xFF64B5F6)
+                                                  : const Color(0xFF1E3A5F))
+                                              : textSecondary,
+                                        ),
+                                        title: Text(
+                                          lineName.isEmpty
+                                              ? (_isArabic
+                                                  ? 'غير معروف'
+                                                  : 'Unknown')
+                                              : lineName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: isSelected
+                                                ? FontWeight.bold
+                                                : FontWeight.w500,
+                                            color: isSelected
+                                                ? (_isDarkMode
+                                                    ? Colors.white
+                                                    : const Color(0xFF1E3A5F))
+                                                : textPrimary,
+                                          ),
+                                        ),
+                                        trailing: isSelected
+                                            ? Icon(
+                                                Icons.check_circle_rounded,
+                                                color: _isDarkMode
+                                                    ? const Color(0xFF64B5F6)
+                                                    : const Color(0xFF1E3A5F),
+                                              )
+                                            : null,
+                                        onTap: () {
+                                          setState(() {
+                                            _selectedLineId = lineId;
+                                            _isLineDropdownOpen = false;
+                                          });
+                                          _loadTrips();
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 12),
-                    // Date Filter
                     InkWell(
                       onTap: _selectDate,
                       child: Container(
@@ -592,7 +694,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                   ],
                 ),
               ),
-              // Trips List
               Expanded(
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
@@ -666,7 +767,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
 
   Widget _buildTripCard(Map<String, dynamic> trip) {
     final line = trip['line'] as Map<String, dynamic>? ?? {};
-    // Get line name based on current language
     final lineName = _isArabic
         ? (line['name_ar']?.toString() ??
             line['linename']?.toString() ??
@@ -683,7 +783,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     final status = trip['status']?.toString() ?? '';
     final tripOpeningTimeStr = trip['trip_opening_time']?.toString();
 
-    // Parse departure time
     DateTime? departureTime;
     try {
       // Parse as server local time (strip timezone and treat as local)
@@ -692,10 +791,8 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       final datePart = deptime.replaceFirst(tzRegex, "");
       departureTime = DateTime.parse(datePart);
     } catch (e) {
-      // Ignore
     }
 
-    // Parse trip opening time
     DateTime? tripOpeningTime;
     if (tripOpeningTimeStr != null && tripOpeningTimeStr.isNotEmpty) {
       try {
@@ -705,7 +802,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
         final datePart = tripOpeningTimeStr.replaceFirst(tzRegex, "");
         tripOpeningTime = DateTime.parse(datePart);
       } catch (e) {
-        // Ignore
       }
     }
 
@@ -736,13 +832,10 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
 
     final isScheduled = status == 'scheduled' || status == 'open';
 
-    // Instant booking: trip must be opened (trip_opening_time passed) AND have available seats
     final canBookInstant = isScheduled && isTripOpened && availableseats > 0;
 
-    // Future booking: always available if trip is scheduled (regardless of opening time)
     final canBookFuture = isScheduled;
 
-    // Theme-aware colors
     final cardColor = _isDarkMode
         ? const Color(0xFF1C2541)
         : const Color(0xFFFAFBFC);

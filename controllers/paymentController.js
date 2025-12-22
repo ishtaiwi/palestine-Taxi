@@ -1,7 +1,7 @@
 import Payment from '../models/Payment.js';
 import Wallet from '../models/Wallet.js';
 import { v4 as uuidv4 } from 'uuid';
-import { PAYMENT_STATUS } from '../utils/constants.js';
+import { PAYMENT_STATUS, PAYMENT_METHOD } from '../utils/constants.js';
 
 
 export const getAllPayments = async (req, res, next) => {

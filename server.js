@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import cors from 'cors';
 import appConfig from './config/app.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
@@ -35,6 +37,9 @@ import { initializeModel } from './services/rushHourPredictionService.js';
 
 const app = express();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 
 app.use(cors(appConfig.cors));
 
@@ -55,6 +60,8 @@ app.use((req, res, next) => {
 
 
 app.use('/api/', generalLimiter);
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 app.get('/health', (req, res) => {

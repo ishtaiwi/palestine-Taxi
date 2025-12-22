@@ -22,6 +22,8 @@ class DriverHomePage extends StatefulWidget {
 
 class _DriverHomePageState extends State<DriverHomePage>
     with WidgetsBindingObserver {
+  final GlobalKey<DriverQueuePageState> _queueKey =
+      GlobalKey<DriverQueuePageState>();
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   bool _isArabic = true;
@@ -30,6 +32,9 @@ class _DriverHomePageState extends State<DriverHomePage>
   final ImagePicker _imagePicker = ImagePicker();
   bool _isTracking = false;
   final LocationService _locationService = LocationService.instance;
+
+  final LocationService _locationService = LocationService.instance;
+  bool _isTracking = false;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -361,14 +366,6 @@ class _DriverHomePageState extends State<DriverHomePage>
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: Icon(
-                    _isArabic ? Icons.language : Icons.translate,
-                    color: Colors.white,
-                  ),
-                  onPressed: () => _switchLanguage(!_isArabic),
-                  tooltip: _isArabic ? 'English' : 'العربية',
-                ),
                 Container(
                   margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
@@ -688,7 +685,7 @@ class _DriverHomePageState extends State<DriverHomePage>
                                   MaterialPageRoute(
                                     builder: (_) => const DriverQueuePage(),
                                   ),
-                                );
+                                ).then((_) => _queueKey.currentState?.refresh());
                               },
                             ),
                           ),
@@ -821,6 +818,7 @@ class _DriverHomePageState extends State<DriverHomePage>
                           ],
                         ),
                         child: DriverQueuePage(
+                          key: _queueKey,
                           embedded: true,
                           isArabicOverride: _isArabic,
                           isDarkModeOverride: _isDarkMode,

@@ -18,10 +18,10 @@ class DriverQueuePage extends StatefulWidget {
   });
 
   @override
-  State<DriverQueuePage> createState() => _DriverQueuePageState();
+  State<DriverQueuePage> createState() => DriverQueuePageState();
 }
 
-class _DriverQueuePageState extends State<DriverQueuePage> {
+class DriverQueuePageState extends State<DriverQueuePage> {
   late bool _isArabic;
   late bool _isDarkMode;
   bool _isLoading = true;
@@ -32,31 +32,39 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
   final Map<String, Map<String, String>> _texts = {
     'ar': {
       'title': 'دور السائقين',
-      'line': 'الخط',
-      'yourTurn': 'دورك الحالي',
+      'line': 'الخط الحالي',
+      'yourTurn': 'دورك',
       'ahead': 'قبلك',
       'behind': 'بعدك',
       'joinQueue': 'حجز دور',
-      'leaveQueue': 'إلغاء الدور',
-      'noDrivers': 'لا يوجد سائقون في الدور حالياً',
-      'notInQueue': 'أنت خارج الدور حالياً',
+      'leaveQueue': 'مغادرة الدور',
+      'noDrivers': 'القائمة فارغة حالياً',
+      'notInQueue': 'أنت لست في قائمة الانتظار',
       'refresh': 'تحديث',
-      'statusWaiting': 'ينتظر',
+      'statusWaiting': 'في الانتظار',
       'retry': 'إعادة المحاولة',
+      'position': 'الترتيب',
+      'driverName': 'اسم السائق',
+      'phoneNumber': 'رقم الهاتف',
+      'you': 'أنت',
     },
     'en': {
       'title': 'Driver Queue',
-      'line': 'Line',
-      'yourTurn': 'Your turn',
+      'line': 'Current Line',
+      'yourTurn': 'Your Turn',
       'ahead': 'Ahead',
       'behind': 'Behind',
       'joinQueue': 'Join Queue',
       'leaveQueue': 'Leave Queue',
-      'noDrivers': 'No drivers in the queue yet',
-      'notInQueue': 'You are currently out of the queue',
+      'noDrivers': 'Queue is currently empty',
+      'notInQueue': 'You are not in the queue',
       'refresh': 'Refresh',
       'statusWaiting': 'Waiting',
       'retry': 'Retry',
+      'position': 'Pos',
+      'driverName': 'Driver Name',
+      'phoneNumber': 'Phone Number',
+      'you': 'You',
     },
   };
 
@@ -113,6 +121,10 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
     }
   }
 
+  void refresh() {
+    _loadQueue();
+  }
+
   Future<void> _loadQueue() async {
     setState(() {
       _isLoading = true;
@@ -133,6 +145,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
   }
 
   Future<void> _joinQueue() async {
+    final currentLine = _queueData?['line'];
     setState(() {
       _isMutating = true;
       _error = null;
@@ -144,6 +157,9 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
     setState(() {
       _isMutating = false;
       if (result['success'] == true) {
+        if (result['line'] == null && currentLine != null) {
+          result['line'] = currentLine;
+        }
         _queueData = result;
       } else {
         _error = result['message']?.toString();
@@ -152,6 +168,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
   }
 
   Future<void> _leaveQueue() async {
+    final currentLine = _queueData?['line'];
     setState(() {
       _isMutating = true;
       _error = null;
@@ -163,6 +180,9 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
     setState(() {
       _isMutating = false;
       if (result['success'] == true) {
+        if (result['line'] == null && currentLine != null) {
+          result['line'] = currentLine;
+        }
         _queueData = result;
       } else {
         _error = result['message']?.toString();
@@ -175,19 +195,19 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
     final body = _buildBody();
 
     if (widget.embedded) {
-      return body;
+      return Directionality(
+        textDirection: textDirection,
+        child: body,
+      );
     }
 
-    // Theme-aware colors for full page view
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
         : const Color.fromARGB(255, 224, 228, 231);
-    final appBarColor = _isDarkMode
-        ? const Color(0xFF1E3A5F)
-        : const Color(0xFF2C5F8D);
 
     return Directionality(
       textDirection: textDirection,
@@ -256,32 +276,38 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
               foregroundColor: Colors.white,
               elevation: 0,
               centerTitle: true,
-              iconTheme: const IconThemeData(color: Colors.white),
-              actionsIconTheme: const IconThemeData(color: Colors.white),
-              actions: [],
+              actions: [
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    onPressed: _loadQueue,
+                    tooltip: t('refresh'),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
         body: body,
-        bottomNavigationBar: widget.embedded
-            ? null
-            : DriverBottomNavBar(
-                currentIndex: 1, // Check-in is index 1
-                isDarkMode: _isDarkMode,
-                isArabic: _isArabic,
-                onTap: (index) {
-                  DriverBottomNavBar.navigateToPage(context, index);
-                },
-              ),
+        bottomNavigationBar: DriverBottomNavBar(
+          currentIndex: 1, // Check-in is index 1
+          isDarkMode: _isDarkMode,
+          isArabic: _isArabic,
+          onTap: (index) {
+            DriverBottomNavBar.navigateToPage(context, index);
+          },
+        ),
       ),
     );
   }
 
   Widget _buildBody() {
-    // Theme-aware colors
-    final textPrimaryColor = _isDarkMode
-        ? Colors.white
-        : const Color(0xFF1E3A5F);
+    final textPrimaryColor = _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
     
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -294,6 +320,8 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
+              const SizedBox(height: 16),
               Text(
                 _error!,
                 textAlign: TextAlign.center,
@@ -321,7 +349,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
       onRefresh: _loadQueue,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: content,
       ),
     );
@@ -329,167 +357,98 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
 
   Widget _buildQueueContent() {
     final queue = (_queueData?['queue'] as List?) ?? [];
-    final current = _queueData?['currentEntry'] as Map<String, dynamic>?;
-
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (!widget.embedded) const SizedBox(height: 8),
-        _buildLineCard(),
-        const SizedBox(height: 16),
+        if (!widget.embedded) ...[
+          _buildLineCard(),
+          const SizedBox(height: 20),
+        ],
         _buildStatsRow(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         _buildActionButton(),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
         if (!_isInQueue)
-          Text(
-            t('notInQueue'),
-            style: TextStyle(
-              color: _isDarkMode
-                  ? Colors.white.withOpacity(0.7)
-                  : AppTheme.lightTextSecondary,
-            ),
-          ),
-        const SizedBox(height: 12),
-        if (queue.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: _isDarkMode
-                  ? Colors.white.withOpacity(0.05)
-                  : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(16),
-              border: _isDarkMode
-                  ? null
-                  : Border.all(color: Colors.grey.shade300, width: 1),
-            ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
             child: Center(
               child: Text(
-                t('noDrivers'),
+                t('notInQueue'),
                 style: TextStyle(
-                  color: _isDarkMode ? Colors.white : AppTheme.lightTextPrimary,
-                  fontSize: 16,
+                  color: _isDarkMode
+                      ? Colors.white.withOpacity(0.7)
+                      : const Color(0xFF546E7A),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
-          )
-        else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: queue.length,
-            itemBuilder: (context, index) {
-              final entry = queue[index] as Map<String, dynamic>;
-              final driver = entry['driver'] as Map<String, dynamic>? ?? {};
-              final user = driver['user'] as Map<String, dynamic>? ?? {};
-              final isCurrent = current != null && current['queueid'] == entry['queueid'];
-              final textColor = _isDarkMode ? Colors.white : AppTheme.lightTextPrimary;
-              final secondaryTextColor = _isDarkMode
-                  ? Colors.white.withOpacity(0.8)
-                  : AppTheme.lightTextSecondary;
-              
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isCurrent
-                      ? (_isDarkMode
-                          ? const Color(0xFF1B5E20).withOpacity(0.15)
-                          : Colors.green.shade50)
-                      : (_isDarkMode
-                          ? Colors.white.withOpacity(0.05)
-                          : Colors.grey.shade50),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isCurrent
-                        ? (_isDarkMode
-                            ? const Color(0xFF1B5E20)
-                            : Colors.green.shade300)
-                        : (_isDarkMode
-                            ? Colors.white24
-                            : Colors.grey.shade300),
-                    width: isCurrent ? 2 : 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.orange.withOpacity(0.2),
-                      child: Text(
-                        '${entry['position']}',
-                        style: const TextStyle(color: Colors.orange),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user['fullname']?.toString() ?? '---',
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            user['phone']?.toString() ?? '',
-                            style: TextStyle(
-                              color: secondaryTextColor,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      t('statusWaiting'),
-                      style: TextStyle(color: secondaryTextColor),
-                    ),
-                  ],
-                ),
-              );
-            },
           ),
+        
+        _buildQueueList(queue),
       ],
     );
   }
 
   Widget _buildLineCard() {
     final line = _queueData?['line'] as Map<String, dynamic>? ?? {};
+    final lineName = _isArabic
+        ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '---')
+        : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '---');
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+        gradient: LinearGradient(
+          colors: _isDarkMode 
+              ? [const Color(0xFF1565C0), const Color(0xFF0D47A1)]
+              : [const Color(0xFF1E88E5), const Color(0xFF1565C0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1565C0).withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            t('line'),
-            style: const TextStyle(
-              color: Colors.white, // نص أبيض على خلفية غامقة
-              fontSize: 14,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.alt_route_rounded, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                t('line'),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
-            _isArabic
-                ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '---')
-                : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '---'),
+            lineName,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
             ),
           ),
         ],
@@ -507,14 +466,16 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
           child: _buildStatBox(
             label: t('ahead'),
             value: '$ahead',
+            icon: Icons.keyboard_arrow_up_rounded,
             color: Colors.orange,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 16),
         Expanded(
           child: _buildStatBox(
             label: t('behind'),
             value: '$behind',
+            icon: Icons.keyboard_arrow_down_rounded,
             color: Colors.green,
           ),
         ),
@@ -522,73 +483,53 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
     );
   }
 
-  Widget _buildActionButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: FilledButton(
-        onPressed: _isMutating
-            ? null
-            : _isInQueue
-                ? _leaveQueue
-                : _joinQueue,
-        style: FilledButton.styleFrom(
-          backgroundColor: _isInQueue ? Colors.redAccent : const Color(0xFFF57C00),
-          textStyle: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        child: _isMutating
-            ? const SizedBox(
-                height: 24,
-                width: 24,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2.5,
-                ),
-              )
-            : Text(_isInQueue ? t('leaveQueue') : t('joinQueue')),
-      ),
-    );
-  }
-
   Widget _buildStatBox({
     required String label,
     required String value,
+    required IconData icon,
     required Color color,
   }) {
+    final cardColor = _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white;
+    final borderColor = _isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200;
+    final textColor = _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _isDarkMode
-            ? Colors.white.withOpacity(0.05)
-            : Colors.grey.shade100,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _isDarkMode
-              ? Colors.white24
-              : Colors.grey.shade300,
-        ),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(_isDarkMode ? 0.2 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: _isDarkMode
-                  ? Colors.white
-                  : AppTheme.lightTextSecondary,
-              fontSize: 12,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: _isDarkMode ? Colors.white70 : const Color(0xFF546E7A),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Icon(icon, color: color, size: 20),
+            ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
           Text(
             value,
             style: TextStyle(
-              color: color,
-              fontSize: 24,
+              color: textColor,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -596,5 +537,152 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
       ),
     );
   }
-}
 
+  Widget _buildActionButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: FilledButton.icon(
+        onPressed: _isMutating
+            ? null
+            : _isInQueue
+                ? _leaveQueue
+                : _joinQueue,
+        icon: _isMutating 
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : Icon(_isInQueue ? Icons.exit_to_app_rounded : Icons.add_circle_outline_rounded),
+        label: Text(
+          _isMutating 
+              ? '' 
+              : (_isInQueue ? t('leaveQueue') : t('joinQueue')),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        style: FilledButton.styleFrom(
+          backgroundColor: _isInQueue ? Colors.redAccent : const Color(0xFFF57C00),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 4,
+          shadowColor: (_isInQueue ? Colors.redAccent : const Color(0xFFF57C00)).withOpacity(0.4),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQueueList(List<dynamic> queue) {
+    if (queue.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: _isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.people_outline_rounded,
+              size: 48,
+              color: _isDarkMode ? Colors.white38 : Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              t('noDrivers'),
+              style: TextStyle(
+                color: _isDarkMode ? Colors.white70 : const Color(0xFF546E7A),
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final currentEntry = _queueData?['currentEntry'] as Map<String, dynamic>?;
+    final textPrimaryColor = _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
+    final cardBgColor = _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white;
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: queue.length,
+      itemBuilder: (context, index) {
+        final entry = queue[index] as Map<String, dynamic>;
+        final driver = entry['driver'] as Map<String, dynamic>? ?? {};
+        final user = driver['user'] as Map<String, dynamic>? ?? {};
+        final isCurrent = currentEntry != null && currentEntry['queueid'] == entry['queueid'];
+        
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: isCurrent 
+                ? (_isDarkMode ? const Color(0xFF1B5E20).withOpacity(0.3) : Colors.green.shade50)
+                : cardBgColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isCurrent
+                  ? Colors.green
+                  : (_isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200),
+              width: isCurrent ? 2 : 1,
+            ),
+            boxShadow: [
+              if (!isCurrent)
+                BoxShadow(
+                  color: Colors.black.withOpacity(_isDarkMode ? 0.2 : 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+            ],
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              radius: 20,
+              backgroundColor: isCurrent ? Colors.green : Colors.orange.withOpacity(0.2),
+              child: Text(
+                '${entry['position']}',
+                style: TextStyle(
+                  color: isCurrent ? Colors.white : Colors.orange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            title: Text(
+              isCurrent ? '${user['fullname']} (${t('you')})' : (user['fullname']?.toString() ?? '---'),
+              style: TextStyle(
+                color: textPrimaryColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: Text(
+              user['phone']?.toString() ?? '',
+              style: TextStyle(
+                color: _isDarkMode ? Colors.white70 : const Color(0xFF546E7A),
+                fontSize: 13,
+              ),
+            ),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: (isCurrent ? Colors.green : const Color(0xFF546E7A)).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                t('statusWaiting'),
+                style: TextStyle(
+                  color: isCurrent ? Colors.green : const Color(0xFF546E7A),
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

@@ -27,9 +27,10 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
   Map<String, dynamic>? _line;
   String? _selectedSeat;
   String? _dropoffPoint;
-  String? _paymentMethod = 'wallet';
   String? _bookingType;
   DateTime? _selectedScheduledTime;
+  double _walletBalance = 0.0;
+  bool _walletLoading = false;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -40,10 +41,10 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
       'tripDetails': 'تفاصيل الرحلة',
       'selectSeat': 'اختر المقعد',
       'dropoffPoint': 'نقطة النزول',
-      'paymentMethod': 'طريقة الدفع',
       'wallet': 'المحفظة',
-      'cash': 'نقد',
-      'card': 'بطاقة',
+      'walletBalance': 'رصيد المحفظة',
+      'insufficientBalance': 'رصيدك غير كافٍ',
+      'topUpWallet': 'شحن المحفظة',
       'book': 'احجز',
       'cancel': 'إلغاء',
       'loading': 'جاري الحجز...',
@@ -60,10 +61,10 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
       'tripDetails': 'Trip Details',
       'selectSeat': 'Select Seat',
       'dropoffPoint': 'Drop-off Point',
-      'paymentMethod': 'Payment Method',
       'wallet': 'Wallet',
-      'cash': 'Cash',
-      'card': 'Card',
+      'walletBalance': 'Wallet Balance',
+      'insufficientBalance': 'Insufficient balance',
+      'topUpWallet': 'Top Up Wallet',
       'book': 'Book',
       'cancel': 'Cancel',
       'loading': 'Booking...',
@@ -89,6 +90,8 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
       _isArabic = isArabic;
     });
 
+    await _loadWalletBalance();
+
     if (widget.tripId != null) {
       await _loadTrip();
     }
@@ -97,7 +100,31 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
       try {
         _selectedScheduledTime = DateTime.parse(widget.scheduledTripTime!);
       } catch (e) {
-        // Ignore
+      }
+    }
+  }
+
+  Future<void> _loadWalletBalance() async {
+    setState(() {
+      _walletLoading = true;
+    });
+    try {
+      final result = await ApiService.fetchWallet();
+      if (mounted && result['success'] == true) {
+        setState(() {
+          _walletBalance = (result['balance'] ?? 0.0).toDouble();
+          _walletLoading = false;
+        });
+      } else {
+        setState(() {
+          _walletLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _walletLoading = false;
+        });
       }
     }
   }
@@ -171,15 +198,23 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
       return;
     }
 
+    if (_bookingType == 'instant' && widget.tripId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isArabic ? 'خطأ: يجب تحديد رحلة' : 'Error: Trip must be selected'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // For future bookings, ensure we have lineid
       String? finalLineId;
       if (_bookingType == 'future') {
-        // Priority: widget.lineId > _line > trip.lineid
         finalLineId = widget.lineId;
         if (finalLineId == null && _line != null) {
           finalLineId = _line!['lineid']?.toString();
@@ -205,8 +240,18 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
           return;
         }
       } else {
-        // For instant bookings, use line from trip
         finalLineId = _line?['lineid']?.toString();
+        
+        if (finalLineId == null && _trip != null) {
+          if (_trip!['line'] != null) {
+            final tripLine = _trip!['line'] as Map<String, dynamic>?;
+            if (tripLine != null) {
+              finalLineId = tripLine['lineid']?.toString();
+            }
+          } else if (_trip!['lineid'] != null) {
+            finalLineId = _trip!['lineid']?.toString();
+          }
+        }
       }
 
       final result = await ApiService.createReservation(
@@ -214,7 +259,7 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
         lineid: finalLineId,
         seatlocation: _selectedSeat,
         dropoffpoint: _dropoffPoint,
-        paymentmethod: _paymentMethod,
+        paymentmethod: 'wallet', // Always use wallet
         booking_type: _bookingType,
         scheduled_trip_time: _selectedScheduledTime?.toIso8601String(),
       );
@@ -286,7 +331,6 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Booking Type
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -395,7 +439,6 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Trip Details (if instant booking)
                       if (_bookingType == 'instant' && _trip != null) ...[
                         Container(
                           padding: const EdgeInsets.all(20),
@@ -448,7 +491,6 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      // Drop-off Point
                       TextField(
                         decoration: InputDecoration(
                           labelText: t('dropoffPoint'),
@@ -479,7 +521,6 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      // Payment Method
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -498,69 +539,110 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              t('paymentMethod'),
-                              style: const TextStyle(
-                                color: Color(0xFF1E3A5F),
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.account_balance_wallet,
+                                  color: Color(0xFF1E3A5F),
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  t('walletBalance'),
+                                  style: const TextStyle(
+                                    color: Color(0xFF1E3A5F),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 16),
-                            RadioListTile<String>(
-                              title: Text(
-                                t('wallet'),
-                                style: const TextStyle(
-                                    color: Color(0xFF1E3A5F),
-                                    fontWeight: FontWeight.w500),
+                            if (_walletLoading)
+                              const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: _walletBalance < (_trip != null && _line != null
+                                          ? ((_line!['baseprice'] ?? 0.0).toDouble() +
+                                              ((_dropoffPoint != null && _line!['additionalprice'] != null)
+                                                  ? (_line!['additionalprice'] ?? 0.0).toDouble()
+                                                  : 0.0))
+                                          : 0.0)
+                                      ? Colors.orange.shade50
+                                      : Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _walletBalance < (_trip != null && _line != null
+                                            ? ((_line!['baseprice'] ?? 0.0).toDouble() +
+                                                ((_dropoffPoint != null && _line!['additionalprice'] != null)
+                                                    ? (_line!['additionalprice'] ?? 0.0).toDouble()
+                                                    : 0.0))
+                                            : 0.0)
+                                        ? Colors.orange
+                                        : Colors.green,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${_walletBalance.toStringAsFixed(2)} ₪',
+                                          style: const TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF1E3A5F),
+                                          ),
+                                        ),
+                                        if (_walletBalance < (_trip != null && _line != null
+                                                ? ((_line!['baseprice'] ?? 0.0).toDouble() +
+                                                    ((_dropoffPoint != null && _line!['additionalprice'] != null)
+                                                        ? (_line!['additionalprice'] ?? 0.0).toDouble()
+                                                        : 0.0))
+                                                : 0.0))
+                                          Text(
+                                            t('insufficientBalance'),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.orange.shade700,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    if (_walletBalance < (_trip != null && _line != null
+                                            ? ((_line!['baseprice'] ?? 0.0).toDouble() +
+                                                ((_dropoffPoint != null && _line!['additionalprice'] != null)
+                                                    ? (_line!['additionalprice'] ?? 0.0).toDouble()
+                                                    : 0.0))
+                                            : 0.0))
+                                      TextButton.icon(
+                                        onPressed: () {
+                                          Navigator.pushNamed(context, '/passenger/wallet');
+                                        },
+                                        icon: const Icon(Icons.add_card, size: 18),
+                                        label: Text(t('topUpWallet')),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: Colors.orange.shade700,
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
-                              value: 'wallet',
-                              groupValue: _paymentMethod,
-                              onChanged: (value) {
-                                setState(() {
-                                  _paymentMethod = value;
-                                });
-                              },
-                              activeColor: Colors.green,
-                            ),
-                            RadioListTile<String>(
-                              title: Text(
-                                t('cash'),
-                                style: const TextStyle(
-                                    color: Color(0xFF1E3A5F),
-                                    fontWeight: FontWeight.w500),
-                              ),
-                              value: 'cash',
-                              groupValue: _paymentMethod,
-                              onChanged: (value) {
-                                setState(() {
-                                  _paymentMethod = value;
-                                });
-                              },
-                              activeColor: Colors.orange,
-                            ),
-                            RadioListTile<String>(
-                              title: Text(
-                                t('card'),
-                                style: const TextStyle(
-                                    color: Color(0xFF1E3A5F),
-                                    fontWeight: FontWeight.w500),
-                              ),
-                              value: 'card',
-                              groupValue: _paymentMethod,
-                              onChanged: (value) {
-                                setState(() {
-                                  _paymentMethod = value;
-                                });
-                              },
-                              activeColor: Colors.blue,
-                            ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 24),
-                      // Book Button
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(

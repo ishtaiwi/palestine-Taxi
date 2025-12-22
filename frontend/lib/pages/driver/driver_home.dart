@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
+import '../../services/location_service.dart';
 import '../../screens/auth/login_page.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/driver_bottom_nav_bar.dart';
@@ -10,6 +11,7 @@ import 'driver_queue_page.dart';
 import 'driver_trips_page.dart';
 import 'driver_vehicle_page.dart';
 import 'driver_profile_page.dart';
+import 'driver_location_tracking_page.dart';
 
 class DriverHomePage extends StatefulWidget {
   const DriverHomePage({super.key});
@@ -18,13 +20,19 @@ class DriverHomePage extends StatefulWidget {
   State<DriverHomePage> createState() => _DriverHomePageState();
 }
 
-class _DriverHomePageState extends State<DriverHomePage> {
+class _DriverHomePageState extends State<DriverHomePage>
+    with WidgetsBindingObserver {
+  final GlobalKey<DriverQueuePageState> _queueKey =
+      GlobalKey<DriverQueuePageState>();
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   bool _isArabic = true;
   bool _isDarkMode = false; // Light mode as default
   String? _profileImagePath; // Local path to profile image
   final ImagePicker _imagePicker = ImagePicker();
+
+  final LocationService _locationService = LocationService.instance;
+  bool _isTracking = false;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -268,6 +276,49 @@ class _DriverHomePageState extends State<DriverHomePage> {
               iconTheme: const IconThemeData(color: Colors.white),
               actionsIconTheme: const IconThemeData(color: Colors.white),
               actions: [
+                // Tracking status indicator
+                GestureDetector(
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DriverLocationTrackingPage(),
+                      ),
+                    );
+                    // Refresh tracking status when returning from tracking page
+                    if (mounted) {
+                      setState(() {
+                        _isTracking = _locationService.isTracking;
+                      });
+                    }
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.all(8),
+                    child: Stack(
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: _isTracking ? Colors.green : Colors.red,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 Container(
                   margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(
@@ -583,7 +634,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
                                   MaterialPageRoute(
                                     builder: (_) => const DriverQueuePage(),
                                   ),
-                                );
+                                ).then((_) => _queueKey.currentState?.refresh());
                               },
                             ),
                           ),
@@ -715,6 +766,7 @@ class _DriverHomePageState extends State<DriverHomePage> {
                           ],
                         ),
                         child: DriverQueuePage(
+                          key: _queueKey,
                           embedded: true,
                           isArabicOverride: _isArabic,
                           isDarkModeOverride: _isDarkMode,

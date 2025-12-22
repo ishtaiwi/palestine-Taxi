@@ -139,7 +139,6 @@ export const validatePasswordReset = [
 ];
 
 export const validateLine = [
-  // Support both old (linename) and new (name_ar, name_en) format
   body('name_ar')
     .optional()
     .trim()
@@ -155,7 +154,6 @@ export const validateLine = [
     .trim()
     .isLength({ min: 2, max: 100 })
     .withMessage('Line name must be between 2 and 100 characters'),
-  // At least one name must be provided
   body()
     .custom((value) => {
       if (!value.name_ar && !value.linename) {
@@ -258,7 +256,6 @@ export const validateReservation = [
     .trim()
     .isLength({ max: 200 })
     .withMessage('Drop-off point must be less than 200 characters'),
-  // Custom validation: tripid required for instant bookings
   body('tripid')
     .custom((value, { req }) => {
       if (req.body.booking_type === 'instant' && !value) {
@@ -266,7 +263,6 @@ export const validateReservation = [
       }
       return true;
     }),
-  // Custom validation: scheduled_trip_time required for future bookings
   body('scheduled_trip_time')
     .custom((value, { req }) => {
       if (req.body.booking_type === 'future' && !value) {
@@ -314,7 +310,7 @@ export const validatePayment = [
   body('method')
     .notEmpty()
     .withMessage('Payment method is required')
-    .isIn(['wallet', 'cash', 'card', 'palpay', 'jawwal_pay'])
+    .isIn(['wallet'])  // فقط wallet للدفع
     .withMessage('Invalid payment method'),
   validate,
 ];

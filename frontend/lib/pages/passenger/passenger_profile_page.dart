@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
+import '../../config/app_config.dart';
 import '../../screens/auth/login_page.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/passenger_bottom_nav_bar.dart';
@@ -115,11 +116,10 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
   }
 
   Future<void> _loadProfileImage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final imagePath = prefs.getString('profile_image_path');
-    if (imagePath != null && File(imagePath).existsSync()) {
+    final userData = await ApiService.getUserData();
+    if (mounted) {
       setState(() {
-        _profileImagePath = imagePath;
+        _userData = userData;
       });
     }
   }
@@ -134,21 +134,41 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
       );
 
       if (image != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('profile_image_path', image.path);
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const Center(child: CircularProgressIndicator()),
+          );
+        }
 
-        setState(() {
-          _profileImagePath = image.path;
-        });
+        final result = await ApiService.uploadProfileImage(image.path);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(t('profileUpdated')),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          Navigator.of(context).pop(); // close loading
+        }
+
+        if (mounted) {
+          if (result['success'] == true) {
+            await _loadUserData();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(t('profileUpdated')),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  result['message']?.toString() ?? t('failedToUpload'),
+                ),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -325,7 +345,6 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Profile Header with Photo
                     Center(
                       child: Column(
                         children: [
@@ -334,13 +353,27 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
                               CircleAvatar(
                                 radius: 60,
                                 backgroundColor: accentColor.withOpacity(0.2),
-                                child: _profileImagePath != null
+                                child: _userData?['avatar_url'] != null &&
+                                        _userData!['avatar_url']
+                                            .toString()
+                                            .isNotEmpty
                                     ? ClipOval(
-                                        child: Image.file(
-                                          File(_profileImagePath!),
+                                        child: Image.network(
+                                          AppConfig.apiBaseUrl
+                                                  .replaceFirst('/api', '') +
+                                              _userData!['avatar_url']
+                                                  .toString(),
                                           width: 120,
                                           height: 120,
                                           fit: BoxFit.cover,
+                                          errorBuilder: (context, error,
+                                              stackTrace) {
+                                            return Icon(
+                                              Icons.person,
+                                              size: 60,
+                                              color: accentColor,
+                                            );
+                                          },
                                         ),
                                       )
                                     : Icon(
@@ -395,7 +428,6 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
                     ),
                     const SizedBox(height: 32),
 
-                    // Account Information Section
                     _buildSection(
                       title: t('accountInfo'),
                       cardColor: cardColor,
@@ -453,7 +485,6 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Settings Section
                     _buildSection(
                       title: t('settings'),
                       cardColor: cardColor,
@@ -462,7 +493,6 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
                       accentColor: accentColor,
                       isDarkMode: _isDarkMode,
                       children: [
-                        // Language Setting
                         _buildSettingTile(
                           icon: Icons.language,
                           title: t('language'),
@@ -522,7 +552,6 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
                           accentColor: accentColor,
                         ),
                         const Divider(height: 1),
-                        // Theme Setting
                         _buildSettingTile(
                           icon: _isDarkMode ? Icons.light_mode : Icons.dark_mode,
                           title: t('theme'),
@@ -541,7 +570,6 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
                     ),
                     const SizedBox(height: 32),
 
-                    // Logout Button
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(

@@ -80,7 +80,7 @@ export const createReservation = async (req, res, next) => {
 
   try {
     const passengerid = req.user.passengerid || req.user.userid;
-    const paymentMethod = (req.body.paymentmethod || PAYMENT_METHOD.WALLET).toLowerCase();
+    const paymentMethod = PAYMENT_METHOD.WALLET;
 
 
     const bookingType = booking_type || BOOKING_TYPE.INSTANT;
@@ -116,44 +116,58 @@ export const createReservation = async (req, res, next) => {
     }
 
 
-    // Require tripid for both instant and future bookings
-    if (!tripid) {
+    if (bookingType === BOOKING_TYPE.INSTANT && !tripid) {
       return res.status(400).json({
-        message: req.t('reservation.tripid_required') || 'tripid is required for bookings',
+        message: req.t('reservation.tripid_required') || 'tripid is required for instant bookings',
       });
     }
 
-    // Fetch and validate trip exists
-    trip = await Trip.findById(tripid);
-    if (!trip) {
-      return res.status(404).json({
-        message: req.t('trip.not_found') || 'Trip not found'
-      });
-    }
-
-    // Check if trip status allows bookings
-    const validStatuses = [TRIP_STATUS.SCHEDULED, 'open']; // Allow 'open' as well if it exists
-    if (!validStatuses.includes(trip.status)) {
+    if (bookingType === BOOKING_TYPE.FUTURE && !tripid && !req.body.lineid) {
       return res.status(400).json({
-        message: req.t('reservation.trip_unavailable') || `Trip is ${trip.status} and cannot accept bookings`
+        message: req.t('reservation.lineid_required') || 'lineid is required for future bookings without tripid',
       });
     }
 
-    // Check if trip has already departed
-    const tripDeptime = new Date(trip.deptime);
-    const now = new Date();
+    if (tripid) {
+      trip = await Trip.findById(tripid);
+      if (!trip) {
+        return res.status(404).json({
+          message: req.t('trip.not_found') || 'Trip not found'
+        });
+      }
+    }
 
-    if (bookingType === BOOKING_TYPE.INSTANT) {
-      // For instant bookings, trip must not have departed
-      if (tripDeptime <= now) {
+    if (trip) {
+      const validStatuses = [TRIP_STATUS.SCHEDULED, TRIP_STATUS.DELAYED, 'open'];
+      if (!validStatuses.includes(trip.status)) {
+        return res.status(400).json({
+          message: req.t('reservation.trip_unavailable') || `Trip is ${trip.status} and cannot accept bookings`
+        });
+      }
+
+      const departedStatuses = [TRIP_STATUS.IN_PROGRESS, TRIP_STATUS.COMPLETED];
+      if (departedStatuses.includes(trip.status)) {
         return res.status(400).json({
           message: req.t('reservation.trip_departed') || 'Trip has already departed'
         });
       }
+    }
 
-      // Check if trip opening time has passed
+    const now = new Date();
+    let tripDeptime = null;
+    if (trip) {
+      tripDeptime = new Date(trip.deptime);
+    }
+
+    if (bookingType === BOOKING_TYPE.INSTANT) {
+      if (!trip) {
+        return res.status(400).json({
+          message: req.t('reservation.tripid_required') || 'tripid is required for instant bookings',
+        });
+      }
+
       const tripOpeningTime = trip.trip_opening_time ? new Date(trip.trip_opening_time) : null;
-      const defaultOpeningTime = new Date(tripDeptime.getTime() - 45 * 60 * 1000); // 45 minutes before departure
+      const defaultOpeningTime = new Date(tripDeptime.getTime() - 45 * 60 * 1000);
       const effectiveOpeningTime = tripOpeningTime || defaultOpeningTime;
 
       if (effectiveOpeningTime > now) {
@@ -162,7 +176,6 @@ export const createReservation = async (req, res, next) => {
         });
       }
 
-      // Check available seats
       if (trip.availableseats <= 0) {
         return res.status(400).json({
           message: req.t('reservation.no_seats') || 'No available seats'
@@ -170,7 +183,6 @@ export const createReservation = async (req, res, next) => {
       }
     }
 
-    // For future bookings, scheduled_trip_time is required and must match trip departure time
     if (bookingType === BOOKING_TYPE.FUTURE) {
       if (!scheduled_trip_time) {
         return res.status(400).json({
@@ -179,16 +191,10 @@ export const createReservation = async (req, res, next) => {
       }
 
       const scheduledTime = new Date(scheduled_trip_time);
-      if (tripDeptime.getTime() !== scheduledTime.getTime()) {
+      
+      if (trip && tripDeptime && tripDeptime.getTime() !== scheduledTime.getTime()) {
         return res.status(400).json({
           message: req.t('reservation.scheduled_trip_time_mismatch') || 'scheduled_trip_time must match trip departure time',
-        });
-      }
-
-      // Future bookings must be for trips that haven't departed
-      if (tripDeptime <= now) {
-        return res.status(400).json({
-          message: req.t('reservation.trip_departed') || 'Cannot book future reservation for a trip that has already departed'
         });
       }
     }
@@ -204,26 +210,38 @@ export const createReservation = async (req, res, next) => {
     }
 
 
-    // Get line from trip (tripid is now required for all bookings)
     let line = null;
-    if (trip && trip.line) {
-      line = trip.line;
+    const Line = (await import('../models/Line.js')).default;
+    
+    if (trip) {
+      if (trip.line) {
+        line = trip.line;
+      } else {
+        line = await Line.findById(trip.lineid);
+        if (!line) {
+          return res.status(404).json({
+            message: req.t('line.not_found') || 'Line not found',
+          });
+        }
+      }
+
+      if (req.body.lineid && trip.lineid && req.body.lineid !== trip.lineid) {
+        return res.status(400).json({
+          message: req.t('reservation.lineid_mismatch') || 'Provided lineid does not match the trip\'s lineid',
+        });
+      }
     } else {
-      // Fallback: load line if not populated in trip
-      const Line = (await import('../models/Line.js')).default;
-      line = await Line.findById(trip.lineid);
+      if (!req.body.lineid) {
+        return res.status(400).json({
+          message: req.t('reservation.lineid_required') || 'lineid is required for future bookings without tripid',
+        });
+      }
+      line = await Line.findById(req.body.lineid);
       if (!line) {
         return res.status(404).json({
           message: req.t('line.not_found') || 'Line not found',
         });
       }
-    }
-
-    // Validate that provided lineid (if any) matches trip's lineid
-    if (req.body.lineid && req.body.lineid !== trip.lineid) {
-      return res.status(400).json({
-        message: req.t('reservation.lineid_mismatch') || 'Provided lineid does not match the trip\'s lineid',
-      });
     }
     let bookingPrice = line.baseprice;
 
@@ -255,7 +273,10 @@ export const createReservation = async (req, res, next) => {
       if ((wallet.balance || 0) < bookingPrice) {
         await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.FAILED });
         return res.status(400).json({
-          message: req.t('payment.insufficient_balance') || 'Insufficient balance'
+          message: req.t('payment.insufficient_balance') || 'Insufficient balance',
+          insufficientAmount: bookingPrice - (wallet.balance || 0),
+          currentBalance: wallet.balance || 0,
+          requiredAmount: bookingPrice,
         });
       }
 
@@ -267,22 +288,15 @@ export const createReservation = async (req, res, next) => {
         status: PAYMENT_STATUS.COMPLETED,
         fromwalletid: wallet.walletid,
       });
-    } else if ([PAYMENT_METHOD.CASH, PAYMENT_METHOD.CARD, PAYMENT_METHOD.PALPAY, PAYMENT_METHOD.JAWWAL_PAY].includes(paymentMethod)) {
-      await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.PENDING });
-    } else {
-      await Payment.update(paymentRecord.paymentid, {
-        status: PAYMENT_STATUS.PENDING,
-        method: 'other',
-      });
     }
 
 
-    const reservationStatus = paymentMethod === PAYMENT_METHOD.WALLET ? RESERVATION_STATUS.CONFIRMED : RESERVATION_STATUS.PENDING;
+    const reservationStatus = RESERVATION_STATUS.CONFIRMED;
     const reservationData = {
       bookingid: uuidv4(),
       passengerid,
       paymentid: paymentRecord.paymentid,
-      tripid: tripid, // Now required for both instant and future bookings
+      tripid: tripid || null,
       seatlocation: seatlocation || null,
       bookingprice: bookingPrice,
       dropoffpoint: dropoffpoint || null,

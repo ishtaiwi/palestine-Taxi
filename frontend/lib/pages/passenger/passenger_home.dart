@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
+import '../../config/app_config.dart';
 import '../../screens/auth/login_page.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/passenger_bottom_nav_bar.dart';
@@ -25,6 +26,8 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   bool _isDarkMode = false; 
   String? _profileImagePath; 
   final ImagePicker _imagePicker = ImagePicker();
+
+  List<Map<String, dynamic>> _favoriteTrips = [];
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -85,45 +88,13 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     return text;
   }
 
-  final List<Map<String, dynamic>> _favoriteTrips = [
-    {
-      'fromAr': 'نابلس',
-      'toAr': 'بيت إيبا',
-      'fromEn': 'Nablus',
-      'toEn': 'Beit Iba',
-      'line': 'Route Nablus - Beit Iba',
-      'lastBookedAr': 'قبل 3 أيام',
-      'lastBookedEn': '3 days ago',
-      'color': Colors.teal,
-    },
-    {
-      'fromAr': 'نابلس',
-      'toAr': 'بيت وزن',
-      'fromEn': 'Nablus',
-      'toEn': 'Beit Wazan',
-      'line': 'Route Nablus - Beit Wazan',
-      'lastBookedAr': 'قبل أسبوع',
-      'lastBookedEn': '1 week ago',
-      'color': Colors.deepOrange,
-    },
-    {
-      'fromAr': 'نابلس',
-      'toAr': 'عصيرة الشمالية',
-      'fromEn': 'Nablus',
-      'toEn': 'Asira Al-Shamaliya',
-      'line': 'Route Nablus - Asira Al-Shamaliya',
-      'lastBookedAr': 'آخر رحلة أمس',
-      'lastBookedEn': 'Last trip yesterday',
-      'color': Colors.indigo,
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _loadThemePreference();
     _loadProfileImage();
+    _loadFavoriteTrips();
   }
 
   Future<void> _loadUserData() async {
@@ -133,7 +104,9 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       _userData = userData;
       _isLoading = false;
       _isArabic = isArabic;
+      _favoriteTrips = [];
     });
+    await _loadFavoriteTrips();
   }
 
   Future<void> _loadThemePreference() async {
@@ -144,11 +117,10 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   }
 
   Future<void> _loadProfileImage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final imagePath = prefs.getString('profile_image_path');
-    if (imagePath != null && File(imagePath).existsSync()) {
+    final userData = await ApiService.getUserData();
+    if (mounted) {
       setState(() {
-        _profileImagePath = imagePath;
+        _userData = userData;
       });
     }
   }
@@ -163,25 +135,48 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       );
 
       if (image != null) {
-        
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('profile_image_path', image.path);
-
-        setState(() {
-          _profileImagePath = image.path;
-        });
-
-        
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                _isArabic ? 'تم تحديث صورة الملف الشخصي' : 'Profile image updated',
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const Center(child: CircularProgressIndicator()),
           );
+        }
+
+        final result = await ApiService.uploadProfileImage(image.path);
+
+        if (mounted) {
+          Navigator.of(context).pop(); // close loading
+        }
+
+        if (mounted) {
+          if (result['success'] == true) {
+            await _loadUserData();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  _isArabic
+                      ? 'تم تحديث صورة الملف الشخصي'
+                      : 'Profile image updated',
+                ),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  result['message']?.toString() ??
+                      (_isArabic
+                          ? 'فشل تحميل الصورة'
+                          : 'Failed to upload image'),
+                ),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -199,9 +194,149 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     }
   }
 
+  Future<void> _loadFavoriteTrips() async {
+    try {
+      final reservations = await ApiService.fetchPassengerReservations();
+      if (!mounted || reservations.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _favoriteTrips = [];
+          });
+        }
+        return;
+      }
+
+      final Map<String, Map<String, dynamic>> lineStats = {};
+
+      for (final reservation in reservations) {
+        final status = reservation['status']?.toString() ?? '';
+        if (status == 'cancelled' || status == 'no_show') continue;
+
+        final trip = reservation['trip'] as Map<String, dynamic>?;
+        final line =
+            trip?['line'] as Map<String, dynamic>? ?? reservation['line'] as Map<String, dynamic>?;
+        if (line == null) continue;
+
+        final lineId = line['lineid']?.toString();
+        if (lineId == null) continue;
+
+        final nameAr = (line['name_ar']?.toString() ??
+                line['linename']?.toString() ??
+                line['name_en']?.toString() ??
+                '')
+            .trim();
+        final nameEn = (line['name_en']?.toString() ??
+                line['linename']?.toString() ??
+                line['name_ar']?.toString() ??
+                '')
+            .trim();
+
+        Map<String, String> _splitRoute(String name) {
+          final parts = name.split(RegExp(r'[-–]'));
+          if (parts.length >= 2) {
+            return {
+              'from': parts.first.trim(),
+              'to': parts.sublist(1).join('-').trim(),
+            };
+          }
+          return {
+            'from': name,
+            'to': '',
+          };
+        }
+
+        final arSplit = nameAr.isNotEmpty ? _splitRoute(nameAr) : {'from': '', 'to': ''};
+        final enSplit = nameEn.isNotEmpty ? _splitRoute(nameEn) : {'from': '', 'to': ''};
+
+        DateTime? bookedAt;
+        final createdStr = reservation['created_at']?.toString() ??
+            reservation['createdAt']?.toString() ??
+            reservation['bookingtime']?.toString();
+        if (createdStr != null) {
+          try {
+            bookedAt = DateTime.parse(createdStr);
+          } catch (_) {
+            bookedAt = null;
+          }
+        }
+
+        final key = lineId;
+        final current = lineStats[key];
+        if (current == null) {
+          lineStats[key] = {
+            'lineId': lineId,
+            'fromAr': arSplit['from'] ?? '',
+            'toAr': arSplit['to'] ?? '',
+            'fromEn': enSplit['from'] ?? '',
+            'toEn': enSplit['to'] ?? '',
+            'lineName': nameEn.isNotEmpty ? nameEn : nameAr,
+            'count': 1,
+            'lastBookedAt': bookedAt,
+          };
+        } else {
+          current['count'] = (current['count'] as int) + 1;
+          final existingDate = current['lastBookedAt'] as DateTime?;
+          if (bookedAt != null &&
+              (existingDate == null || bookedAt.isAfter(existingDate))) {
+            current['lastBookedAt'] = bookedAt;
+          }
+        }
+      }
+
+      if (!mounted) return;
+
+      final statsList = lineStats.values.toList()
+        ..sort((a, b) {
+          final countA = a['count'] as int? ?? 0;
+          final countB = b['count'] as int? ?? 0;
+          final cmpCount = countB.compareTo(countA);
+          if (cmpCount != 0) return cmpCount;
+
+          final dateA = a['lastBookedAt'] as DateTime?;
+          final dateB = b['lastBookedAt'] as DateTime?;
+
+          if (dateA == null && dateB == null) return 0;
+          if (dateA == null) return 1;
+          if (dateB == null) return -1;
+          return dateB.compareTo(dateA);
+        });
+
+      final topFavorites = statsList.take(3).map((stat) {
+        final lastBookedAt = stat['lastBookedAt'] as DateTime?;
+        final lastBookedText = lastBookedAt != null
+            ? _formatRelativeTime(lastBookedAt)
+            : (_isArabic ? 'غير متوفر' : 'Not available');
+
+        return {
+          'fromAr': stat['fromAr'] as String? ?? '',
+          'toAr': stat['toAr'] as String? ?? '',
+          'fromEn': stat['fromEn'] as String? ?? '',
+          'toEn': stat['toEn'] as String? ?? '',
+          'line': stat['lineName'] as String? ?? '',
+          'lastBookedAr': lastBookedText,
+          'lastBookedEn': lastBookedText,
+          'color': Colors.indigo, // default; can later be customized per line
+        };
+      }).toList();
+
+      setState(() {
+        _favoriteTrips = topFavorites;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _favoriteTrips = [];
+        });
+      }
+    }
+  }
+
 
   Future<void> _handleLogout() async {
     await ApiService.clearAuthData();
+    setState(() {
+      _favoriteTrips = [];
+    });
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
@@ -334,17 +469,24 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                             ),
                                           ],
                                         ),
-                                        child: ClipOval(
-                                          child: _profileImagePath != null
-                                              ? Image.file(
-                                                  File(_profileImagePath!),
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return _buildDefaultAvatar();
-                                                  },
-                                                )
-                                              : _buildDefaultAvatar(),
-                                        ),
+                                      child: ClipOval(
+                                        child: _userData?['avatar_url'] != null &&
+                                                _userData!['avatar_url']
+                                                    .toString()
+                                                    .isNotEmpty
+                                            ? Image.network(
+                                                AppConfig.apiBaseUrl
+                                                        .replaceFirst('/api', '') +
+                                                    _userData!['avatar_url']
+                                                        .toString(),
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (context, error,
+                                                    stackTrace) {
+                                                  return _buildDefaultAvatar();
+                                                },
+                                              )
+                                            : _buildDefaultAvatar(),
+                                      ),
                                       ),
                                       
                                       Positioned(
@@ -1195,6 +1337,27 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
         ],
       ),
     );
+  }
+
+  String _formatRelativeTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inDays <= 0) {
+      return _isArabic ? 'اليوم' : 'Today';
+    } else if (difference.inDays == 1) {
+      return _isArabic ? 'أمس' : 'Yesterday';
+    } else if (difference.inDays < 7) {
+      final days = difference.inDays;
+      return _isArabic ? 'قبل $days أيام' : '$days days ago';
+    } else {
+      final weeks = (difference.inDays / 7).floor();
+      return _isArabic
+          ? 'قبل $weeks أسبوع'
+          : weeks == 1
+              ? '1 week ago'
+              : '$weeks weeks ago';
+    }
   }
 
   

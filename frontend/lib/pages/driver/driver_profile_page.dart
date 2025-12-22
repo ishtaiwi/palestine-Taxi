@@ -206,7 +206,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
         ? Colors.white
         : const Color(0xFF1E3A5F);
     final textSecondaryColor = _isDarkMode
-        ? Colors.white70
+        ? Colors.white.withOpacity(0.9)
         : const Color(0xFF546E7A);
     final accentColor = Colors.orange;
     
@@ -274,7 +274,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
         : const Color(0xFF1E3A5F);
     final accentColor = Colors.orange;
     
-    // Determine icon based on title
     IconData sectionIcon;
     if (title == t('driverInfo')) {
       sectionIcon = Icons.person;
@@ -350,7 +349,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
         ? Colors.white
         : const Color(0xFF1E3A5F);
     final textSecondaryColor = _isDarkMode
-        ? Colors.white70
+        ? Colors.white.withOpacity(0.9)
         : const Color(0xFF546E7A);
     final accentColor = Colors.orange;
     
@@ -404,7 +403,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
             ],
           ),
           const SizedBox(height: 20),
-          // Language Setting
           _buildSettingTile(
             icon: Icons.language,
             title: t('language'),
@@ -469,7 +467,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                 ? Colors.white.withOpacity(0.1)
                 : Colors.grey.shade300,
           ),
-          // Theme Setting
           _buildSettingTile(
             icon: _isDarkMode ? Icons.light_mode : Icons.dark_mode,
             title: t('theme'),
@@ -537,7 +534,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
     
-    // Theme-aware colors
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
         : const Color.fromARGB(255, 224, 228, 231);
@@ -545,7 +541,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
         ? Colors.white
         : const Color(0xFF1E3A5F);
     final textSecondaryColor = _isDarkMode
-        ? Colors.white70
+        ? Colors.white.withOpacity(0.9)
         : const Color(0xFF546E7A);
 
     return Directionality(
@@ -694,7 +690,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Driver Information
                                 _buildSection(
                                   t('driverInfo'),
                                   Column(
@@ -738,7 +733,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                               ),
                             ),
 
-                                // Line Information
                                 _buildSection(
                                   t('lineInfo'),
                                   Column(
@@ -780,7 +774,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                                         padding: const EdgeInsets.all(16.0),
                                         child: Text(
                                           t('noLine'),
-                                          style: const TextStyle(color: Colors.white70),
+                                          style: TextStyle(color: _isDarkMode ? Colors.white : Colors.grey.shade600),
                                         ),
                                       ),
                                     ),
@@ -789,7 +783,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                               ),
                             ),
 
-                                // Vehicle Information
                                 _buildSection(
                                   t('vehicleInfo'),
                                   Column(
@@ -815,7 +808,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                                             v['seatnum']?.toString() ?? t('unknown'),
                                           ),
                                           if (vehicles.length > 1 && vehicles.indexOf(vehicle) < vehicles.length - 1)
-                                            const Divider(color: Colors.white24, height: 32),
+                                            const Divider(color: Colors.white, height: 32),
                                         ],
                                       );
                                     }),
@@ -825,7 +818,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                                         padding: const EdgeInsets.all(16.0),
                                         child: Text(
                                           t('noVehicle'),
-                                          style: const TextStyle(color: Colors.white70),
+                                          style: TextStyle(color: _isDarkMode ? Colors.white : Colors.grey.shade600),
                                         ),
                                       ),
                                     ),
@@ -835,7 +828,6 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                                 ),
                                 const SizedBox(height: 20),
 
-                                // Settings Section
                                 _buildSettingsSection(),
                               ],
                             ),

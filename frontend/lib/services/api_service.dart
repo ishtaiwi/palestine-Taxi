@@ -34,6 +34,58 @@ class ApiService {
     await prefs.remove('user_data');
   }
 
+  static Future<Map<String, dynamic>> uploadProfileImage(String imagePath) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/auth/profile/avatar');
+      final request = http.MultipartRequest('POST', uri);
+
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Accept'] = 'application/json';
+
+      final file = await http.MultipartFile.fromPath('avatar', imagePath);
+      request.files.add(file);
+
+      final streamedResponse =
+          await request.send().timeout(AppConfig.requestTimeout);
+      final response = await http.Response.fromStream(streamedResponse);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        if (decoded['user'] != null && decoded['user'] is Map) {
+          await saveUserData(
+              Map<String, dynamic>.from(decoded['user'] as Map));
+        }
+
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Avatar uploaded successfully',
+          'avatarUrl': decoded['avatarUrl'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to upload avatar',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
   static Future<void> saveLanguagePreference(bool isArabic) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('language_arabic', isArabic);
@@ -2316,11 +2368,7 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // ADMIN - REPORTS API
-  // ============================================
 
-  /// Get revenue time series data (admin)
   static Future<Map<String, dynamic>> getRevenueTimeSeries({
     String? startDate,
     String? endDate,
@@ -2359,7 +2407,6 @@ class ApiService {
     }
   }
 
-  /// Get booking time series data (admin)
   static Future<Map<String, dynamic>> getBookingTimeSeries({
     String? startDate,
     String? endDate,
@@ -2398,7 +2445,6 @@ class ApiService {
     }
   }
 
-  /// Get trip statistics (admin)
   static Future<Map<String, dynamic>> getTripStatistics({
     String? startDate,
     String? endDate,
@@ -2435,7 +2481,6 @@ class ApiService {
     }
   }
 
-  /// Get user growth data (admin)
   static Future<Map<String, dynamic>> getUserGrowth({
     String? startDate,
     String? endDate,
@@ -2474,7 +2519,6 @@ class ApiService {
     }
   }
 
-  /// Get vehicle utilization data (admin)
   static Future<Map<String, dynamic>> getVehicleUtilization({
     String? startDate,
     String? endDate,
@@ -2511,7 +2555,6 @@ class ApiService {
     }
   }
 
-  /// Get line performance data (admin)
   static Future<Map<String, dynamic>> getLinePerformance({
     String? startDate,
     String? endDate,
@@ -2548,9 +2591,6 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // ADMIN - USERS API
-  // ============================================
 
   
   static Future<List<Map<String, dynamic>>> getAllUsers() async {

@@ -78,12 +78,17 @@ export const createTrip = async (req, res, next) => {
       });
     }
     
-    
-    const vehicle = await Vehicle.findById(vehicleid);
-    if (!vehicle) {
-      return res.status(404).json({ 
-        message: req.t('vehicle.not_found') || 'Vehicle not found' 
-      });
+    // Vehicle is optional - if provided, validate it; otherwise will be assigned from queue
+    let vehicle = null;
+    let defaultSeats = 5; // Default to 4+1
+    if (vehicleid) {
+      vehicle = await Vehicle.findById(vehicleid);
+      if (!vehicle) {
+        return res.status(404).json({ 
+          message: req.t('vehicle.not_found') || 'Vehicle not found' 
+        });
+      }
+      defaultSeats = vehicle.seatnum;
     }
     
     
@@ -94,12 +99,13 @@ export const createTrip = async (req, res, next) => {
     
     const initialAvailableSeats = availableseats !== undefined 
       ? availableseats 
-      : calculateAvailablePassengerSeats(vehicle.seatnum, 0, 0);
+      : calculateAvailablePassengerSeats(defaultSeats, 0, 0);
     
+    // Set vehicleid to null if not provided - will be assigned from driver queue at opening
     const tripData = {
       tripid: uuidv4(),
       lineid,
-      vehicleid,
+      vehicleid: vehicleid || null, // Null if not provided - will be assigned from queue
       deptime,
       status: 'scheduled',
       availableseats: initialAvailableSeats,
@@ -186,9 +192,21 @@ export const getTripSeatMap = async (req, res, next) => {
       });
     }
     
+    // Check if trip has vehicle assigned
+    if (!trip.vehicleid) {
+      return res.status(400).json({ 
+        message: req.t('trip.no_vehicle') || 'Trip does not have a vehicle assigned yet' 
+      });
+    }
+    
     const reservations = await Reservation.findByTripId(tripid);
     const vehicle = await Vehicle.findById(trip.vehicleid);
     
+    if (!vehicle) {
+      return res.status(404).json({ 
+        message: req.t('vehicle.not_found') || 'Vehicle not found' 
+      });
+    }
     
     const seatMap = generateSeatMap(
       vehicle.seatlayout,

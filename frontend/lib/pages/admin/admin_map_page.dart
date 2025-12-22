@@ -40,24 +40,36 @@ class _AdminMapPageState extends State<AdminMapPage> {
       // Load vehicle locations
       final locationsResult = await ApiService.getAllVehicleLocations();
       if (locationsResult['success'] == true) {
-        setState(() {
-          _vehicleLocations = locationsResult['locations'] ?? [];
-        });
+        final locationsList = locationsResult['locations'];
+        if (locationsList is List) {
+          setState(() {
+            _vehicleLocations = locationsList
+                .whereType<Map<String, dynamic>>()
+                .map((loc) => Map<String, dynamic>.from(loc))
+                .toList();
+          });
+        }
       }
 
       // Load base stations
       final stationsResult =
           await ApiService.getAllBaseStations(isActive: true);
       if (stationsResult['success'] == true) {
-        setState(() {
-          _baseStations = stationsResult['stations'] ?? [];
-          if (_baseStations.isNotEmpty && _center == null) {
-            _center = LatLng(
-              _baseStations[0]['latitude']?.toDouble() ?? 31.9522,
-              _baseStations[0]['longitude']?.toDouble() ?? 35.2332,
-            );
-          }
-        });
+        final stationsList = stationsResult['stations'];
+        if (stationsList is List) {
+          setState(() {
+            _baseStations = stationsList
+                .whereType<Map<String, dynamic>>()
+                .map((station) => Map<String, dynamic>.from(station))
+                .toList();
+            if (_baseStations.isNotEmpty && _center == null) {
+              _center = LatLng(
+                _baseStations[0]['latitude']?.toDouble() ?? 31.9522,
+                _baseStations[0]['longitude']?.toDouble() ?? 35.2332,
+              );
+            }
+          });
+        }
       }
 
       // Load lines
@@ -203,9 +215,11 @@ class _AdminMapPageState extends State<AdminMapPage> {
                                   value: null,
                                   child: Text('All Lines'),
                                 ),
-                                ..._lines.map((line) => DropdownMenuItem<String>(
+                                ..._lines.map((line) =>
+                                    DropdownMenuItem<String>(
                                       value: line['lineid'].toString(),
-                                      child: Text(line['linename'] ?? 'Unknown'),
+                                      child:
+                                          Text(line['linename'] ?? 'Unknown'),
                                     )),
                               ],
                               onChanged: (value) {
@@ -348,7 +362,8 @@ class _AdminMapPageState extends State<AdminMapPage> {
 
                 // Stats bar
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                   color: AppTheme.getCardBackground(0.1),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,

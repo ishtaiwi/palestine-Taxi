@@ -100,6 +100,33 @@ app.get('/api/db/test', async (req, res) => {
   }
 });
 
+// Config endpoint for client-side configuration (Supabase URL and anon key)
+app.get('/api/config/supabase', (req, res) => {
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return res.status(503).json({
+        success: false,
+        message: 'Supabase configuration not available',
+      });
+    }
+
+    res.json({
+      success: true,
+      url: supabaseUrl,
+      anonKey: supabaseAnonKey,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving Supabase configuration',
+      error: error.message,
+    });
+  }
+});
+
 
 app.use('/api/auth', authRoutes);
 app.use('/api/lines', lineRoutes);

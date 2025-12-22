@@ -154,9 +154,10 @@ const findOrCreateDriverTrip = async (driverid, lineid, deptime) => {
  * Distribute future bookings to drivers
  * @param {string} scheduledTripTime - The scheduled trip departure time
  * @param {string} lineid - The line ID
+ * @param {string} tripid - Optional trip ID to assign bookings to (if provided, uses this trip instead of creating new ones)
  * @returns {Promise<object>} - Distribution result
  */
-export const distributeFutureBookings = async (scheduledTripTime, lineid) => {
+export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid = null) => {
   try {
     console.log(`[MatchingService] 🚀 Starting distribution of future bookings for time ${scheduledTripTime}`);
     
@@ -182,9 +183,57 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid) => {
     let remainingBookings = [...unassignedBookings];
     const driversUsed = [];
     
+    // If tripid is provided, use that specific trip for distribution
+    let targetTrip = null;
+    if (tripid) {
+      targetTrip = await Trip.findById(tripid);
+      if (!targetTrip || !targetTrip.vehicleid) {
+        console.log(`[MatchingService] ⚠️ Trip ${tripid} not found or has no vehicle, cannot distribute bookings`);
+        return {
+          success: false,
+          distributed: 0,
+          remaining: unassignedBookings.length,
+          driversUsed: [],
+        };
+      }
+      console.log(`[MatchingService] Using existing trip ${tripid} for distribution`);
+    }
+    
     // Distribute future bookings to drivers in queue order (Rule 1: Future Bookings first)
     while (remainingBookings.length > 0) {
-      // Get next driver from queue (Rule 2: First driver in queue)
+      // If using existing trip, assign all bookings to it
+      if (targetTrip) {
+        const driverVehicle = await Vehicle.findById(targetTrip.vehicleid);
+        const availableSeats = await getAvailableSeats(driverVehicle, targetTrip.tripid);
+        
+        if (availableSeats <= 0) {
+          console.log(`[MatchingService] ⚠️ Trip ${targetTrip.tripid} is full`);
+          break;
+        }
+        
+        const bookingsToAssign = remainingBookings.slice(0, availableSeats);
+        
+        for (const booking of bookingsToAssign) {
+          await Reservation.update(booking.bookingid, {
+            tripid: targetTrip.tripid,
+          });
+          distributedCount++;
+        }
+        
+        remainingBookings = remainingBookings.slice(bookingsToAssign.length);
+        
+        driversUsed.push({
+          driverid: targetTrip.assigned_driverid,
+          tripid: targetTrip.tripid,
+          bookingsAssigned: bookingsToAssign.length,
+          vehicle: driverVehicle,
+        });
+        
+        console.log(`[MatchingService] ✅ Assigned ${bookingsToAssign.length} future bookings to trip ${targetTrip.tripid}`);
+        break; // All bookings assigned to this trip
+      }
+      
+      // Original logic: Get next driver from queue (Rule 2: First driver in queue)
       const driverQueueEntry = await getNextDriverFromQueue(lineid);
       
       if (!driverQueueEntry) {
@@ -262,9 +311,10 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid) => {
  * Distribute instant bookings to drivers for the next available trip
  * @param {string} lineid - The line ID
  * @param {string} nextTripTime - The next trip departure time (optional)
+ * @param {string} tripid - Optional trip ID to assign bookings to (if provided, uses this trip instead of finding next)
  * @returns {Promise<object>} - Distribution result
  */
-export const distributeInstantBookings = async (lineid, nextTripTime = null) => {
+export const distributeInstantBookings = async (lineid, nextTripTime = null, tripid = null) => {
   try {
     console.log(`[MatchingService] 🚀 Starting distribution of instant bookings for line ${lineid}`);
     
@@ -323,9 +373,57 @@ export const distributeInstantBookings = async (lineid, nextTripTime = null) => 
     let remainingBookings = [...unassignedBookings];
     const driversUsed = [];
     
+    // If tripid is provided, use that specific trip for distribution
+    let targetTrip = null;
+    if (tripid) {
+      targetTrip = await Trip.findById(tripid);
+      if (!targetTrip || !targetTrip.vehicleid) {
+        console.log(`[MatchingService] ⚠️ Trip ${tripid} not found or has no vehicle, cannot distribute bookings`);
+        return {
+          success: false,
+          distributed: 0,
+          remaining: unassignedBookings.length,
+          driversUsed: [],
+        };
+      }
+      console.log(`[MatchingService] Using existing trip ${tripid} for instant booking distribution`);
+    }
+    
     // Distribute instant bookings to drivers in queue order (Rule 2: First driver in queue)
     while (remainingBookings.length > 0) {
-      // Get next driver from queue
+      // If using existing trip, assign all bookings to it
+      if (targetTrip) {
+        const driverVehicle = await Vehicle.findById(targetTrip.vehicleid);
+        const availableSeats = await getAvailableSeats(driverVehicle, targetTrip.tripid);
+        
+        if (availableSeats <= 0) {
+          console.log(`[MatchingService] ⚠️ Trip ${targetTrip.tripid} is full`);
+          break;
+        }
+        
+        const bookingsToAssign = remainingBookings.slice(0, availableSeats);
+        
+        for (const booking of bookingsToAssign) {
+          await Reservation.update(booking.bookingid, {
+            tripid: targetTrip.tripid,
+          });
+          distributedCount++;
+        }
+        
+        remainingBookings = remainingBookings.slice(bookingsToAssign.length);
+        
+        driversUsed.push({
+          driverid: targetTrip.assigned_driverid,
+          tripid: targetTrip.tripid,
+          bookingsAssigned: bookingsToAssign.length,
+          vehicle: driverVehicle,
+        });
+        
+        console.log(`[MatchingService] ✅ Assigned ${bookingsToAssign.length} instant bookings to trip ${targetTrip.tripid}`);
+        break; // All bookings assigned to this trip
+      }
+      
+      // Original logic: Get next driver from queue
       const driverQueueEntry = await getNextDriverFromQueue(lineid);
       
       if (!driverQueueEntry) {
@@ -414,16 +512,29 @@ export const distributeAllBookings = async (tripid) => {
       throw new Error(`Trip ${tripid} not found`);
     }
     
+    // Check if trip has vehicle assigned - cannot distribute bookings without vehicle
+    if (!trip.vehicleid) {
+      console.log(`[MatchingService] ⚠️ Trip ${tripid} has no vehicle assigned, skipping booking distribution`);
+      return {
+        success: false,
+        message: 'Trip has no vehicle assigned',
+        future: { distributed: 0, remaining: 0, driversUsed: [] },
+        instant: { distributed: 0, remaining: 0, driversUsed: [] },
+        totalDistributed: 0,
+        totalRemaining: 0,
+      };
+    }
+    
     const scheduledTripTime = trip.deptime;
     const lineid = trip.lineid;
     
     // Step 1: Distribute Future Bookings first (Rule 1: Future Bookings first - highest priority)
     console.log(`[MatchingService] 📅 Step 1: Distributing Future Bookings`);
-    const futureResult = await distributeFutureBookings(scheduledTripTime, lineid);
+    const futureResult = await distributeFutureBookings(scheduledTripTime, lineid, tripid);
     
     // Step 2: Distribute Instant Bookings (Rule 4: Ordered by timestamp)
     console.log(`[MatchingService] ⚡ Step 2: Distributing Instant Bookings`);
-    const instantResult = await distributeInstantBookings(lineid, scheduledTripTime);
+    const instantResult = await distributeInstantBookings(lineid, scheduledTripTime, tripid);
     
     return {
       success: true,

@@ -15,9 +15,11 @@ class AppTheme {
   static const Color darkDateBackground = Color(0xFF101428);
 
   // Light mode colors - Eye-friendly palette
-  static const Color lightBackground = Color(0xFFECF0F3); // Soft blue-gray, easy on eyes
+  static const Color lightBackground =
+      Color(0xFFECF0F3); // Soft blue-gray, easy on eyes
   static const Color lightAppBar = Color(0xFF2C5F8D); // Professional blue
-  static const Color lightCardBackground = Color(0xFFFAFBFC); // Off-white with cool tint
+  static const Color lightCardBackground =
+      Color(0xFFFAFBFC); // Off-white with cool tint
   static const Color lightTextPrimary = Color(0xFF1E3A5F); // Dark navy
   static const Color lightTextSecondary = Color(0xFF546E7A); // Medium gray-blue
   static const Color lightBorder = Color(0xFFD1D9E0); // Soft gray-blue border
@@ -46,14 +48,14 @@ class AppTheme {
 
   static Color getCardBorder([double opacity = 0.15]) {
     return _isDarkMode
-        ? Colors.white.withOpacity(opacity)
-        : Colors.black.withOpacity(opacity * 0.4);
+        ? Colors.white.withValues(alpha: opacity)
+        : Colors.black.withValues(alpha: opacity * 0.4);
   }
 
   static Color getShadowColor([double opacity = 0.3]) {
     return _isDarkMode
-        ? Colors.black.withOpacity(opacity)
-        : Colors.black.withOpacity(opacity * 0.1);
+        ? Colors.black.withValues(alpha: opacity)
+        : Colors.black.withValues(alpha: opacity * 0.1);
   }
 
   /// Lighten a color by adjusting its HSL lightness value

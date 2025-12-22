@@ -5,6 +5,7 @@ import Vehicle from '../models/Vehicle.js';
 import Trip from '../models/Trip.js';
 import Reservation from '../models/Reservation.js';
 import { RESERVATION_STATUS } from '../utils/constants.js';
+import { checkAndAssignWaitingTrips } from '../services/tripOpeningService.js';
 
 const buildQueueResponse = (queue = [], driverid) => {
   const normalizedQueue = queue.map((entry, index) => ({
@@ -103,6 +104,14 @@ export const joinDriverQueue = async (req, res, next) => {
     const entry = await DriverQueue.join(driverRecord.driverid, driverRecord.lineid);
     const queue = await DriverQueue.getActiveByLine(driverRecord.lineid);
     const response = buildQueueResponse(queue, driverRecord.driverid);
+
+    // Check for waiting trips and assign vehicle (event-driven assignment)
+    try {
+      await checkAndAssignWaitingTrips(driverRecord.lineid);
+    } catch (error) {
+      // Log error but don't fail the queue join operation
+      console.error('[DriverController] Error checking waiting trips after queue join:', error);
+    }
 
     res.status(201).json({
       message: req.t('driver.queue_joined') || 'Driver added to queue',

@@ -785,36 +785,50 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
 
     DateTime? departureTime;
     try {
-      departureTime = DateTime.parse(deptime);
+      // Parse as server local time (strip timezone and treat as local)
+      // Backend sends UTC but it should be interpreted as server local time
+      final tzRegex = RegExp(r'([+-]\d{2}):(\d{2})$');
+      final datePart = deptime.replaceFirst(tzRegex, "");
+      departureTime = DateTime.parse(datePart);
     } catch (e) {
     }
 
     DateTime? tripOpeningTime;
     if (tripOpeningTimeStr != null && tripOpeningTimeStr.isNotEmpty) {
       try {
-        tripOpeningTime = DateTime.parse(tripOpeningTimeStr);
+        // Parse as server local time (strip timezone and treat as local)
+        // Backend sends UTC but it should be interpreted as server local time
+        final tzRegex = RegExp(r'([+-]\d{2}):(\d{2})$');
+        final datePart = tripOpeningTimeStr.replaceFirst(tzRegex, "");
+        tripOpeningTime = DateTime.parse(datePart);
       } catch (e) {
       }
     }
 
+    // Get server time (already in server's local timezone)
     DateTime now = TimeSyncService.now();
 
     bool isTripOpened;
 
     if (tripOpeningTime != null) {
-      final opening = tripOpeningTime!.toUtc();
+      final opening = tripOpeningTime;
       isTripOpened = opening.isBefore(now) || opening.isAtSameMomentAs(now);
     } else if (departureTime != null) {
-      final departure = departureTime!.toUtc();
+      final departure = departureTime;
       final defaultOpening = departure.subtract(const Duration(minutes: 45));
       isTripOpened =
           defaultOpening.isBefore(now) || defaultOpening.isAtSameMomentAs(now);
     } else {
       isTripOpened = false;
     }
-    print("now UTC: ${TimeSyncService.now().toUtc()}");
-
-    print("opening UTC: ${tripOpeningTime}");
+    print("************************************************************");
+    print("now (server local): ${now}");
+    print("opening (original): ${tripOpeningTimeStr}");
+    print("opening (parsed, local): ${tripOpeningTime}");
+    print("opening.isBefore(now): ${tripOpeningTime?.isBefore(now) ?? 'N/A'}");
+    print(
+        "opening.isAtSameMomentAs(now): ${tripOpeningTime?.isAtSameMomentAs(now) ?? 'N/A'}");
+    print("isTripOpened: $isTripOpened");
 
     final isScheduled = status == 'scheduled' || status == 'open';
 

@@ -1,29 +1,45 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../config/app_config.dart';
+import 'api_service.dart';
 
 class SupabaseRealtimeService {
   static SupabaseClient? _client;
   static RealtimeChannel? _channel;
   static Function(Map<String, dynamic>)? _onLocationUpdate;
 
-  /// Initialize Supabase client
-  /// Note: You'll need to add SUPABASE_URL and SUPABASE_ANON_KEY to your app config
+  /// Initialize Supabase client by fetching config from server
   static Future<void> initialize() async {
     if (_client != null) {
       return;
     }
 
-    // TODO: Add Supabase URL and anon key to app_config.dart
-    // For now, we'll need to get these from environment or config
-    // You can get these from your Supabase project settings
-    
-    // Example initialization (you'll need to add these values):
-    // await Supabase.initialize(
-    //   url: 'YOUR_SUPABASE_URL',
-    //   anonKey: 'YOUR_SUPABASE_ANON_KEY',
-    // );
-    
-    // _client = Supabase.instance.client;
+    try {
+      // Fetch Supabase configuration from server
+      final config = await ApiService.getSupabaseConfig();
+
+      if (config['success'] != true) {
+        print('Failed to get Supabase config: ${config['message']}');
+        return;
+      }
+
+      final String? url = config['url'];
+      final String? anonKey = config['anonKey'];
+
+      if (url == null || anonKey == null) {
+        print('Supabase URL or anon key is null');
+        return;
+      }
+
+      // Initialize Supabase with fetched configuration
+      await Supabase.initialize(
+        url: url,
+        anonKey: anonKey,
+      );
+
+      _client = Supabase.instance.client;
+      print('Supabase client initialized successfully');
+    } catch (e) {
+      print('Error initializing Supabase client: $e');
+    }
   }
 
   /// Subscribe to vehicle location updates
@@ -74,4 +90,3 @@ class SupabaseRealtimeService {
   /// Get Supabase client instance
   static SupabaseClient? get client => _client;
 }
-

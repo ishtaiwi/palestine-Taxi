@@ -13,6 +13,12 @@ import {
   applyScheduleRecommendation,
   triggerModelRetrain,
   getPredictionInsights,
+  getRevenueTimeSeries,
+  getBookingTimeSeries,
+  getTripStatistics,
+  getUserGrowth,
+  getVehicleUtilization,
+  getLinePerformance,
 } from '../controllers/adminController.js';
 import {
   getAllBaseStations,
@@ -38,6 +44,12 @@ router.use(requireAdmin);
 
 router.get('/dashboard/stats', getDashboardStats);
 router.get('/dashboard/revenue', getRevenueAnalytics);
+router.get('/reports/revenue-timeseries', getRevenueTimeSeries);
+router.get('/reports/booking-timeseries', getBookingTimeSeries);
+router.get('/reports/trip-statistics', getTripStatistics);
+router.get('/reports/user-growth', getUserGrowth);
+router.get('/reports/vehicle-utilization', getVehicleUtilization);
+router.get('/reports/line-performance', getLinePerformance);
 router.get('/predictions/rush-hours', getRushHourPredictionsReport);
 router.get('/predictions/line-demand', getLineDemandAnalysis);
 router.get('/predictions/insights', getPredictionInsights);

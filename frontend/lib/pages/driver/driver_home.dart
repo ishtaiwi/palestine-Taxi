@@ -33,9 +33,6 @@ class _DriverHomePageState extends State<DriverHomePage>
   bool _isTracking = false;
   final LocationService _locationService = LocationService.instance;
 
-  final LocationService _locationService = LocationService.instance;
-  bool _isTracking = false;
-
   final Map<String, Map<String, String>> _texts = {
     'ar': {
       'title': 'لوحة السائق',
@@ -685,7 +682,8 @@ class _DriverHomePageState extends State<DriverHomePage>
                                   MaterialPageRoute(
                                     builder: (_) => const DriverQueuePage(),
                                   ),
-                                ).then((_) => _queueKey.currentState?.refresh());
+                                ).then(
+                                    (_) => _queueKey.currentState?.refresh());
                               },
                             ),
                           ),

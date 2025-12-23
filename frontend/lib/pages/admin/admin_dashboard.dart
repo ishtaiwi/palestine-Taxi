@@ -15,6 +15,7 @@ import 'admin_predictions_page.dart';
 import 'admin_map_page.dart';
 import 'admin_base_station_page.dart';
 import 'admin_reports_page.dart';
+import 'admin_settings_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -66,6 +67,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'aiPredictions': 'توقعات الذكاء الاصطناعي',
       'vehicleMap': 'خريطة المركبات',
       'baseStations': 'محطات القاعدة',
+      'settings': 'الإعدادات',
       'analytics': 'التحليلات',
       'map': 'الخريطة',
     },
@@ -92,6 +94,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'aiPredictions': 'AI Predictions',
       'vehicleMap': 'Vehicle Map',
       'baseStations': 'Base Stations',
+      'settings': 'Settings',
       'analytics': 'Analytics',
       'map': 'Map',
     },
@@ -416,7 +419,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         t('welcome'),
@@ -639,6 +643,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildActionCard(
+                                    icon: Icons.settings_rounded,
+                                    title: t('settings'),
+                                    color: Colors.grey,
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminSettingsPage())),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -713,7 +734,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         color: cardColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: _isDarkMode ? Colors.white.withAlpha(38) : Colors.grey.shade200,
+          color:
+              _isDarkMode ? Colors.white.withAlpha(38) : Colors.grey.shade200,
           width: 1.5,
         ),
         boxShadow: [
@@ -897,7 +919,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.white.withAlpha(13) : const Color(0xFFF8F9FA),
+        color:
+            isDarkMode ? Colors.white.withAlpha(13) : const Color(0xFFF8F9FA),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isDarkMode ? Colors.white.withAlpha(25) : Colors.grey.shade200,
@@ -1172,10 +1195,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   String _formatTimestamp(dynamic value) {
     if (value == null) return '-';
-    final parsed = DateTime.tryParse(value.toString());
-    if (parsed == null) return value.toString();
-    return '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')} '
-        '${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
+    try {
+      // Normalize Supabase timestamp format to ISO 8601 and convert to local time
+      String normalized = value.toString();
+      // Replace space with T
+      normalized = normalized.replaceFirst(' ', 'T');
+      // Replace +00 or +00:00 with Z (UTC indicator)
+      normalized = normalized.replaceFirst(RegExp(r'\+00:?00?$'), 'Z');
+      // If no timezone indicator, assume UTC
+      if (!normalized.contains('Z') &&
+          !normalized.contains('+') &&
+          !normalized.contains('-')) {
+        normalized += 'Z';
+      }
+      // Parse as UTC and convert to local timezone for display
+      final parsed = DateTime.tryParse(normalized)?.toLocal();
+      if (parsed == null) return value.toString();
+      return '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')} '
+          '${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return value.toString();
+    }
   }
 
   String _formatRevenue(dynamic value) {

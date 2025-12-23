@@ -8,6 +8,7 @@ import Line from '../models/Line.js';
 import Vehicle from '../models/Vehicle.js';
 import Payment from '../models/Payment.js';
 import DriverQueue from '../models/DriverQueue.js';
+import AppConfig from '../models/AppConfig.js';
 import { TRIP_STATUS, RESERVATION_STATUS, VEHICLE_STATUS, USER_ROLES, PAYMENT_STATUS } from '../utils/constants.js';
 import {
   trainModelBulk as trainRushHourModel,
@@ -30,7 +31,7 @@ export const getDashboardStats = async (req, res, next) => {
     const lines = await Line.findAll();
     const vehicles = await Vehicle.findAll();
     const users = await User.findAll();
-    
+
     const stats = {
       totalTrips: trips.length,
       completedTrips: trips.filter(t => t.status === TRIP_STATUS.COMPLETED).length,
@@ -43,7 +44,7 @@ export const getDashboardStats = async (req, res, next) => {
       totalDrivers: users.filter(u => u.role === USER_ROLES.DRIVER).length,
       totalPassengers: users.filter(u => u.role === USER_ROLES.PASSENGER).length,
     };
-    
+
     res.json(stats);
   } catch (error) {
     next(error);
@@ -55,7 +56,7 @@ export const getAllUsers = async (req, res, next) => {
   try {
     const { role } = req.query;
     const filters = role ? { role } : {};
-    
+
     const users = await User.findAll(filters);
     res.json(users);
   } catch (error) {
@@ -68,13 +69,13 @@ export const getUserById = async (req, res, next) => {
   try {
     const { userid } = req.params;
     const user = await User.findById(userid);
-    
+
     if (!user) {
-      return res.status(404).json({ 
-        message: req.t('user.not_found') || 'User not found' 
+      return res.status(404).json({
+        message: req.t('user.not_found') || 'User not found'
       });
     }
-    
+
     res.json(user);
   } catch (error) {
     next(error);
@@ -86,7 +87,7 @@ export const updateUser = async (req, res, next) => {
   try {
     const { userid } = req.params;
     const updates = req.body;
-    
+
     const user = await User.update(userid, updates);
     res.json({
       message: req.t('user.updated') || 'User updated successfully',
@@ -102,7 +103,7 @@ export const deleteUser = async (req, res, next) => {
   try {
     const { userid } = req.params;
 
-    
+
     const user = await User.findById(userid);
     if (!user) {
       return res.status(404).json({
@@ -110,29 +111,29 @@ export const deleteUser = async (req, res, next) => {
       });
     }
 
-    
+
     const driver = await Driver.findByUserId(userid);
     if (driver) {
-      
+
       await DriverQueue.deleteByDriverId(driver.driverid);
 
-      
-      
-      
+
+
+
       const vehicles = await Vehicle.findByDriverId(driver.driverid);
       if (vehicles && vehicles.length > 0) {
         for (const vehicle of vehicles) {
-           await Vehicle.delete(vehicle.vehicleid);
+          await Vehicle.delete(vehicle.vehicleid);
         }
       }
-      
-      
+
+
       await Driver.delete(driver.driverid);
     }
 
-    
+
     await User.delete(userid);
-    
+
     res.json({
       message: req.t('user.deleted') || 'User deleted successfully',
     });
@@ -145,20 +146,20 @@ export const deleteUser = async (req, res, next) => {
 export const getRevenueAnalytics = async (req, res, next) => {
   try {
     const { startDate, endDate, lineid } = req.query;
-    
+
     const { PAYMENT_STATUS } = await import('../utils/constants.js');
     let payments = await Payment.findAll({ status: PAYMENT_STATUS.COMPLETED });
-    
+
     if (startDate) {
       payments = payments.filter(p => new Date(p.time) >= new Date(startDate));
     }
     if (endDate) {
       payments = payments.filter(p => new Date(p.time) <= new Date(endDate));
     }
-    
+
     const totalRevenue = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    
-    
+
+
     const revenueByLine = {};
     if (lineid) {
       const reservations = await Reservation.findAll();
@@ -171,7 +172,7 @@ export const getRevenueAnalytics = async (req, res, next) => {
         }
       });
     }
-    
+
     res.json({
       totalRevenue,
       revenueByLine,
@@ -187,7 +188,7 @@ export const updateAdminPermissions = async (req, res, next) => {
   try {
     const { adminid } = req.params;
     const { permissions } = req.body;
-    
+
     const admin = await Admin.updatePermissions(adminid, permissions);
     res.json({
       message: req.t('admin.permissions_updated') || 'Permissions updated successfully',
@@ -462,6 +463,7 @@ export const getTripStatistics = async (req, res, next) => {
     const completed = trips.filter((t) => t.status === TRIP_STATUS.COMPLETED).length;
     const cancelled = trips.filter((t) => t.status === TRIP_STATUS.CANCELLED).length;
     const scheduled = trips.filter((t) => t.status === TRIP_STATUS.SCHEDULED).length;
+    const open = trips.filter((t) => t.status === TRIP_STATUS.OPEN).length;
     const inProgress = trips.filter((t) => t.status === TRIP_STATUS.IN_PROGRESS).length;
 
     let totalUtilization = 0;
@@ -475,6 +477,7 @@ export const getTripStatistics = async (req, res, next) => {
         completed: items.filter((t) => t.status === TRIP_STATUS.COMPLETED).length,
         cancelled: items.filter((t) => t.status === TRIP_STATUS.CANCELLED).length,
         scheduled: items.filter((t) => t.status === TRIP_STATUS.SCHEDULED).length,
+        open: items.filter((t) => t.status === TRIP_STATUS.OPEN).length,
         inProgress: items.filter((t) => t.status === TRIP_STATUS.IN_PROGRESS).length,
       };
     });
@@ -496,6 +499,7 @@ export const getTripStatistics = async (req, res, next) => {
       completed,
       cancelled,
       scheduled,
+      open,
       inProgress,
       averageUtilization,
       overTime,
@@ -694,6 +698,75 @@ export const getLinePerformance = async (req, res, next) => {
 
     res.json({
       linePerformance: Object.values(linePerformance),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get current timezone configuration
+ * @route GET /api/admin/config/timezone
+ */
+export const getTimezoneConfig = async (req, res, next) => {
+  try {
+    const offset = await AppConfig.getTimezoneOffset();
+
+    // Generate timezone name (e.g., "UTC+2", "UTC-5")
+    const timezoneName = offset >= 0 ? `UTC+${offset}` : `UTC${offset}`;
+
+    // Common timezone descriptions
+    const timezoneDescriptions = {
+      2: 'Palestine Standard Time',
+      3: 'Arabia Standard Time',
+      '-5': 'Eastern Standard Time',
+      0: 'Coordinated Universal Time',
+    };
+
+    res.json({
+      success: true,
+      timezone_offset: offset,
+      timezone_name: timezoneName,
+      description: timezoneDescriptions[offset] || `UTC${offset >= 0 ? '+' : ''}${offset}`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update timezone configuration
+ * @route PUT /api/admin/config/timezone
+ */
+export const updateTimezoneConfig = async (req, res, next) => {
+  try {
+    const { timezone_offset } = req.body;
+
+    if (timezone_offset === undefined || timezone_offset === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'timezone_offset is required',
+      });
+    }
+
+    // Validate offset range (-12 to 14)
+    const offset = parseInt(timezone_offset, 10);
+    if (isNaN(offset) || offset < -12 || offset > 14) {
+      return res.status(400).json({
+        success: false,
+        message: 'timezone_offset must be between -12 and 14',
+      });
+    }
+
+    await AppConfig.setTimezoneOffset(offset);
+
+    const timezoneName = offset >= 0 ? `UTC+${offset}` : `UTC${offset}`;
+
+    res.json({
+      success: true,
+      message: 'Timezone configuration updated successfully',
+      timezone_offset: offset,
+      timezone_name: timezoneName,
     });
   } catch (error) {
     next(error);

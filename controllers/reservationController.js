@@ -9,6 +9,7 @@ import { validateReservationData } from '../utils/validation.js';
 import { distributeInstantBookings } from '../services/matchingService.js';
 import { updateModelIncremental } from '../services/rushHourPredictionService.js';
 import logger from '../utils/logger.js';
+import { canBookInstant } from '../utils/timeUtils.js';
 
 
 export const getAllReservations = async (req, res, next) => {
@@ -105,10 +106,16 @@ export const createReservation = async (req, res, next) => {
         });
       }
 
+      // Parse scheduled_trip_time as UTC
       const scheduledTime = new Date(scheduled_trip_time);
-      const now = new Date();
+      if (Number.isNaN(scheduledTime.getTime())) {
+        return res.status(400).json({
+          message: req.t('reservation.invalid_scheduled_trip_time') || 'Invalid scheduled_trip_time format',
+        });
+      }
 
-      if (scheduledTime <= now) {
+      const now = new Date(); // UTC now
+      if (scheduledTime.getTime() <= now.getTime()) {
         return res.status(400).json({
           message: req.t('reservation.scheduled_trip_time_future') || 'scheduled_trip_time must be in the future',
         });
@@ -138,7 +145,7 @@ export const createReservation = async (req, res, next) => {
     }
 
     if (trip) {
-      const validStatuses = [TRIP_STATUS.SCHEDULED, TRIP_STATUS.DELAYED, 'open'];
+      const validStatuses = [TRIP_STATUS.SCHEDULED, TRIP_STATUS.OPEN, TRIP_STATUS.DELAYED];
       if (!validStatuses.includes(trip.status)) {
         return res.status(400).json({
           message: req.t('reservation.trip_unavailable') || `Trip is ${trip.status} and cannot accept bookings`
@@ -153,12 +160,6 @@ export const createReservation = async (req, res, next) => {
       }
     }
 
-    const now = new Date();
-    let tripDeptime = null;
-    if (trip) {
-      tripDeptime = new Date(trip.deptime);
-    }
-
     if (bookingType === BOOKING_TYPE.INSTANT) {
       if (!trip) {
         return res.status(400).json({
@@ -166,13 +167,8 @@ export const createReservation = async (req, res, next) => {
         });
       }
 
-      const tripOpeningTime = trip.trip_opening_time ? new Date(trip.trip_opening_time) : null;
-      const defaultOpeningTime = new Date(tripDeptime.getTime() - 45 * 60 * 1000);
-      const effectiveOpeningTime = tripOpeningTime || defaultOpeningTime;
-
-
-
-      if (effectiveOpeningTime > now) {
+      // Use UTC-based canBookInstant utility to check if trip is open for instant bookings
+      if (!canBookInstant(trip)) {
         return res.status(400).json({
           message: req.t('reservation.trip_not_open') || 'Trip is not yet open for instant bookings'
         });
@@ -192,12 +188,22 @@ export const createReservation = async (req, res, next) => {
         });
       }
 
+      // Parse scheduled_trip_time as UTC
       const scheduledTime = new Date(scheduled_trip_time);
-      
-      if (trip && tripDeptime && tripDeptime.getTime() !== scheduledTime.getTime()) {
+      if (Number.isNaN(scheduledTime.getTime())) {
         return res.status(400).json({
-          message: req.t('reservation.scheduled_trip_time_mismatch') || 'scheduled_trip_time must match trip departure time',
+          message: req.t('reservation.invalid_scheduled_trip_time') || 'Invalid scheduled_trip_time format',
         });
+      }
+
+      if (trip && trip.deptime) {
+        const tripDeptime = new Date(trip.deptime);
+        // Compare UTC times
+        if (tripDeptime.getTime() !== scheduledTime.getTime()) {
+          return res.status(400).json({
+            message: req.t('reservation.scheduled_trip_time_mismatch') || 'scheduled_trip_time must match trip departure time',
+          });
+        }
       }
     }
 
@@ -214,7 +220,7 @@ export const createReservation = async (req, res, next) => {
 
     let line = null;
     const Line = (await import('../models/Line.js')).default;
-    
+
     if (trip) {
       if (trip.line) {
         line = trip.line;

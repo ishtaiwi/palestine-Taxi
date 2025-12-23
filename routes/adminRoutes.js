@@ -19,6 +19,8 @@ import {
   getUserGrowth,
   getVehicleUtilization,
   getLinePerformance,
+  getTimezoneConfig,
+  updateTimezoneConfig,
 } from '../controllers/adminController.js';
 import {
   getAllBaseStations,
@@ -74,6 +76,10 @@ router.get('/base-station/check-driver/:driverid', checkDriverAtStation);
 router.get('/lines/:lineid/path', getLinePath);
 router.post('/lines/:lineid/path', createOrUpdateLinePath);
 router.delete('/lines/:lineid/path', deleteLinePath);
+
+// Timezone configuration routes
+router.get('/config/timezone', getTimezoneConfig);
+router.put('/config/timezone', updateTimezoneConfig);
 
 export default router;
 

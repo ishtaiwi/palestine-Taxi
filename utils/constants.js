@@ -25,6 +25,7 @@ export const VEHICLE_LAYOUT = {
 
 export const TRIP_STATUS = {
   SCHEDULED: 'scheduled',
+  OPEN: 'open',
   IN_PROGRESS: 'in_progress',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',

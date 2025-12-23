@@ -5,6 +5,7 @@ import Vehicle from '../models/Vehicle.js';
 import { v4 as uuidv4 } from 'uuid';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
 import logger from '../utils/logger.js';
+import { parseUtcDate, getUtcNow } from '../utils/timeUtils.js';
 import {
     getRushHourPredictions,
     getTopDemandLines,
@@ -67,14 +68,32 @@ export async function applyRecommendation(recommendation) {
             throw new Error('insert_buffer_trip requires deptime in payload');
         }
 
-        // Calculate trip opening time (45 minutes before departure)
-        const deptime = new Date(actionPayload.deptime);
+        // Calculate trip opening time (45 minutes before departure) - parse as UTC
+        const deptime = parseUtcDate(actionPayload.deptime);
+        if (!deptime) {
+            throw new Error('Invalid deptime format');
+        }
         const openingTime = new Date(deptime.getTime() - 45 * 60 * 1000);
 
         // Get default vehicle for seat count calculation (optional)
         // Vehicle will be assigned from driver queue at trip opening time
         const vehicles = await Vehicle.findAll({ lineid, status: 'active' });
         const defaultSeats = vehicles && vehicles.length > 0 ? vehicles[0].seatnum : 5;
+
+        // Get departure settings from template if templateId is provided, otherwise default to false
+        let autoDepartureEnabled = false;
+        let scheduledDepartureEnforced = false;
+        if (templateId) {
+            try {
+                const template = await ScheduleTemplate.findById(templateId);
+                if (template) {
+                    autoDepartureEnabled = template.auto_departure_enabled ?? false;
+                    scheduledDepartureEnforced = template.scheduled_departure_enforced ?? false;
+                }
+            } catch (error) {
+                logger.warn('Could not fetch template for departure settings, using defaults', { templateId, error: error.message });
+            }
+        }
 
         const tripData = {
             tripid: uuidv4(),
@@ -85,9 +104,9 @@ export async function applyRecommendation(recommendation) {
             availableseats: calculateAvailablePassengerSeats(defaultSeats, 0, 0),
             totalbookings: 0,
             trip_opening_time: openingTime.toISOString(),
-            auto_departure_enabled: true,
+            auto_departure_enabled: autoDepartureEnabled,
             early_departure_allowed: true,
-            scheduled_departure_enforced: true,
+            scheduled_departure_enforced: scheduledDepartureEnforced,
             templateid: templateId || null,
         };
 
@@ -101,7 +120,7 @@ export async function applyRecommendation(recommendation) {
 
         return {
             trip: createdTrip,
-            appliedAt: new Date().toISOString(),
+            appliedAt: getUtcNow().toISOString(),
         };
     }
 
@@ -117,7 +136,7 @@ export async function applyRecommendation(recommendation) {
 
     return {
         updatedTemplate,
-        appliedAt: new Date().toISOString(),
+        appliedAt: getUtcNow().toISOString(),
     };
 }
 
@@ -185,7 +204,7 @@ function buildUtilizationMap(buckets = []) {
 
     buckets.forEach((bucket) => {
         const sample = bucket.samples?.[0];
-        const date = sample?.deptime ? new Date(sample.deptime) : null;
+        const date = sample?.deptime ? parseUtcDate(sample.deptime) : null;
         if (!date || Number.isNaN(date.getTime())) return;
 
         const key = `${date.getUTCDay()}|${date.getUTCHours()}`;
@@ -213,10 +232,11 @@ async function getTotalAvailableSeatsForTimeSlot(lineid, date, hour) {
         // Filter trips that match the hour and sum available seats
         let totalAvailable = 0;
         for (const trip of trips || []) {
-            const tripDeptime = new Date(trip.deptime);
+            const tripDeptime = parseUtcDate(trip.deptime);
             if (
+                tripDeptime &&
                 tripDeptime.getUTCHours() === hour &&
-                trip.status === 'scheduled' &&
+                (trip.status === 'scheduled' || trip.status === 'open') &&
                 trip.availableseats > 0
             ) {
                 totalAvailable += trip.availableseats || 0;

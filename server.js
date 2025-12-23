@@ -30,6 +30,7 @@ import locationRoutes from './routes/locationRoutes.js';
 
 import { startTripOpeningJob } from './jobs/tripOpeningJob.js';
 import { startDepartureCheckJob } from './jobs/departureCheckJob.js';
+import { startDelayedTripCheckJob } from './jobs/delayedTripCheckJob.js';
 import { startNoShowCheckJob } from './jobs/noShowCheckJob.js';
 import { startDailyTripCreationJob } from './jobs/dailyTripCreationJob.js';
 import { startPredictionUpdateJob } from './jobs/predictionUpdateJob.js';
@@ -163,16 +164,17 @@ app.listen(PORT, async () => {
   if (dbTest.connected) {
     logger.info('✅ Database connection verified');
 
-    
+
     logger.info('Starting background jobs...');
     startTripOpeningJob();
+    startDelayedTripCheckJob();
     startDepartureCheckJob();
     startNoShowCheckJob();
     startDailyTripCreationJob();
     startPredictionUpdateJob();
     logger.info('✅ All background jobs started');
 
-    
+
     setImmediate(async () => {
       try {
         await initializeModel();

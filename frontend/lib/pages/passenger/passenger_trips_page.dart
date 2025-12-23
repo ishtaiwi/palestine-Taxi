@@ -111,8 +111,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
           _lines = lines;
         });
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<void> _loadTrips() async {
@@ -551,8 +550,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                                               color: isSelected
                                                   ? (_isDarkMode
                                                       ? Colors.white
-                                                      : const Color(
-                                                          0xFF1E3A5F))
+                                                      : const Color(0xFF1E3A5F))
                                                   : textPrimary,
                                             ),
                                           ),
@@ -561,8 +559,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                                                   Icons.check_circle_rounded,
                                                   color: _isDarkMode
                                                       ? const Color(0xFF64B5F6)
-                                                      : const Color(
-                                                          0xFF1E3A5F),
+                                                      : const Color(0xFF1E3A5F),
                                                 )
                                               : null,
                                           onTap: () {
@@ -579,8 +576,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
 
                                       final line =
                                           filteredLines[index - 1]; // offset
-                                      final lineId =
-                                          line['lineid']?.toString();
+                                      final lineId = line['lineid']?.toString();
                                       final lineName = _isArabic
                                           ? (line['name_ar']?.toString() ??
                                               line['linename']?.toString() ??
@@ -781,72 +777,70 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     final baseprice = line['baseprice'] ?? 0.0;
     final tripid = trip['tripid']?.toString() ?? '';
     final status = trip['status']?.toString() ?? '';
-    final tripOpeningTimeStr = trip['trip_opening_time']?.toString();
+    // Use backend-computed flags instead of calculating locally
+    // Backend handles all timezone logic and returns boolean flags
+    final canBookInstantBackend = trip['canBookInstant'] as bool? ?? false;
 
+    // Parse UTC times for display only (convert to device local timezone)
+    // Supabase returns timestamps like "2025-12-23 21:00:00+00" - normalize to ISO format
     DateTime? departureTime;
     try {
-      // Parse as server local time (strip timezone and treat as local)
-      // Backend sends UTC but it should be interpreted as server local time
-      final tzRegex = RegExp(r'([+-]\d{2}):(\d{2})$');
-      final datePart = deptime.replaceFirst(tzRegex, "");
-      departureTime = DateTime.parse(datePart);
+      if (deptime.isNotEmpty) {
+        // Normalize Supabase timestamp format to ISO 8601
+        String normalized = deptime.toString();
+        // Replace space with T
+        normalized = normalized.replaceFirst(' ', 'T');
+        // Replace +00 or +00:00 with Z (UTC indicator)
+        normalized = normalized.replaceFirst(RegExp(r'\+00:?00?$'), 'Z');
+        // If no timezone, assume UTC
+        if (!normalized.contains('Z') &&
+            !normalized.contains('+') &&
+            !normalized.contains('-')) {
+          normalized += 'Z';
+        }
+        departureTime = DateTime.parse(normalized).toLocal();
+      }
     } catch (e) {
+      // Ignore parse errors
+      debugPrint('Error parsing deptime: $deptime, error: $e');
     }
 
     DateTime? tripOpeningTime;
+    final tripOpeningTimeStr = trip['trip_opening_time']?.toString();
     if (tripOpeningTimeStr != null && tripOpeningTimeStr.isNotEmpty) {
       try {
-        // Parse as server local time (strip timezone and treat as local)
-        // Backend sends UTC but it should be interpreted as server local time
-        final tzRegex = RegExp(r'([+-]\d{2}):(\d{2})$');
-        final datePart = tripOpeningTimeStr.replaceFirst(tzRegex, "");
-        tripOpeningTime = DateTime.parse(datePart);
+        // Normalize Supabase timestamp format to ISO 8601
+        String normalized = tripOpeningTimeStr;
+        normalized = normalized.replaceFirst(' ', 'T');
+        normalized = normalized.replaceFirst(RegExp(r'\+00:?00?$'), 'Z');
+        if (!normalized.contains('Z') &&
+            !normalized.contains('+') &&
+            !normalized.contains('-')) {
+          normalized += 'Z';
+        }
+        tripOpeningTime = DateTime.parse(normalized).toLocal();
       } catch (e) {
+        // Ignore parse errors
+        debugPrint(
+            'Error parsing trip_opening_time: $tripOpeningTimeStr, error: $e');
       }
     }
 
-    // Get server time (already in server's local timezone)
-    DateTime now = TimeSyncService.now();
-
-    bool isTripOpened;
-
-    if (tripOpeningTime != null) {
-      final opening = tripOpeningTime;
-      isTripOpened = opening.isBefore(now) || opening.isAtSameMomentAs(now);
-    } else if (departureTime != null) {
-      final departure = departureTime;
-      final defaultOpening = departure.subtract(const Duration(minutes: 45));
-      isTripOpened =
-          defaultOpening.isBefore(now) || defaultOpening.isAtSameMomentAs(now);
-    } else {
-      isTripOpened = false;
-    }
-    print("************************************************************");
-    print("now (server local): ${now}");
-    print("opening (original): ${tripOpeningTimeStr}");
-    print("opening (parsed, local): ${tripOpeningTime}");
-    print("opening.isBefore(now): ${tripOpeningTime?.isBefore(now) ?? 'N/A'}");
-    print(
-        "opening.isAtSameMomentAs(now): ${tripOpeningTime?.isAtSameMomentAs(now) ?? 'N/A'}");
-    print("isTripOpened: $isTripOpened");
-
     final isScheduled = status == 'scheduled' || status == 'open';
 
-    final canBookInstant = isScheduled && isTripOpened && availableseats > 0;
+    // Use backend flag for instant booking (backend already checked status, opening time, and seats)
+    final canBookInstant = canBookInstantBackend;
 
     final canBookFuture = isScheduled;
 
-    final cardColor = _isDarkMode
-        ? const Color(0xFF1C2541)
-        : const Color(0xFFFAFBFC);
+    final cardColor =
+        _isDarkMode ? const Color(0xFF1C2541) : const Color(0xFFFAFBFC);
 
-    final textPrimary = _isDarkMode
-        ? const Color(0xFFE8EAF6)
-        : const Color(0xFF1E3A5F);
+    final textPrimary =
+        _isDarkMode ? const Color(0xFFE8EAF6) : const Color(0xFF1E3A5F);
 
-    final borderColor = _isDarkMode
-        ? const Color(0xFF2C3E50)
-        : Colors.grey.shade200;
+    final borderColor =
+        _isDarkMode ? const Color(0xFF2C3E50) : Colors.grey.shade200;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 18),
@@ -1054,8 +1048,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                                 openingTime.hour.toString().padLeft(2, '0');
                             final minute =
                                 openingTime.minute.toString().padLeft(2, '0');
-                            message =
-                                '${t('tripOpensAt')} $hour:$minute $isTripOpened';
+                            message = '${t('tripOpensAt')} $hour:$minute';
                           } else {
                             message = t('tripNotOpenedYet');
                           }

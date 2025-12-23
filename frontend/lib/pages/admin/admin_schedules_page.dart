@@ -27,6 +27,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   int _endHour = 19;
   int _intervalMinutes = 60;
   bool _active = true;
+  bool _autoDepartureEnabled = false;
+  bool _scheduledDepartureEnforced = false;
   String? _editingTemplateId;
 
   final Map<String, Map<String, String>> _texts = {
@@ -42,6 +44,10 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'interval': 'الفترة (بالدقائق)',
       'active': 'نشط',
       'inactive': 'غير نشط',
+      'autoDepartureEnabled': 'تفعيل المغادرة التلقائية',
+      'scheduledDepartureEnforced': 'فرض وقت المغادرة المجدول',
+      'autoDepartureDescription': 'تفعيل المغادرة التلقائية للرحلات المبنية من هذا الجدول',
+      'scheduledDepartureDescription': 'فرض وقت المغادرة المجدول للرحلات المبنية من هذا الجدول',
       'save': 'حفظ',
       'cancel': 'إلغاء',
       'edit': 'تعديل',
@@ -86,6 +92,10 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'interval': 'Interval (minutes)',
       'active': 'Active',
       'inactive': 'Inactive',
+      'autoDepartureEnabled': 'Auto Departure Enabled',
+      'scheduledDepartureEnforced': 'Scheduled Departure Enforced',
+      'autoDepartureDescription': 'Enable automatic departure for trips created from this schedule',
+      'scheduledDepartureDescription': 'Enforce scheduled departure time for trips created from this schedule',
       'save': 'Save',
       'cancel': 'Cancel',
       'edit': 'Edit',
@@ -218,6 +228,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           endHour: _endHour,
           intervalMinutes: _intervalMinutes,
           active: _active,
+          autoDepartureEnabled: _autoDepartureEnabled,
+          scheduledDepartureEnforced: _scheduledDepartureEnforced,
         );
       } else {
         result = await ApiService.createSchedule(
@@ -226,6 +238,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           endHour: _endHour,
           intervalMinutes: _intervalMinutes,
           active: _active,
+          autoDepartureEnabled: _autoDepartureEnabled,
+          scheduledDepartureEnforced: _scheduledDepartureEnforced,
         );
       }
 
@@ -331,6 +345,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         _endHour = schedule['end_hour'] ?? 19;
         _intervalMinutes = schedule['interval_minutes'] ?? 60;
         _active = schedule['active'] ?? true;
+        _autoDepartureEnabled = schedule['auto_departure_enabled'] ?? false;
+        _scheduledDepartureEnforced = schedule['scheduled_departure_enforced'] ?? false;
       });
     } else {
       setState(() {
@@ -340,6 +356,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         _endHour = 19;
         _intervalMinutes = 60;
         _active = true;
+        _autoDepartureEnabled = false;
+        _scheduledDepartureEnforced = false;
       });
     }
 
@@ -502,6 +520,24 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                       value: _active,
                       activeColor: Colors.blue.shade600,
                       onChanged: (val) => setState(() => _active = val),
+                    ),
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(t('autoDepartureEnabled'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+                      subtitle: Text(t('autoDepartureDescription'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary, fontSize: 12)),
+                      value: _autoDepartureEnabled,
+                      activeColor: Colors.blue.shade600,
+                      onChanged: (val) => setState(() => _autoDepartureEnabled = val),
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(t('scheduledDepartureEnforced'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+                      subtitle: Text(t('scheduledDepartureDescription'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary, fontSize: 12)),
+                      value: _scheduledDepartureEnforced,
+                      activeColor: Colors.blue.shade600,
+                      onChanged: (val) => setState(() => _scheduledDepartureEnforced = val),
                     ),
                     const SizedBox(height: 24),
                     SizedBox(

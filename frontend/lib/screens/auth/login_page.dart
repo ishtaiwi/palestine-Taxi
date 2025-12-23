@@ -35,14 +35,84 @@ class TaxiPalestineApp extends StatelessWidget {
         Locale('en', ''), // English
         Locale('ar', ''), // Arabic
       ],
-      initialRoute: '/',
+      // Start with a small router that decides whether to go to login
+      // or directly into the appropriate dashboard based on saved session.
+      home: const _StartupRouter(),
       routes: {
-        '/': (context) => const LoginScreen(),
+        '/login': (context) => const LoginScreen(),
         '/passenger': (context) => const PassengerHomePage(),
         '/driver': (context) => const DriverHomePage(),
         '/admin': (context) => const AdminDashboardPage(),
       },
     );
+  }
+}
+
+/// Small wrapper that checks for a saved session and routes accordingly.
+class _StartupRouter extends StatefulWidget {
+  const _StartupRouter({super.key});
+
+  @override
+  State<_StartupRouter> createState() => _StartupRouterState();
+}
+
+class _StartupRouterState extends State<_StartupRouter> {
+  bool _isLoading = true;
+  Widget? _targetPage;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    // Try to get cached user first
+    Map<String, dynamic>? user = await ApiService.getUserData();
+
+    // If there is a token but no cached user, try to refresh from backend
+    if (user == null) {
+      final profileResult = await ApiService.getProfile();
+      if (profileResult['success'] == true) {
+        user = profileResult['user'] as Map<String, dynamic>?;
+      }
+    }
+
+    if (!mounted) return;
+
+    Widget target;
+    if (user != null) {
+      final role = user['role']?.toString().toUpperCase();
+      if (role == 'PASSENGER') {
+        target = const PassengerHomePage();
+      } else if (role == 'DRIVER') {
+        target = const DriverHomePage();
+      } else if (role == 'ADMIN') {
+        target = const AdminDashboardPage();
+      } else {
+        target = const LoginScreen();
+      }
+    } else {
+      target = const LoginScreen();
+    }
+
+    setState(() {
+      _targetPage = target;
+      _isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return _targetPage!;
   }
 }
 

@@ -2,21 +2,23 @@ import Trip from '../models/Trip.js';
 import Line from '../models/Line.js';
 import Vehicle from '../models/Vehicle.js';
 import Reservation from '../models/Reservation.js';
+import DriverQueue from '../models/DriverQueue.js';
 import { buildSeatRows, normalizeSeatId } from '../utils/seatLayout.js';
 import { calculateAvailablePassengerSeats, getTotalPassengerSeats } from '../utils/seatCalculation.js';
 import { v4 as uuidv4 } from 'uuid';
 import { TRIP_STATUS } from '../utils/constants.js';
+import { getUtcNow, parseUtcDate } from '../utils/timeUtils.js';
 
 
 export const getAllTrips = async (req, res, next) => {
   try {
     const { lineid, status, date } = req.query;
     const filters = {};
-    
+
     if (lineid) filters.lineid = lineid;
     if (status) filters.status = status;
     if (date) filters.date = date;
-    
+
     const trips = await Trip.findAll(filters);
     res.json(trips);
   } catch (error) {
@@ -29,11 +31,11 @@ export const getUpcomingTrips = async (req, res, next) => {
   try {
     const { lineid, status, date } = req.query;
     const filters = {};
-    
+
     if (lineid) filters.lineid = lineid;
     if (status) filters.status = status;
     if (date) filters.date = date;
-    
+
     const trips = await Trip.findUpcoming(filters);
     res.json(trips);
   } catch (error) {
@@ -46,16 +48,16 @@ export const getTripById = async (req, res, next) => {
   try {
     const { tripid } = req.params;
     const trip = await Trip.findById(tripid);
-    
+
     if (!trip) {
-      return res.status(404).json({ 
-        message: req.t('trip.not_found') || 'Trip not found' 
+      return res.status(404).json({
+        message: req.t('trip.not_found') || 'Trip not found'
       });
     }
-    
-    
+
+
     const reservations = await Reservation.findByTripId(tripid);
-    
+
     res.json({
       ...trip,
       reservations,
@@ -69,38 +71,44 @@ export const getTripById = async (req, res, next) => {
 export const createTrip = async (req, res, next) => {
   try {
     const { lineid, vehicleid, deptime, availableseats } = req.body;
-    
-    
+
+
     const line = await Line.findById(lineid);
     if (!line) {
-      return res.status(404).json({ 
-        message: req.t('line.not_found') || 'Line not found' 
+      return res.status(404).json({
+        message: req.t('line.not_found') || 'Line not found'
       });
     }
-    
+
     // Vehicle is optional - if provided, validate it; otherwise will be assigned from queue
     let vehicle = null;
     let defaultSeats = 5; // Default to 4+1
     if (vehicleid) {
       vehicle = await Vehicle.findById(vehicleid);
       if (!vehicle) {
-        return res.status(404).json({ 
-          message: req.t('vehicle.not_found') || 'Vehicle not found' 
+        return res.status(404).json({
+          message: req.t('vehicle.not_found') || 'Vehicle not found'
         });
       }
       defaultSeats = vehicle.seatnum;
     }
-    
-    
-    const deptimeDate = new Date(deptime);
+
+
+    // Parse deptime as UTC and calculate opening time (45 minutes before)
+    const deptimeDate = parseUtcDate(deptime);
+    if (!deptimeDate) {
+      return res.status(400).json({
+        message: req.t('trip.invalid_deptime') || 'Invalid deptime format',
+      });
+    }
     const openingTime = new Date(deptimeDate.getTime() - 45 * 60 * 1000);
-    
-    
-    
-    const initialAvailableSeats = availableseats !== undefined 
-      ? availableseats 
+
+
+
+    const initialAvailableSeats = availableseats !== undefined
+      ? availableseats
       : calculateAvailablePassengerSeats(defaultSeats, 0, 0);
-    
+
     // Set vehicleid to null if not provided - will be assigned from driver queue at opening
     const tripData = {
       tripid: uuidv4(),
@@ -115,7 +123,7 @@ export const createTrip = async (req, res, next) => {
       early_departure_allowed: true,
       scheduled_departure_enforced: true,
     };
-    
+
     const trip = await Trip.create(tripData);
     res.status(201).json({
       message: req.t('trip.created') || 'Trip created successfully',
@@ -131,7 +139,7 @@ export const updateTrip = async (req, res, next) => {
   try {
     const { tripid } = req.params;
     const updates = req.body;
-    
+
     const trip = await Trip.update(tripid, updates);
     res.json({
       message: req.t('trip.updated') || 'Trip updated successfully',
@@ -146,15 +154,35 @@ export const updateTrip = async (req, res, next) => {
 export const startTrip = async (req, res, next) => {
   try {
     const { tripid } = req.params;
-    
-    const trip = await Trip.update(tripid, {
+
+    // Get trip details first to check for assigned driver
+    const trip = await Trip.findById(tripid);
+    if (!trip) {
+      return res.status(404).json({
+        message: req.t('trip.not_found') || 'Trip not found',
+      });
+    }
+
+    // Update trip status to in_progress
+    const updatedTrip = await Trip.update(tripid, {
       status: 'in_progress',
-      deptime: new Date().toISOString(),
+      deptime: getUtcNow().toISOString(),
     });
-    
+
+    // Remove driver from queue if assigned
+    if (trip.assigned_driverid) {
+      try {
+        await DriverQueue.removeDriverFromQueue(trip.assigned_driverid);
+        console.log(`[TripController] ✅ Removed driver ${trip.assigned_driverid} from queue`);
+      } catch (error) {
+        console.error(`[TripController] ⚠️ Error removing driver from queue:`, error);
+        // Don't fail the trip start if queue removal fails
+      }
+    }
+
     res.json({
       message: req.t('trip.started') || 'Trip started successfully',
-      trip,
+      trip: updatedTrip,
     });
   } catch (error) {
     next(error);
@@ -165,12 +193,12 @@ export const startTrip = async (req, res, next) => {
 export const endTrip = async (req, res, next) => {
   try {
     const { tripid } = req.params;
-    
+
     const trip = await Trip.update(tripid, {
       status: TRIP_STATUS.COMPLETED,
-      arrivaltime: new Date().toISOString(),
+      arrivaltime: getUtcNow().toISOString(),
     });
-    
+
     res.json({
       message: req.t('trip.ended') || 'Trip ended successfully',
       trip,
@@ -184,37 +212,37 @@ export const endTrip = async (req, res, next) => {
 export const getTripSeatMap = async (req, res, next) => {
   try {
     const { tripid } = req.params;
-    
+
     const trip = await Trip.findById(tripid);
     if (!trip) {
-      return res.status(404).json({ 
-        message: req.t('trip.not_found') || 'Trip not found' 
+      return res.status(404).json({
+        message: req.t('trip.not_found') || 'Trip not found'
       });
     }
-    
+
     // Check if trip has vehicle assigned
     if (!trip.vehicleid) {
-      return res.status(400).json({ 
-        message: req.t('trip.no_vehicle') || 'Trip does not have a vehicle assigned yet' 
+      return res.status(400).json({
+        message: req.t('trip.no_vehicle') || 'Trip does not have a vehicle assigned yet'
       });
     }
-    
+
     const reservations = await Reservation.findByTripId(tripid);
     const vehicle = await Vehicle.findById(trip.vehicleid);
-    
+
     if (!vehicle) {
-      return res.status(404).json({ 
-        message: req.t('vehicle.not_found') || 'Vehicle not found' 
+      return res.status(404).json({
+        message: req.t('vehicle.not_found') || 'Vehicle not found'
       });
     }
-    
+
     const seatMap = generateSeatMap(
       vehicle.seatlayout,
       vehicle.seatnum,
       reservations,
       vehicle.broken_seats || []
     );
-    
+
     res.json({
       trip,
       seatMap,
@@ -234,7 +262,7 @@ function generateSeatMap(layout, totalSeats, reservations, brokenSeats = []) {
     .map((r) => normalizeSeatId(r.seatlocation))
     .filter(Boolean);
   const brokenSeatIds = (brokenSeats || []).map((seat) => seat.toLowerCase());
-  
+
   for (let i = 1; i <= totalSeats; i++) {
     const seatKey = `seat_${i}`;
     let status = 'available';
@@ -250,7 +278,7 @@ function generateSeatMap(layout, totalSeats, reservations, brokenSeats = []) {
       reservation: reservations.find(r => r.seatlocation === seatKey) || null,
     };
   }
-  
+
   return seatMap;
 }
 

@@ -17,10 +17,9 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
   bool _isLoading = true;
   bool _isArabic = true;
 
-  
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  String? _statusFilter; 
+  String? _statusFilter;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -107,7 +106,8 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
             content: Text('${t('error')}: ${e.toString()}'),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -119,23 +119,40 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
       final method = (payment['method'] ?? '').toString().toLowerCase();
       final status = (payment['status'] ?? '').toString().toLowerCase();
       final amount = (payment['amount'] ?? '').toString();
-      
+
       final matchesSearch = _searchQuery.isEmpty ||
           method.contains(_searchQuery) ||
           amount.contains(_searchQuery);
 
-      final matchesStatus = _statusFilter == null || status == _statusFilter?.toLowerCase();
+      final matchesStatus =
+          _statusFilter == null || status == _statusFilter?.toLowerCase();
 
       return matchesSearch && matchesStatus;
     }).toList();
   }
 
   String _formatDate(String? dateString) {
-    if (dateString == null) return '';
+    if (dateString == null || dateString.isEmpty) return '';
     try {
-      final date = DateTime.parse(dateString);
+      // Normalize Supabase timestamp format to ISO 8601 and convert to local time
+      // Supabase returns: "2025-12-23 21:00:00+00" -> convert to: "2025-12-23T21:00:00Z"
+      String normalized = dateString.toString();
+      // Replace space with T
+      normalized = normalized.replaceFirst(' ', 'T');
+      // Replace +00 or +00:00 with Z (UTC indicator)
+      normalized = normalized.replaceFirst(RegExp(r'\+00:?00?$'), 'Z');
+      // If no timezone indicator, assume UTC
+      if (!normalized.contains('Z') &&
+          !normalized.contains('+') &&
+          !normalized.contains('-')) {
+        normalized += 'Z';
+      }
+      // Parse as UTC and convert to local timezone for display
+      final date = DateTime.parse(normalized).toLocal();
       return DateFormat('dd/MM/yyyy HH:mm').format(date);
     } catch (e) {
+      debugPrint(
+          'Error parsing date in admin payments: $dateString, error: $e');
       return dateString;
     }
   }
@@ -168,7 +185,8 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final textDirection = _isArabic ? material.TextDirection.rtl : material.TextDirection.ltr;
+    final textDirection =
+        _isArabic ? material.TextDirection.rtl : material.TextDirection.ltr;
 
     return Directionality(
       textDirection: textDirection,
@@ -176,7 +194,8 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
         backgroundColor: AppTheme.backgroundColor,
         appBar: _buildAppBar(),
         body: _isLoading
-            ? Center(child: CircularProgressIndicator(color: AppTheme.appBarColor))
+            ? Center(
+                child: CircularProgressIndicator(color: AppTheme.appBarColor))
             : Column(
                 children: [
                   _buildSearchBar(),
@@ -187,8 +206,10 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
                         : ListView.separated(
                             padding: const EdgeInsets.all(16),
                             itemCount: _filteredPayments.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 12),
-                            itemBuilder: (context, index) => _buildPaymentCard(_filteredPayments[index]),
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, index) =>
+                                _buildPaymentCard(_filteredPayments[index]),
                           ),
                   ),
                 ],
@@ -259,10 +280,12 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
           hintStyle: TextStyle(color: AppTheme.textSecondary),
           prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textSecondary),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                  icon:
+                      Icon(Icons.close_rounded, color: AppTheme.textSecondary),
                   onPressed: () {
                     _searchController.clear();
                     FocusScope.of(context).unfocus();
@@ -312,7 +335,9 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
           color: isSelected ? activeColor : AppTheme.cardBackground,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? activeColor : AppTheme.textSecondary.withOpacity(0.3),
+            color: isSelected
+                ? activeColor
+                : AppTheme.textSecondary.withOpacity(0.3),
             width: 1.5,
           ),
           boxShadow: isSelected
@@ -353,8 +378,12 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
           ),
         ],
         border: Border(
-          right: _isArabic ? BorderSide(color: statusColor, width: 4) : BorderSide.none,
-          left: !_isArabic ? BorderSide(color: statusColor, width: 4) : BorderSide.none,
+          right: _isArabic
+              ? BorderSide(color: statusColor, width: 4)
+              : BorderSide.none,
+          left: !_isArabic
+              ? BorderSide(color: statusColor, width: 4)
+              : BorderSide.none,
         ),
       ),
       child: Material(
@@ -393,7 +422,7 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '${payment['amount'] ?? 0} ILS', 
+                              '${payment['amount'] ?? 0} ILS',
                               style: TextStyle(
                                 color: AppTheme.textPrimary,
                                 fontSize: 18,
@@ -401,7 +430,8 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: statusColor.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
@@ -420,10 +450,12 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Icon(Icons.credit_card_rounded, size: 14, color: AppTheme.textSecondary),
+                            Icon(Icons.credit_card_rounded,
+                                size: 14, color: AppTheme.textSecondary),
                             const SizedBox(width: 4),
                             Text(
-                              payment['method']?.toString().toUpperCase() ?? 'CASH',
+                              payment['method']?.toString().toUpperCase() ??
+                                  'CASH',
                               style: TextStyle(
                                 color: AppTheme.textSecondary,
                                 fontSize: 13,
@@ -431,7 +463,8 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
                               ),
                             ),
                             const SizedBox(width: 16),
-                            Icon(Icons.access_time_rounded, size: 14, color: AppTheme.textSecondary),
+                            Icon(Icons.access_time_rounded,
+                                size: 14, color: AppTheme.textSecondary),
                             const SizedBox(width: 4),
                             Text(
                               _formatDate(payment['time']?.toString()),

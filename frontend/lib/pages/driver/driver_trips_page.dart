@@ -710,7 +710,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              if (status == 'open' || status == 'scheduled')
+              if (status == 'open' || status == 'scheduled' || status == 'delayed')
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: () => _startTrip(tripId),

@@ -161,25 +161,32 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
     final pickerMapController = MapController();
     bool pickerMapReady = false;
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => Dialog(
-          insetPadding: const EdgeInsets.all(16),
+          insetPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0)
+          ),
           child: Container(
             width: double.maxFinite,
             height: MediaQuery.of(context).size.height * 0.8,
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
             child: Column(
               children: [
                 Text(
                   station == null ? 'Create Base Station' : 'Edit Base Station',
-                  style: const TextStyle(
-                    fontSize: 20,
+                  style: TextStyle(
+                    fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                 // Map
                 Expanded(
                   child: FlutterMap(
@@ -212,12 +219,12 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                         markers: [
                           Marker(
                             point: selectedLocation,
-                            width: 50,
-                            height: 50,
-                            child: const Icon(
+                            width: isSmallScreen ? 45.0 : 50.0,
+                            height: isSmallScreen ? 45.0 : 50.0,
+                            child: Icon(
                               Icons.location_on,
                               color: Colors.red,
-                              size: 50,
+                              size: isSmallScreen ? 45.0 : 50.0,
                             ),
                           ),
                         ],
@@ -238,17 +245,25 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                 // Form fields
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(
+                  style: TextStyle(fontSize: isSmallScreen ? 14.0 : 16.0),
+                  decoration: InputDecoration(
                     labelText: 'Name',
+                    labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
                     hintText: 'Main Station',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 16.0 : 20.0,
+                      vertical: isSmallScreen ? 12.0 : 16.0,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                 Row(
                   children: [
                     Expanded(
@@ -256,56 +271,88 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                         controller: TextEditingController(
                           text: selectedLocation.latitude.toStringAsFixed(6),
                         ),
-                        decoration: const InputDecoration(
+                        style: TextStyle(fontSize: isSmallScreen ? 14.0 : 16.0),
+                        decoration: InputDecoration(
                           labelText: 'Latitude',
-                          border: OutlineInputBorder(),
+                          labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 16.0 : 20.0,
+                            vertical: isSmallScreen ? 12.0 : 16.0,
+                          ),
                         ),
                         readOnly: true,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                     Expanded(
                       child: TextField(
                         controller: TextEditingController(
                           text: selectedLocation.longitude.toStringAsFixed(6),
                         ),
-                        decoration: const InputDecoration(
+                        style: TextStyle(fontSize: isSmallScreen ? 14.0 : 16.0),
+                        decoration: InputDecoration(
                           labelText: 'Longitude',
-                          border: OutlineInputBorder(),
+                          labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 16.0 : 20.0,
+                            vertical: isSmallScreen ? 12.0 : 16.0,
+                          ),
                         ),
                         readOnly: true,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                 TextField(
                   controller: radiusController,
-                  decoration: const InputDecoration(
+                  style: TextStyle(fontSize: isSmallScreen ? 14.0 : 16.0),
+                  decoration: InputDecoration(
                     labelText: 'Geofence Radius (meters)',
+                    labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
                     hintText: '100',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 16.0 : 20.0,
+                      vertical: isSmallScreen ? 12.0 : 16.0,
+                    ),
                   ),
                   keyboardType: TextInputType.number,
                   onChanged: (value) {
                     setDialogState(() {});
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                 // Buttons
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                      ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                     ElevatedButton(
                       onPressed: () {
                         if (nameController.text.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Name is required')),
+                            SnackBar(
+                              content: Text(
+                                'Name is required',
+                                style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                              ),
+                            ),
                           );
                           return;
                         }
@@ -319,7 +366,16 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                           },
                         );
                       },
-                      child: const Text('Save'),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 20.0 : 24.0,
+                          vertical: isSmallScreen ? 10.0 : 12.0,
+                        ),
+                      ),
+                      child: Text(
+                        'Save',
+                        style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                      ),
                     ),
                   ],
                 ),
@@ -332,23 +388,53 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
   }
 
   Future<void> _deleteStation(Map<String, dynamic> station) async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Base Station'),
-        content: Text('Are you sure you want to delete ${station['name']}?'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 14.0 : 16.0)
+        ),
+        titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+        title: Text(
+          'Delete Base Station',
+          style: TextStyle(
+            fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete ${station['name']}?',
+          style: TextStyle(
+            fontSize: isSmallScreen ? 13.0 : 14.0,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 20.0 : 24.0,
+                vertical: isSmallScreen ? 10.0 : 12.0,
+              ),
             ),
-            child: const Text('Delete'),
+            child: Text(
+              'Delete',
+              style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+            ),
           ),
         ],
       ),
@@ -385,15 +471,20 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: Text(
           'Base Stations',
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
           ),
         ),
         backgroundColor: AppTheme.isDarkMode
@@ -401,14 +492,20 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
             : AppTheme.appBarColor,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        iconTheme: IconThemeData(
+          color: Colors.white,
+          size: isSmallScreen ? 20.0 : 24.0,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(isSmallScreen ? 16.0 : 20.0),
+          ),
         ),
         actions: [
           IconButton(
             icon: Icon(_showMap ? Icons.list : Icons.map),
             color: Colors.white,
+            iconSize: isSmallScreen ? 20.0 : 24.0,
             onPressed: () {
               setState(() {
                 _showMap = !_showMap;
@@ -417,8 +514,9 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
             tooltip: _showMap ? 'Show List' : 'Show Map',
           ),
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: Icon(Icons.add),
             color: Colors.white,
+            iconSize: isSmallScreen ? 20.0 : 24.0,
             onPressed: () => _createOrUpdateStation(),
             tooltip: 'Add Base Station',
           ),
@@ -428,25 +526,45 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
           ? const Center(child: CircularProgressIndicator())
           : _stations.isEmpty
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('No base stations found'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => _createOrUpdateStation(),
-                        child: const Text('Create First Base Station'),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'No base stations found',
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 16.0 : 18.0,
+                            color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                        ElevatedButton(
+                          onPressed: () => _createOrUpdateStation(),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 20.0 : 24.0,
+                              vertical: isSmallScreen ? 12.0 : 14.0,
+                            ),
+                          ),
+                          child: Text(
+                            'Create First Base Station',
+                            style: TextStyle(
+                              fontSize: isSmallScreen ? 13.0 : 14.0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               : _showMap
-                  ? _buildMapView()
-                  : _buildListView(),
+                  ? _buildMapView(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen)
+                  : _buildListView(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
     );
   }
 
-  Widget _buildMapView() {
+  Widget _buildMapView({bool isSmallScreen = false, bool isMediumScreen = false}) {
     // Determine center point
     LatLng center = _selectedStation != null
         ? LatLng(
@@ -499,8 +617,8 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
 
                 return Marker(
                   point: LatLng(lat, lng),
-                  width: 50,
-                  height: 50,
+                  width: isSmallScreen ? 45.0 : 50.0,
+                  height: isSmallScreen ? 45.0 : 50.0,
                   child: GestureDetector(
             onTap: () {
               setState(() {
@@ -515,7 +633,7 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                       color: isSelected
                           ? Colors.blue
                           : (isActive ? Colors.green : Colors.grey),
-                      size: 40,
+                      size: isSmallScreen ? 36.0 : (isMediumScreen ? 38.0 : 40.0),
                     ),
                   ),
                 );
@@ -545,13 +663,13 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
         // Station info card
         if (_selectedStation != null)
           Positioned(
-            bottom: 16,
-            left: 16,
-            right: 16,
+            bottom: isSmallScreen ? 12.0 : 16.0,
+            left: isSmallScreen ? 12.0 : 16.0,
+            right: isSmallScreen ? 12.0 : 16.0,
             child: Card(
               elevation: 8,
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -559,40 +677,65 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          _selectedStation!['name'] ?? 'Unnamed Station',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Text(
+                            _selectedStation!['name'] ?? 'Unnamed Station',
+                            style: TextStyle(
+                              fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.edit),
+                              icon: Icon(Icons.edit),
+                              iconSize: isSmallScreen ? 20.0 : 24.0,
+                              padding: EdgeInsets.all(isSmallScreen ? 4.0 : 8.0),
+                              constraints: BoxConstraints(
+                                minWidth: isSmallScreen ? 36.0 : 48.0,
+                                minHeight: isSmallScreen ? 36.0 : 48.0,
+                              ),
                               onPressed: () => _createOrUpdateStation(
                                 station: _selectedStation,
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
+                              icon: Icon(Icons.delete, color: Colors.red),
+                              iconSize: isSmallScreen ? 20.0 : 24.0,
+                              padding: EdgeInsets.all(isSmallScreen ? 4.0 : 8.0),
+                              constraints: BoxConstraints(
+                                minWidth: isSmallScreen ? 36.0 : 48.0,
+                                minHeight: isSmallScreen ? 36.0 : 48.0,
+                              ),
                               onPressed: () => _deleteStation(_selectedStation!),
                             ),
                           ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: isSmallScreen ? 6.0 : 8.0),
                     Text(
                       'Lat: ${_selectedStation!['latitude']?.toStringAsFixed(6)}, '
                       'Lng: ${_selectedStation!['longitude']?.toStringAsFixed(6)}',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 12.0 : 13.0,
+                      ),
                     ),
+                    SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                     Text(
                       'Radius: ${_selectedStation!['geofence_radius_meters']}m',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 12.0 : 13.0,
+                      ),
                     ),
+                    SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                     Text(
                       'Status: ${_selectedStation!['is_active'] == true ? 'Active' : 'Inactive'}',
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 12.0 : 13.0,
+                      ),
                     ),
                   ],
                 ),
@@ -603,50 +746,91 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
     );
   }
 
-  Widget _buildListView() {
+  Widget _buildListView({bool isSmallScreen = false, bool isMediumScreen = false}) {
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
+    
     return ListView.builder(
+      padding: EdgeInsets.all(basePadding),
       itemCount: _stations.length,
       itemBuilder: (context, index) {
         final station = _stations[index];
         final isSelected = _selectedStation?['stationid'] == station['stationid'];
 
         return Card(
-          margin: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 8,
+          margin: EdgeInsets.symmetric(
+            horizontal: 0,
+            vertical: isSmallScreen ? 6.0 : 8.0,
           ),
           color: isSelected ? Colors.blue.withOpacity(0.1) : null,
           child: ListTile(
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 12.0 : 16.0,
+              vertical: isSmallScreen ? 8.0 : 12.0,
+            ),
             leading: Icon(
               Icons.location_city,
-              size: 40,
+              size: isSmallScreen ? 36.0 : (isMediumScreen ? 38.0 : 40.0),
               color: station['is_active'] == true ? Colors.green : Colors.grey,
             ),
-            title: Text(station['name'] ?? 'Unnamed Station'),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Lat: ${station['latitude']?.toStringAsFixed(6)}, '
-                  'Lng: ${station['longitude']?.toStringAsFixed(6)}',
-                ),
-                Text('Radius: ${station['geofence_radius_meters']}m'),
-                Text(
-                  'Status: ${station['is_active'] == true ? 'Active' : 'Inactive'}',
-                ),
-              ],
+            title: Text(
+              station['name'] ?? 'Unnamed Station',
+              style: TextStyle(
+                fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: Padding(
+              padding: EdgeInsets.only(top: isSmallScreen ? 4.0 : 6.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Lat: ${station['latitude']?.toStringAsFixed(6)}, '
+                    'Lng: ${station['longitude']?.toStringAsFixed(6)}',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                    ),
+                  ),
+                  SizedBox(height: isSmallScreen ? 2.0 : 4.0),
+                  Text(
+                    'Radius: ${station['geofence_radius_meters']}m',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                    ),
+                  ),
+                  SizedBox(height: isSmallScreen ? 2.0 : 4.0),
+                  Text(
+                    'Status: ${station['is_active'] == true ? 'Active' : 'Inactive'}',
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                    ),
+                  ),
+                ],
+              ),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.edit),
+                  icon: Icon(Icons.edit),
+                  iconSize: isSmallScreen ? 20.0 : 24.0,
+                  padding: EdgeInsets.all(isSmallScreen ? 4.0 : 8.0),
+                  constraints: BoxConstraints(
+                    minWidth: isSmallScreen ? 36.0 : 48.0,
+                    minHeight: isSmallScreen ? 36.0 : 48.0,
+                  ),
                   onPressed: () => _createOrUpdateStation(
                     station: station,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: Icon(Icons.delete, color: Colors.red),
+                  iconSize: isSmallScreen ? 20.0 : 24.0,
+                  padding: EdgeInsets.all(isSmallScreen ? 4.0 : 8.0),
+                  constraints: BoxConstraints(
+                    minWidth: isSmallScreen ? 36.0 : 48.0,
+                    minHeight: isSmallScreen ? 36.0 : 48.0,
+                  ),
                   onPressed: () => _deleteStation(station),
                 ),
               ],

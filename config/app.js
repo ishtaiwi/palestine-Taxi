@@ -3,6 +3,18 @@ dotenv.config();
 
 
 const parseCorsOrigins = (originsValue) => {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  
+  if (nodeEnv === 'development') {
+    return (origin, callback) => {
+      if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    };
+  }
+
   if (!originsValue) {
     return [
       'http://localhost:3000',

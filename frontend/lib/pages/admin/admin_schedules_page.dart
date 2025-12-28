@@ -259,26 +259,62 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   }
 
   Future<void> _handleDeleteSchedule(String templateid) async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(t('confirmDelete'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
-        content: Text(t('deleteWarning'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 14.0 : 16.0)
+        ),
+        titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+        title: Text(
+          t('confirmDelete'), 
+          style: TextStyle(
+            color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+            fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+          ),
+        ),
+        content: Text(
+          t('deleteWarning'), 
+          style: TextStyle(
+            color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+            fontSize: isSmallScreen ? 13.0 : 14.0,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(t('no'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
+            child: Text(
+              t('no'), 
+              style: TextStyle(
+                color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                fontSize: isSmallScreen ? 13.0 : 14.0,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red.shade600,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0)
+              ),
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 20.0 : 24.0,
+                vertical: isSmallScreen ? 10.0 : 12.0,
+              ),
             ),
-            child: Text(t('yes')),
+            child: Text(
+              t('yes'),
+              style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+            ),
           ),
         ],
       ),
@@ -336,7 +372,11 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     }
   }
 
-  void _openScheduleForm({Map<String, dynamic>? schedule}) {
+  void _openScheduleForm(BuildContext context, {Map<String, dynamic>? schedule}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     if (schedule != null) {
       setState(() {
         _editingTemplateId = schedule['templateid'] as String;
@@ -365,15 +405,17 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(isSmallScreen ? 20.0 : 24.0)
+        ),
       ),
       builder: (context) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 16,
-          right: 16,
-          top: 24,
+          left: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),
+          right: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),
+          top: isSmallScreen ? 20.0 : 24.0,
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -387,18 +429,22 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                     _editingTemplateId != null ? t('updateSchedule') : t('createSchedule'),
                     style: TextStyle(
                       color: AppTheme.textPrimary,
-                      fontSize: 20,
+                      fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close, color: AppTheme.textSecondary),
+                    icon: Icon(
+                      Icons.close, 
+                      color: AppTheme.textSecondary,
+                      size: isSmallScreen ? 20.0 : 24.0,
+                    ),
                   ),
                 ],
               ),
-              const Divider(),
-              const SizedBox(height: 16),
+              Divider(height: isSmallScreen ? 0.5 : 1.0),
+              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
               Form(
                 key: _formKey,
                 child: Column(
@@ -414,13 +460,13 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                           value: line['lineid'],
                           child: Container(
                             width: double.infinity,
-                            margin: const EdgeInsets.symmetric(vertical: 4),
-                            padding: const EdgeInsets.all(12),
+                            margin: EdgeInsets.symmetric(vertical: isSmallScreen ? 3.0 : 4.0),
+                            padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
                             decoration: BoxDecoration(
                               color: AppTheme.isDarkMode
                                   ? Colors.white.withOpacity(0.05)
                                   : Colors.grey.shade50,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                               border: Border.all(
                                 color: AppTheme.isDarkMode
                                     ? Colors.white.withOpacity(0.1)
@@ -430,7 +476,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                             child: Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                                   decoration: BoxDecoration(
                                     color: AppTheme.isDarkMode
                                         ? Colors.blueAccent.withOpacity(0.2)
@@ -439,20 +485,20 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                                   ),
                                   child: Icon(
                                     Icons.directions_bus_rounded,
-                                    size: 18,
+                                    size: isSmallScreen ? 16.0 : 18.0,
                                     color: AppTheme.isDarkMode
                                         ? Colors.blueAccent
                                         : AppTheme.appBarColor,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: isSmallScreen ? 10.0 : 12.0),
                                 Expanded(
                                   child: Text(
                                     name.toString(),
                                     style: TextStyle(
                                       color: AppTheme.textPrimary,
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 14,
+                                      fontSize: isSmallScreen ? 13.0 : 14.0,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -472,15 +518,17 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                             style: TextStyle(
                               color: AppTheme.textPrimary,
                               fontWeight: FontWeight.w500,
-                              fontSize: 15,
+                              fontSize: isSmallScreen ? 14.0 : 15.0,
                             ),
                             overflow: TextOverflow.ellipsis,
                           );
                         }).toList();
                       },
                       onChanged: (val) => setState(() => _selectedLineId = val),
+                      isSmallScreen: isSmallScreen,
+                      isMediumScreen: isMediumScreen,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                     Row(
                       children: [
                         Expanded(
@@ -489,9 +537,11 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                             value: _startHour,
                             onChanged: (val) => _startHour = val,
                             max: 23,
+                            isSmallScreen: isSmallScreen,
+                            isMediumScreen: isMediumScreen,
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                         Expanded(
                           child: _buildNumberInput(
                             label: t('endHour'),
@@ -502,62 +552,101 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                               return null;
                             },
                             max: 23,
+                            isSmallScreen: isSmallScreen,
+                            isMediumScreen: isMediumScreen,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                     _buildNumberInput(
                       label: t('interval'),
                       value: _intervalMinutes,
                       onChanged: (val) => _intervalMinutes = val,
                       min: 1,
+                      isSmallScreen: isSmallScreen,
+                      isMediumScreen: isMediumScreen,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(t('active'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+                      title: Text(
+                        t('active'), 
+                        style: TextStyle(
+                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                          fontSize: isSmallScreen ? 14.0 : 15.0,
+                        ),
+                      ),
                       value: _active,
                       activeColor: Colors.blue.shade600,
                       onChanged: (val) => setState(() => _active = val),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(t('autoDepartureEnabled'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
-                      subtitle: Text(t('autoDepartureDescription'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary, fontSize: 12)),
+                      title: Text(
+                        t('autoDepartureEnabled'), 
+                        style: TextStyle(
+                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                          fontSize: isSmallScreen ? 14.0 : 15.0,
+                        ),
+                      ),
+                      subtitle: Text(
+                        t('autoDepartureDescription'), 
+                        style: TextStyle(
+                          color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary, 
+                          fontSize: isSmallScreen ? 11.0 : 12.0
+                        ),
+                      ),
                       value: _autoDepartureEnabled,
                       activeColor: Colors.blue.shade600,
                       onChanged: (val) => setState(() => _autoDepartureEnabled = val),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: isSmallScreen ? 6.0 : 8.0),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: Text(t('scheduledDepartureEnforced'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
-                      subtitle: Text(t('scheduledDepartureDescription'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary, fontSize: 12)),
+                      title: Text(
+                        t('scheduledDepartureEnforced'), 
+                        style: TextStyle(
+                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                          fontSize: isSmallScreen ? 14.0 : 15.0,
+                        ),
+                      ),
+                      subtitle: Text(
+                        t('scheduledDepartureDescription'), 
+                        style: TextStyle(
+                          color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary, 
+                          fontSize: isSmallScreen ? 11.0 : 12.0
+                        ),
+                      ),
                       value: _scheduledDepartureEnforced,
                       activeColor: Colors.blue.shade600,
                       onChanged: (val) => setState(() => _scheduledDepartureEnforced = val),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: isSmallScreen ? 20.0 : 24.0),
                     SizedBox(
                       width: double.infinity,
-                      height: 50,
+                      height: isSmallScreen ? 44.0 : (isMediumScreen ? 47.0 : 50.0),
                       child: ElevatedButton(
                         onPressed: _handleSave,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.appBarColor,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
+                          ),
                           elevation: 2,
                         ),
                         child: Text(
                           t('save'),
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 14.0 : 16.0, 
+                            fontWeight: FontWeight.bold
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: isSmallScreen ? 20.0 : 24.0),
                   ],
                 ),
               ),
@@ -575,21 +664,35 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     int min = 0,
     int max = 9999,
     String? Function(int?)? validator,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     return TextFormField(
       initialValue: value.toString(),
       keyboardType: TextInputType.number,
-      style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
+      style: TextStyle(
+        color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+        fontSize: isSmallScreen ? 14.0 : 16.0,
+      ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        labelStyle: TextStyle(
+          color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+          fontSize: isSmallScreen ? 13.0 : 14.0,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
           borderSide: BorderSide(color: AppTheme.isDarkMode ? Colors.white12 : AppTheme.borderColor),
         ),
         filled: true,
         fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : AppTheme.backgroundColor,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 16.0 : 20.0,
+          vertical: isSmallScreen ? 12.0 : 16.0,
+        ),
       ),
       onChanged: (val) => onChanged(int.tryParse(val) ?? value),
       validator: (val) {
@@ -609,6 +712,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     required Function(String?) onChanged,
     IconData icon = Icons.alt_route_rounded,
     List<Widget> Function(BuildContext)? selectedItemBuilder,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     return DropdownButtonFormField<String>(
       value: value,
@@ -618,33 +723,38 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       isExpanded: true,
       itemHeight: null, // Allow variable height for card items
       dropdownColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
       style: TextStyle(
         color: AppTheme.textPrimary,
         fontWeight: FontWeight.w500,
-        fontSize: 15,
+        fontSize: isSmallScreen ? 14.0 : 15.0,
       ),
       icon: Icon(
         Icons.keyboard_arrow_down_rounded,
         color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+        size: isSmallScreen ? 20.0 : 24.0,
       ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: AppTheme.textSecondary),
+        labelStyle: TextStyle(
+          color: AppTheme.textSecondary,
+          fontSize: isSmallScreen ? 13.0 : 14.0,
+        ),
         prefixIcon: Icon(
           icon,
           color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+          size: isSmallScreen ? 20.0 : 24.0,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
           borderSide: BorderSide(
             color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
             width: 2,
@@ -654,7 +764,10 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         fillColor: AppTheme.isDarkMode
             ? Colors.white.withOpacity(0.05)
             : Colors.grey.shade100,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 16.0 : 20.0, 
+          vertical: isSmallScreen ? 12.0 : 16.0
+        ),
       ),
       validator: (val) => val == null ? t('required') : null,
     );
@@ -663,18 +776,30 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
 
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        appBar: _buildAppBar(),
+        appBar: _buildAppBar(context),
         floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _openScheduleForm(),
+          onPressed: () => _openScheduleForm(context),
           backgroundColor: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
           foregroundColor: Colors.white,
-          icon: const Icon(Icons.add),
-          label: Text(t('createSchedule')),
+          icon: Icon(
+            Icons.add,
+            size: isSmallScreen ? 20.0 : 24.0,
+          ),
+          label: Text(
+            t('createSchedule'),
+            style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+          ),
         ),
         body: _isLoading
             ? Center(child: CircularProgressIndicator(color: AppTheme.appBarColor))
@@ -683,14 +808,23 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                 color: AppTheme.appBarColor,
                 child: Column(
                   children: [
-                    _buildSearchBar(),
+                    _buildSearchBar(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                     Expanded(
                       child: _filteredSchedules.isEmpty
-                          ? _buildEmptyState()
+                          ? _buildEmptyState(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen)
                           : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                              padding: EdgeInsets.fromLTRB(
+                                basePadding, 
+                                basePadding, 
+                                basePadding, 
+                                isSmallScreen ? 70.0 : 80.0
+                              ),
                               itemCount: _filteredSchedules.length,
-                              itemBuilder: (context, index) => _buildScheduleCard(_filteredSchedules[index]),
+                              itemBuilder: (context, index) => _buildScheduleCard(
+                                _filteredSchedules[index],
+                                isSmallScreen: isSmallScreen,
+                                isMediumScreen: isMediumScreen,
+                              ),
                             ),
                     ),
                   ],
@@ -700,7 +834,11 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     return AppBar(
       backgroundColor: AppTheme.isDarkMode
           ? const Color(0xFF1C2541) // Dark card color for better integration
@@ -708,15 +846,19 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        icon: Icon(
+          Icons.arrow_back_ios_new_rounded, 
+          color: Colors.white,
+          size: isSmallScreen ? 18.0 : 20.0,
+        ),
         onPressed: () => Navigator.pop(context),
       ),
       title: Text(
         t('title'),
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
-          fontSize: 20,
+          fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
         ),
       ),
       actions: [
@@ -724,6 +866,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           icon: Icon(
             _isArabic ? Icons.language : Icons.translate,
             color: Colors.white,
+            size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 24.0),
           ),
           onPressed: () {
             setState(() {
@@ -733,16 +876,30 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           },
         ),
         PopupMenuButton(
-          icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+          icon: Icon(
+            Icons.more_vert_rounded, 
+            color: Colors.white,
+            size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 24.0),
+          ),
           color: AppTheme.cardBackground,
           itemBuilder: (context) => [
             PopupMenuItem(
               value: 'createAll',
               child: Row(
                 children: [
-                  Icon(Icons.calendar_today_rounded, color: AppTheme.textPrimary, size: 20),
-                  const SizedBox(width: 12),
-                  Text(t('createAllTrips'), style: TextStyle(color: AppTheme.textPrimary)),
+                  Icon(
+                    Icons.calendar_today_rounded, 
+                    color: AppTheme.textPrimary, 
+                    size: isSmallScreen ? 18.0 : 20.0
+                  ),
+                  SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+                  Text(
+                    t('createAllTrips'), 
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -751,20 +908,27 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
             if (value == 'createAll') _handleCreateAllTrips();
           },
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: isSmallScreen ? 4.0 : 8.0),
       ],
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(isSmallScreen ? 16.0 : 20.0),
+        ),
       ),
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      margin: EdgeInsets.fromLTRB(
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        isSmallScreen ? 16.0 : 20.0, 
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        0
+      ),
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 15.0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -775,16 +939,33 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       ),
       child: TextField(
         controller: _searchController,
-        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
+        style: TextStyle(
+          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+          fontSize: isSmallScreen ? 14.0 : 16.0,
+        ),
         decoration: InputDecoration(
           hintText: t('search'),
-          hintStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
-          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+          hintStyle: TextStyle(
+            color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+            fontSize: isSmallScreen ? 14.0 : 16.0,
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded, 
+            color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+            size: isSmallScreen ? 20.0 : 24.0,
+          ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 16.0 : 20.0, 
+            vertical: isSmallScreen ? 12.0 : 15.0
+          ),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                  icon: Icon(
+                    Icons.close_rounded, 
+                    color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                    size: isSmallScreen ? 20.0 : 24.0,
+                  ),
                   onPressed: () {
                     _searchController.clear();
                     FocusScope.of(context).unfocus();
@@ -796,7 +977,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Container(
@@ -807,22 +988,25 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           children: [
             Icon(
               Icons.schedule_outlined, 
-              size: 80, 
+              size: isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0), 
               color: AppTheme.isDarkMode ? Colors.white24 : AppTheme.textSecondary.withOpacity(0.5)
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isSmallScreen ? 12.0 : 16.0),
             Text(
               t('noSchedules'),
               style: TextStyle(
-                fontSize: 20,
+                fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
                 fontWeight: FontWeight.bold,
                 color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: isSmallScreen ? 6.0 : 8.0),
             Text(
               t('noSchedulesSub'),
-              style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+              style: TextStyle(
+                color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                fontSize: isSmallScreen ? 13.0 : 14.0,
+              ),
             ),
           ],
         ),
@@ -830,7 +1014,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     );
   }
 
-  Widget _buildScheduleCard(Map<String, dynamic> schedule) {
+  Widget _buildScheduleCard(Map<String, dynamic> schedule, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final line = schedule['line'] as Map<String, dynamic>?;
     final lineName = _isArabic
         ? (line?['name_ar'] ?? line?['linename'] ?? line?['name_en'] ?? 'Unknown')
@@ -843,10 +1027,10 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     final isDark = AppTheme.isDarkMode;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? 12.0 : 16.0),
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -860,18 +1044,18 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         ),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         child: Material(
           color: Colors.transparent,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(10),
+                      padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
                       decoration: BoxDecoration(
                         color: active
                             ? (isDark ? Colors.greenAccent.withOpacity(0.1) : Colors.green.shade50)
@@ -883,10 +1067,10 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                         color: active
                             ? (isDark ? Colors.greenAccent : Colors.green.shade700)
                             : (isDark ? Colors.redAccent : Colors.red.shade700),
-                        size: 24,
+                        size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: isSmallScreen ? 10.0 : 12.0),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -895,18 +1079,21 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                             lineName.toString(),
                             style: TextStyle(
                               color: isDark ? Colors.white : AppTheme.textPrimary,
-                              fontSize: 18,
+                              fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 6.0 : 8.0, 
+                              vertical: isSmallScreen ? 1.0 : 2.0
+                            ),
                             decoration: BoxDecoration(
                               color: active
                                   ? (isDark ? Colors.greenAccent.withOpacity(0.1) : Colors.green.shade100)
                                   : (isDark ? Colors.redAccent.withOpacity(0.1) : Colors.red.shade100),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
                             ),
                             child: Text(
                               active ? t('active') : t('inactive'),
@@ -914,7 +1101,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                                 color: active
                                     ? (isDark ? Colors.greenAccent : Colors.green.shade800)
                                     : (isDark ? Colors.redAccent : Colors.red.shade800),
-                                fontSize: 11,
+                                fontSize: isSmallScreen ? 10.0 : 11.0,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -924,9 +1111,9 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                 Divider(color: isDark ? Colors.white12 : AppTheme.borderColor.withOpacity(0.5)),
-                const SizedBox(height: 16),
+                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                 Row(
                   children: [
                     _buildInfoItem(
@@ -934,24 +1121,30 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                       t('startHour'), 
                       '$startHour:00',
                       isDark,
+                      isSmallScreen: isSmallScreen,
+                      isMediumScreen: isMediumScreen,
                     ),
                     _buildInfoItem(
                       Icons.last_page_rounded, 
                       t('endHour'), 
                       '$endHour:00',
                       isDark,
+                      isSmallScreen: isSmallScreen,
+                      isMediumScreen: isMediumScreen,
                     ),
                     _buildInfoItem(
                       Icons.timer_rounded, 
                       t('interval'), 
                       '$interval ${t('minutes')}',
                       isDark,
+                      isSmallScreen: isSmallScreen,
+                      isMediumScreen: isMediumScreen,
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                 Divider(color: isDark ? Colors.white12 : AppTheme.borderColor.withOpacity(0.5)),
-                const SizedBox(height: 8),
+                SizedBox(height: isSmallScreen ? 6.0 : 8.0),
                 Row(
                   children: [
                     Expanded(
@@ -960,34 +1153,41 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                         icon: Icon(
                           Icons.add_task_rounded,
                           color: isDark ? Colors.blueAccent : AppTheme.appBarColor,
-                          size: 20,
+                          size: isSmallScreen ? 18.0 : 20.0,
                         ),
                         label: Text(
                           t('createTrips'),
                           style: TextStyle(
                             color: isDark ? Colors.blueAccent : AppTheme.appBarColor,
                             fontWeight: FontWeight.bold,
+                            fontSize: isSmallScreen ? 12.0 : 13.0,
                           ),
                         ),
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 12.0),
                           backgroundColor: isDark 
                               ? Colors.blueAccent.withOpacity(0.1) 
                               : AppTheme.appBarColor.withOpacity(0.05),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0)
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                     _buildActionButton(
                       icon: Icons.edit_rounded,
                       color: Colors.blueAccent,
-                      onTap: () => _openScheduleForm(schedule: schedule),
+                      isSmallScreen: isSmallScreen,
+                      isMediumScreen: isMediumScreen,
+                      onTap: () => _openScheduleForm(context, schedule: schedule),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                     _buildActionButton(
                       icon: Icons.delete_outline_rounded,
                       color: Colors.redAccent,
+                      isSmallScreen: isSmallScreen,
+                      isMediumScreen: isMediumScreen,
                       onTap: () => _handleDeleteSchedule(templateid),
                     ),
                   ],
@@ -1000,26 +1200,30 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     );
   }
 
-  Widget _buildInfoItem(IconData icon, String label, String value, bool isDark) {
+  Widget _buildInfoItem(IconData icon, String label, String value, bool isDark, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, size: 20, color: isDark ? Colors.blueAccent : AppTheme.textSecondary),
-          const SizedBox(height: 6),
+          Icon(
+            icon, 
+            size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0), 
+            color: isDark ? Colors.blueAccent : AppTheme.textSecondary
+          ),
+          SizedBox(height: isSmallScreen ? 4.0 : 6.0),
           Text(
             value,
             style: TextStyle(
               color: isDark ? Colors.white : AppTheme.textPrimary,
               fontWeight: FontWeight.w600,
-              fontSize: 14,
+              fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
             ),
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: isSmallScreen ? 1.0 : 2.0),
           Text(
             label,
             style: TextStyle(
               color: isDark ? Colors.white70 : AppTheme.textSecondary, 
-              fontSize: 11,
+              fontSize: isSmallScreen ? 10.0 : 11.0,
             ),
             textAlign: TextAlign.center,
           ),
@@ -1032,18 +1236,20 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     return Material(
       color: AppTheme.isDarkMode ? color.withOpacity(0.2) : color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
           child: Icon(
             icon,
-            size: 20,
+            size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
             color: color,
           ),
         ),

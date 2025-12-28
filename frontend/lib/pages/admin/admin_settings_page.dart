@@ -162,6 +162,12 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
     final _isDarkMode = AppTheme.isDarkMode;
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
 
     return Directionality(
       textDirection: textDirection,
@@ -176,14 +182,18 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
           elevation: 0,
           title: Text(
             t('title'),
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
-              fontSize: 20,
+              fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
             ),
           ),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: Icon(
+              Icons.arrow_back, 
+              color: Colors.white,
+              size: isSmallScreen ? 20.0 : 24.0,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
         ),
@@ -191,18 +201,18 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
             ? const Center(child: CircularProgressIndicator())
             : SafeArea(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
+                  padding: EdgeInsets.all(basePadding),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Current Timezone Card
                       Container(
-                        padding: const EdgeInsets.all(24),
+                        padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
                         decoration: BoxDecoration(
                           color: _isDarkMode
                               ? const Color(0xFF1C2541)
                               : const Color(0xFFFAFBFC),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
                           border: Border.all(
                             color: _isDarkMode
                                 ? const Color(0xFF2C3E50)
@@ -220,54 +230,54 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                                   color: _isDarkMode
                                       ? Colors.white70
                                       : const Color(0xFF546E7A),
-                                  size: 24,
+                                  size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: isSmallScreen ? 10.0 : 12.0),
                                 Text(
                                   t('currentTimezone'),
                                   style: TextStyle(
                                     color: _isDarkMode
                                         ? Colors.white
                                         : const Color(0xFF1E3A5F),
-                                    fontSize: 18,
+                                    fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 16),
+                            SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                             Text(
                               _timezoneName,
                               style: TextStyle(
                                 color: _isDarkMode
                                     ? Colors.white
                                     : const Color(0xFF1E3A5F),
-                                fontSize: 24,
+                                fontSize: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                             Text(
                               _description,
                               style: TextStyle(
                                 color: _isDarkMode
                                     ? const Color(0xFFB0BEC5)
                                     : const Color(0xFF546E7A),
-                                fontSize: 14,
+                                fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: isSmallScreen ? 16.0 : 24.0),
                       // Timezone Selection Card
                       Container(
-                        padding: const EdgeInsets.all(24),
+                        padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
                         decoration: BoxDecoration(
                           color: _isDarkMode
                               ? const Color(0xFF1C2541)
                               : const Color(0xFFFAFBFC),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
                           border: Border.all(
                             color: _isDarkMode
                                 ? const Color(0xFF2C3E50)
@@ -284,11 +294,11 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                                 color: _isDarkMode
                                     ? Colors.white
                                     : const Color(0xFF1E3A5F),
-                                fontSize: 18,
+                                fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                             DropdownButtonFormField<int>(
                               value: _timezoneOffset,
                               decoration: InputDecoration(
@@ -297,12 +307,13 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                                   color: _isDarkMode
                                       ? Colors.white70
                                       : const Color(0xFF546E7A),
+                                  fontSize: isSmallScreen ? 13.0 : 14.0,
                                 ),
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                                 ),
                                 enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                                   borderSide: BorderSide(
                                     color: _isDarkMode
                                         ? Colors.white12
@@ -313,6 +324,10 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                                 fillColor: _isDarkMode
                                     ? Colors.white.withOpacity(0.05)
                                     : Colors.white,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: isSmallScreen ? 16.0 : 20.0,
+                                  vertical: isSmallScreen ? 12.0 : 16.0,
+                                ),
                               ),
                               dropdownColor: _isDarkMode
                                   ? const Color(0xFF1C2541)
@@ -321,6 +336,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                                 color: _isDarkMode
                                     ? Colors.white
                                     : const Color(0xFF1E3A5F),
+                                fontSize: isSmallScreen ? 14.0 : 16.0,
                               ),
                               items: _timezones.map((tz) {
                                 return DropdownMenuItem<int>(
@@ -331,6 +347,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                                       color: _isDarkMode
                                           ? Colors.white
                                           : const Color(0xFF1E3A5F),
+                                      fontSize: isSmallScreen ? 13.0 : 14.0,
                                     ),
                                   ),
                                 );
@@ -348,46 +365,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                                 }
                               },
                             ),
-                            const SizedBox(height: 24),
-                            // Note
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: _isDarkMode
-                                    ? Colors.blue.withOpacity(0.1)
-                                    : Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: _isDarkMode
-                                      ? Colors.blue.withOpacity(0.3)
-                                      : Colors.blue.shade200,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    color: _isDarkMode
-                                        ? Colors.blue.shade300
-                                        : Colors.blue.shade700,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      t('note'),
-                                      style: TextStyle(
-                                        color: _isDarkMode
-                                            ? Colors.blue.shade300
-                                            : Colors.blue.shade700,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 24),
+                            SizedBox(height: isSmallScreen ? 16.0 : 24.0),
                             // Save Button
                             SizedBox(
                               width: double.infinity,
@@ -396,16 +374,18 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppTheme.appBarColor,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),
+                                  ),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                                   ),
                                   elevation: 2,
                                 ),
                                 child: _isSaving
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
+                                    ? SizedBox(
+                                        height: isSmallScreen ? 18.0 : 20.0,
+                                        width: isSmallScreen ? 18.0 : 20.0,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
                                           valueColor: AlwaysStoppedAnimation<Color>(
@@ -415,11 +395,51 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                                       )
                                     : Text(
                                         t('save'),
-                                        style: const TextStyle(
-                                          fontSize: 16,
+                                        style: TextStyle(
+                                          fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
+                              ),
+                            ),
+                            SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                            // Note
+                            Container(
+                              padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
+                              decoration: BoxDecoration(
+                                color: _isDarkMode
+                                    ? Colors.blue.withOpacity(0.1)
+                                    : Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                                border: Border.all(
+                                  color: _isDarkMode
+                                      ? Colors.blue.withOpacity(0.3)
+                                      : Colors.blue.shade200,
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    color: _isDarkMode
+                                        ? Colors.blueAccent
+                                        : Colors.blue.shade700,
+                                    size: isSmallScreen ? 18.0 : 20.0,
+                                  ),
+                                  SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+                                  Expanded(
+                                    child: Text(
+                                      t('note'),
+                                      style: TextStyle(
+                                        color: _isDarkMode
+                                            ? Colors.blueAccent
+                                            : Colors.blue.shade700,
+                                        fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 12.5 : 13.0),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],

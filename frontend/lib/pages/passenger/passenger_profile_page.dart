@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
 import '../../config/app_config.dart';
 import '../../screens/auth/login_page.dart';
@@ -199,21 +198,29 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
   }
 
   Future<void> _handleLogout() async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: _isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
+        ),
         title: Text(
           t('logout'),
           style: TextStyle(
             color: _isDarkMode ? Colors.white : const Color(0xFF1E3A5F),
             fontWeight: FontWeight.bold,
+            fontSize: isSmallScreen ? 18.0 : 20.0,
           ),
         ),
         content: Text(
           t('logoutConfirm'),
           style: TextStyle(
             color: _isDarkMode ? Colors.white70 : Colors.grey.shade700,
+            fontSize: isSmallScreen ? 13.0 : 15.0,
           ),
         ),
         actions: [
@@ -223,6 +230,7 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
               t('cancel'),
               style: TextStyle(
                 color: _isDarkMode ? Colors.white70 : Colors.grey.shade700,
+                fontSize: isSmallScreen ? 13.0 : 14.0,
               ),
             ),
           ),
@@ -231,8 +239,18 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 16.0 : 20.0,
+                vertical: isSmallScreen ? 10.0 : 12.0,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+              ),
             ),
-            child: Text(t('confirm')),
+            child: Text(
+              t('confirm'),
+              style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+            ),
           ),
         ],
       ),
@@ -253,6 +271,29 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Web-specific responsive breakpoints
+    final isWeb = kIsWeb;
+    final isDesktop = isWeb && screenWidth >= 1200;
+    final isTablet = screenWidth >= 600 && screenWidth < 1200;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    
+    // Responsive sizing - enhanced for web
+    final double basePadding = isWeb 
+        ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
+        : (isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0));
+    final double titleFontSize = isWeb
+        ? (isDesktop ? 24.0 : 22.0)
+        : (isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0));
+    final double avatarRadius = isWeb
+        ? (isDesktop ? 70.0 : (isTablet ? 65.0 : 60.0))
+        : (isSmallScreen ? 50.0 : (isMediumScreen ? 55.0 : 60.0));
+    
+    // Max width for web to prevent content from stretching too wide
+    final double maxContentWidth = isWeb ? 1200.0 : double.infinity;
+    
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0F1419)
         : const Color(0xFFF5F7FA);
@@ -323,10 +364,10 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
               ),
               title: Text(
                 t('title'),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 22,
+                  fontSize: titleFontSize,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -340,18 +381,21 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
         ),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+            : Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxContentWidth),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(basePadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                     Center(
                       child: Column(
                         children: [
                           Stack(
                             children: [
                               CircleAvatar(
-                                radius: 60,
+                                radius: avatarRadius,
                                 backgroundColor: accentColor.withOpacity(0.2),
                                 child: _userData?['avatar_url'] != null &&
                                         _userData!['avatar_url']
@@ -411,16 +455,16 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
                             _userData?['fullname'] ?? _userData?['name'] ?? '',
                             style: TextStyle(
                               color: textPrimaryColor,
-                              fontSize: 24,
+                              fontSize: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                           Text(
                             _userData?['email'] ?? '',
                             style: TextStyle(
                               color: textSecondaryColor,
-                              fontSize: 16,
+                              fontSize: isSmallScreen ? 14.0 : 16.0,
                             ),
                           ),
                         ],
@@ -498,24 +542,38 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
                           title: t('language'),
                           subtitle: _isArabic ? t('arabic') : t('english'),
                           onTap: () {
+                            final screenWidth = MediaQuery.of(context).size.width;
+                            final isSmallScreen = screenWidth < 360;
+                            
                             showDialog(
                               context: context,
                               builder: (context) => AlertDialog(
                                 backgroundColor: cardColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
+                                ),
                                 title: Text(
                                   t('language'),
                                   style: TextStyle(
                                     color: textPrimaryColor,
                                     fontWeight: FontWeight.bold,
+                                    fontSize: isSmallScreen ? 18.0 : 20.0,
                                   ),
                                 ),
                                 content: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     ListTile(
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: isSmallScreen ? 8.0 : 16.0,
+                                        vertical: isSmallScreen ? 4.0 : 8.0,
+                                      ),
                                       title: Text(
                                         t('arabic'),
-                                        style: TextStyle(color: textPrimaryColor),
+                                        style: TextStyle(
+                                          color: textPrimaryColor,
+                                          fontSize: isSmallScreen ? 14.0 : 16.0,
+                                        ),
                                       ),
                                       leading: Radio<bool>(
                                         value: true,
@@ -528,9 +586,16 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
                                       ),
                                     ),
                                     ListTile(
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: isSmallScreen ? 8.0 : 16.0,
+                                        vertical: isSmallScreen ? 4.0 : 8.0,
+                                      ),
                                       title: Text(
                                         t('english'),
-                                        style: TextStyle(color: textPrimaryColor),
+                                        style: TextStyle(
+                                          color: textPrimaryColor,
+                                          fontSize: isSmallScreen ? 14.0 : 16.0,
+                                        ),
                                       ),
                                       leading: Radio<bool>(
                                         value: false,
@@ -593,7 +658,9 @@ class _PassengerProfilePageState extends State<PassengerProfilePage> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
         bottomNavigationBar: PassengerBottomNavBar(

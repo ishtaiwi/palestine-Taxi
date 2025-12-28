@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../services/api_service.dart';
 import 'select_role_page.dart';
 
@@ -141,6 +142,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = kIsWeb && screenWidth > 800;
+    
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
@@ -174,27 +178,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: Colors.white38),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 25,
-                      offset: const Offset(0, 15),
-                    ),
-                  ],
+            child: Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 24 : 24,
+                  vertical: isDesktop ? 16 : 24,
                 ),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                child: Container(
+                  width: isDesktop ? 520 : double.infinity,
+                  constraints: BoxConstraints(
+                    maxWidth: isDesktop ? 520 : double.infinity,
+                  ),
+                  padding: EdgeInsets.all(isDesktop ? 28 : 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: Colors.white38),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 25,
+                        offset: const Offset(0, 15),
+                      ),
+                    ],
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                       Text(
                         t('subtitle'),
                         style: Theme.of(context)
@@ -205,13 +218,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               fontWeight: FontWeight.w500,
                             ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: isDesktop ? 20 : 24),
                       _buildTextField(
                         controller: _firstNameController,
                         label: t('firstName'),
                         hint: t('enterFirstName'),
                         keyboardType: TextInputType.name,
                         icon: Icons.person_outline,
+                        isDesktop: isDesktop,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return t('enterFirstName');
@@ -224,13 +238,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: isDesktop ? 14 : 16),
                       _buildTextField(
                         controller: _lastNameController,
                         label: t('lastName'),
                         hint: t('enterLastName'),
                         keyboardType: TextInputType.name,
                         icon: Icons.badge_outlined,
+                        isDesktop: isDesktop,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return t('enterLastName');
@@ -243,13 +258,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: isDesktop ? 14 : 16),
                       _buildTextField(
                         controller: _phoneController,
                         label: t('phone'),
                         hint: t('enterPhone'),
                         keyboardType: TextInputType.phone,
                         icon: Icons.phone_outlined,
+                        isDesktop: isDesktop,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return t('enterPhone');
@@ -268,13 +284,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: isDesktop ? 14 : 16),
                       _buildTextField(
                         controller: _emailController,
                         label: t('email'),
                         hint: t('enterEmail'),
                         keyboardType: TextInputType.emailAddress,
                         icon: Icons.email_outlined,
+                        isDesktop: isDesktop,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return t('enterEmail');
@@ -290,13 +307,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: isDesktop ? 14 : 16),
                       _buildPasswordField(
                         controller: _passwordController,
                         label: t('password'),
                         hint: t('enterPassword'),
                         obscure: _obscurePassword,
                         icon: Icons.lock_outline,
+                        isDesktop: isDesktop,
                         toggle: () => setState(() {
                           _obscurePassword = !_obscurePassword;
                         }),
@@ -317,13 +335,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: isDesktop ? 14 : 16),
                       _buildPasswordField(
                         controller: _confirmPasswordController,
                         label: t('confirmPassword'),
                         hint: t('confirmPasswordHint'),
                         obscure: _obscureConfirmPassword,
                         icon: Icons.lock_outline,
+                        isDesktop: isDesktop,
                         toggle: () => setState(() {
                           _obscureConfirmPassword = !_obscureConfirmPassword;
                         }),
@@ -340,10 +359,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 32),
+                      SizedBox(height: isDesktop ? 24 : 28),
                       SizedBox(
                         width: double.infinity,
-                        height: 56,
+                        height: isDesktop ? 52 : 56,
                         child: Container(
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
@@ -386,7 +405,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: isDesktop ? 16 : 20),
                       Align(
                         alignment: Alignment.center,
                         child: TextButton(
@@ -402,6 +421,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ],
                   ),
+                ),
                 ),
               ),
             ),
@@ -419,14 +439,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     TextCapitalization textCapitalization = TextCapitalization.none,
     IconData? icon,
     String? Function(String?)? validator,
+    bool isDesktop = false,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       textCapitalization: textCapitalization,
-      style: const TextStyle(
+      style: TextStyle(
         color: Colors.white,
-        fontSize: 16,
+        fontSize: isDesktop ? 16 : 16,
         fontWeight: FontWeight.w500,
       ),
       decoration: _inputDecoration(label, hint, prefixIcon: icon != null ? Icon(icon, color: Colors.white70) : null),
@@ -445,13 +466,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     IconData? icon,
     String? Function(String?)? validator,
     VoidCallback? onChanged,
+    bool isDesktop = false,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: obscure,
-      style: const TextStyle(
+      style: TextStyle(
         color: Colors.white,
-        fontSize: 16,
+        fontSize: isDesktop ? 16 : 16,
         fontWeight: FontWeight.w500,
       ),
       decoration: _inputDecoration(

@@ -16,6 +16,7 @@ import 'admin_map_page.dart';
 import 'admin_base_station_page.dart';
 import 'admin_reports_page.dart';
 import 'admin_settings_page.dart';
+import 'admin_driver_approvals_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -32,13 +33,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Map<String, dynamic>? _predictionInsights;
   bool _insightsLoading = true;
 
-  // Map tracking state
   List<Map<String, dynamic>> _vehicleLocations = [];
   List<Map<String, dynamic>> _baseStations = [];
   bool _mapLoading = false;
   final MapController _mapController = MapController();
 
-  // Statistics state
   Map<String, dynamic>? _dashboardStats;
   Map<String, dynamic>? _revenueStats;
   bool _statsLoading = false;
@@ -142,7 +141,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     });
 
     try {
-      // Load vehicle locations
       final locationsResult = await ApiService.getAllVehicleLocations();
       if (locationsResult['success'] == true) {
         final locationsList = locationsResult['locations'];
@@ -156,7 +154,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         }
       }
 
-      // Load base stations
       final stationsResult =
           await ApiService.getAllBaseStations(isActive: true);
       if (stationsResult['success'] == true) {
@@ -271,7 +268,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     return AppBar(
       backgroundColor: AppTheme.isDarkMode
           ? const Color(0xFF1C2541) // Dark card color for better integration
@@ -281,10 +282,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       automaticallyImplyLeading: false,
       title: Text(
         t('title'),
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
-          fontSize: 20,
+          fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
         ),
       ),
       actions: [
@@ -292,6 +293,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           icon: Icon(
             AppTheme.isDarkMode ? Icons.light_mode : Icons.dark_mode,
             color: Colors.white,
+            size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 24.0),
           ),
           onPressed: () async {
             await AppTheme.toggleTheme();
@@ -305,19 +307,26 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           icon: Icon(
             _isArabic ? Icons.language : Icons.translate,
             color: Colors.white,
+            size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 24.0),
           ),
           onPressed: () => _switchLanguage(!_isArabic),
           tooltip: _isArabic ? 'English' : 'العربية',
         ),
         IconButton(
-          icon: const Icon(Icons.logout_rounded, color: Colors.white),
+          icon: Icon(
+            Icons.logout_rounded, 
+            color: Colors.white,
+            size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 24.0),
+          ),
           onPressed: _handleLogout,
           tooltip: t('logout'),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: isSmallScreen ? 4.0 : 8.0),
       ],
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(isSmallScreen ? 16.0 : 20.0),
+        ),
       ),
     );
   }
@@ -325,8 +334,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
 
-    // Theme-aware colors
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
         : const Color.fromARGB(255, 224, 228, 231);
@@ -342,18 +355,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: backgroundColor,
-        appBar: _buildAppBar(),
+        appBar: _buildAppBar(context),
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : SafeArea(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
+                  padding: EdgeInsets.all(basePadding),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Gradient Header
                       Container(
-                        padding: const EdgeInsets.all(32),
+                        padding: EdgeInsets.all(isSmallScreen ? 20.0 : (isMediumScreen ? 26.0 : 32.0)),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
@@ -365,7 +377,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             ],
                             stops: [0.0, 0.5, 1.0],
                           ),
-                          borderRadius: BorderRadius.circular(28),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 20.0 : (isMediumScreen ? 24.0 : 28.0)),
                           boxShadow: [
                             BoxShadow(
                               color: const Color(0xFF7B1FA2).withAlpha(102),
@@ -386,13 +398,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             Row(
                               children: [
                                 Container(
-                                  width: 80,
-                                  height: 80,
+                                  width: isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0),
+                                  height: isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0),
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: Colors.white,
-                                      width: 3,
+                                      width: isSmallScreen ? 2.0 : 3.0,
                                     ),
                                     boxShadow: [
                                       BoxShadow(
@@ -410,13 +422,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                       ],
                                     ),
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.admin_panel_settings_rounded,
                                     color: Colors.white,
-                                    size: 40,
+                                    size: isSmallScreen ? 30.0 : (isMediumScreen ? 35.0 : 40.0),
                                   ),
                                 ),
-                                const SizedBox(width: 16),
+                                SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
@@ -424,19 +436,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     children: [
                                       Text(
                                         t('welcome'),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: Colors.white70,
-                                          fontSize: 16,
+                                          fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                                           fontWeight: FontWeight.w600,
                                           letterSpacing: 0.5,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                                       Text(
                                         _userData?['fullname'] ?? t('admin'),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 24,
+                                          fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 21.0 : 24.0),
                                           fontWeight: FontWeight.bold,
                                           letterSpacing: 0.3,
                                           height: 1.2,
@@ -444,12 +456,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      const SizedBox(height: 4),
+                                      SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                                       Text(
                                         t('manageSystem'),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: Colors.white60,
-                                          fontSize: 14,
+                                          fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
                                         ),
                                       ),
                                     ],
@@ -457,8 +469,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 24),
-                            // Stats Row
+                            SizedBox(height: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 24.0)),
                             Row(
                               children: [
                                 Expanded(
@@ -470,9 +481,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                         : (_dashboardStats?['totalUsers']
                                                 ?.toString() ??
                                             '0'),
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                                 Expanded(
                                   child: _buildWelcomeStatCard(
                                     icon: Icons.directions_bus_rounded,
@@ -482,9 +495,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                         : (_dashboardStats?['totalTrips']
                                                 ?.toString() ??
                                             '0'),
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                                 Expanded(
                                   child: _buildWelcomeStatCard(
                                     icon: Icons.attach_money_rounded,
@@ -493,6 +508,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                         ? '-'
                                         : _formatRevenue(
                                             _revenueStats?['totalRevenue']),
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                   ),
                                 ),
                               ],
@@ -500,15 +517,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      SizedBox(height: isSmallScreen ? 20.0 : (isMediumScreen ? 26.0 : 32.0)),
 
-                      // System Management Card
                       _buildSectionCard(
                         title: t('systemManagement'),
                         icon: Icons.dashboard_rounded,
                         color: adminPrimaryColor,
                         cardColor: cardColor,
                         textPrimaryColor: textPrimaryColor,
+                        isSmallScreen: isSmallScreen,
+                        isMediumScreen: isMediumScreen,
                         child: Column(
                           children: [
                             Row(
@@ -518,6 +536,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     icon: Icons.people_outline_rounded,
                                     title: t('users'),
                                     color: Colors.blue,
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                     onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -525,12 +545,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                                 const AdminUsersPage())),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                                 Expanded(
                                   child: _buildActionCard(
                                     icon: Icons.route_rounded,
                                     title: t('lines'),
                                     color: Colors.green,
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                     onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -540,7 +562,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            SizedBox(height: isSmallScreen ? 10.0 : 12.0),
                             Row(
                               children: [
                                 Expanded(
@@ -548,6 +570,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     icon: Icons.directions_car_filled_rounded,
                                     title: t('vehicles'),
                                     color: Colors.orange,
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                     onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -555,12 +579,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                                 const AdminVehiclesPage())),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                                 Expanded(
                                   child: _buildActionCard(
                                     icon: Icons.directions_bus_filled_rounded,
                                     title: t('trips'),
                                     color: Colors.purple,
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                     onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -570,7 +596,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            SizedBox(height: isSmallScreen ? 10.0 : 12.0),
                             Row(
                               children: [
                                 Expanded(
@@ -578,6 +604,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     icon: Icons.schedule_rounded,
                                     title: t('schedules'),
                                     color: Colors.indigo,
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                     onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -585,12 +613,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                                 const AdminSchedulesPage())),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                                 Expanded(
                                   child: _buildActionCard(
                                     icon: Icons.payment_rounded,
                                     title: t('payments'),
                                     color: Colors.teal,
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                     onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -598,12 +628,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                                 const AdminPaymentsPage())),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                                 Expanded(
                                   child: _buildActionCard(
                                     icon: Icons.bar_chart_rounded,
                                     title: t('reports'),
                                     color: Colors.red,
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                     onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -613,7 +645,26 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            SizedBox(height: isSmallScreen ? 10.0 : 12.0),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildActionCard(
+                                    icon: Icons.verified_user_rounded,
+                                    title: _isArabic ? 'موافقة السائقين' : 'Driver Approvals',
+                                    color: Colors.amber,
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
+                                    onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                                const AdminDriverApprovalsPage())),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: isSmallScreen ? 10.0 : 12.0),
                             Row(
                               children: [
                                 Expanded(
@@ -621,6 +672,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     icon: Icons.trending_up_rounded,
                                     title: t('aiPredictions'),
                                     color: Colors.deepOrange,
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                     onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -628,12 +681,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                                 const AdminPredictionsPage())),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                                 Expanded(
                                   child: _buildActionCard(
                                     icon: Icons.location_city_rounded,
                                     title: t('baseStations'),
                                     color: Colors.brown,
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                     onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -643,7 +698,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            SizedBox(height: isSmallScreen ? 10.0 : 12.0),
                             Row(
                               children: [
                                 Expanded(
@@ -651,6 +706,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     icon: Icons.settings_rounded,
                                     title: t('settings'),
                                     color: Colors.grey,
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                     onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
@@ -664,27 +721,26 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         ),
                       ),
 
-                      const SizedBox(height: 32),
+                      SizedBox(height: isSmallScreen ? 20.0 : (isMediumScreen ? 26.0 : 32.0)),
 
-                      // Map Section
                       _buildVehicleTrackingMap(
-                          cardColor, textPrimaryColor, textSecondaryColor),
+                          cardColor, textPrimaryColor, textSecondaryColor, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
 
-                      const SizedBox(height: 32),
+                      SizedBox(height: isSmallScreen ? 20.0 : (isMediumScreen ? 26.0 : 32.0)),
 
-                      // Analytics Section
                       _buildPredictionSummaryCard(
-                          cardColor, textPrimaryColor, textSecondaryColor),
+                          cardColor, textPrimaryColor, textSecondaryColor, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
 
-                      const SizedBox(height: 32),
+                      SizedBox(height: isSmallScreen ? 20.0 : (isMediumScreen ? 26.0 : 32.0)),
 
-                      // Account Info
                       _buildSectionCard(
                         title: t('accountInfo'),
                         icon: Icons.person_outline_rounded,
                         color: adminPrimaryColor,
                         cardColor: cardColor,
                         textPrimaryColor: textPrimaryColor,
+                        isSmallScreen: isSmallScreen,
+                        isMediumScreen: isMediumScreen,
                         child: Column(
                           children: [
                             _buildInfoRow(
@@ -696,8 +752,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               textSecondaryColor,
                               cardColor,
                               _isDarkMode,
+                              isSmallScreen: isSmallScreen,
+                              isMediumScreen: isMediumScreen,
                             ),
-                            const SizedBox(height: 14),
+                            SizedBox(height: isSmallScreen ? 10.0 : 14.0),
                             _buildInfoRow(
                               Icons.badge_outlined,
                               t('role'),
@@ -707,6 +765,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                               textSecondaryColor,
                               cardColor,
                               _isDarkMode,
+                              isSmallScreen: isSmallScreen,
+                              isMediumScreen: isMediumScreen,
                             ),
                           ],
                         ),
@@ -727,12 +787,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required Color textPrimaryColor,
     required Widget child,
     Widget? headerAction,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         border: Border.all(
           color:
               _isDarkMode ? Colors.white.withAlpha(38) : Colors.grey.shade200,
@@ -755,23 +817,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
                     decoration: BoxDecoration(
                       color: color.withAlpha(51),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                     ),
                     child: Icon(
                       icon,
                       color: color,
-                      size: 24,
+                      size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  SizedBox(width: isSmallScreen ? 12.0 : 14.0),
                   Text(
                     title,
                     style: TextStyle(
                       color: textPrimaryColor,
-                      fontSize: 20,
+                      fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                     ),
@@ -781,7 +843,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               if (headerAction != null) headerAction,
             ],
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 24.0)),
           child,
         ],
       ),
@@ -793,20 +855,24 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required String title,
     required Color color,
     required VoidCallback onTap,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
-    // Determine background color based on theme
     final bgColor = _isDarkMode ? const Color(0xFF1C2541) : Colors.white;
     final borderColor =
         _isDarkMode ? Colors.white.withAlpha(25) : Colors.grey.shade200;
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+        padding: EdgeInsets.symmetric(
+          vertical: isSmallScreen ? 14.0 : (isMediumScreen ? 17.0 : 20.0), 
+          horizontal: isSmallScreen ? 8.0 : 12.0
+        ),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
           border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
@@ -825,7 +891,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(isSmallScreen ? 8.0 : (isMediumScreen ? 10.0 : 12.0)),
               decoration: BoxDecoration(
                 color: color.withAlpha(25),
                 shape: BoxShape.circle,
@@ -834,15 +900,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   width: 1,
                 ),
               ),
-              child: Icon(icon, color: color, size: 28),
+              child: Icon(
+                icon, 
+                color: color, 
+                size: isSmallScreen ? 22.0 : (isMediumScreen ? 25.0 : 28.0)
+              ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: isSmallScreen ? 8.0 : 12.0),
             Text(
               title,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: _isDarkMode ? Colors.white : AppTheme.textPrimary,
-                fontSize: 13,
+                fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.3,
               ),
@@ -859,12 +929,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     required IconData icon,
     required String label,
     required String value,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      padding: EdgeInsets.symmetric(
+        vertical: isSmallScreen ? 8.0 : (isMediumScreen ? 10.0 : 12.0), 
+        horizontal: isSmallScreen ? 6.0 : 8.0
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withAlpha(38),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         border: Border.all(
           color: Colors.white.withAlpha(77),
           width: 1.5,
@@ -875,25 +950,25 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           Icon(
             icon,
             color: Colors.white,
-            size: 24,
+            size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: isSmallScreen ? 4.0 : 6.0),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
               fontWeight: FontWeight.bold,
               letterSpacing: 0.3,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: isSmallScreen ? 2.0 : 4.0),
           Text(
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withAlpha(217),
-              fontSize: 10,
+              fontSize: isSmallScreen ? 9.0 : (isMediumScreen ? 9.5 : 10.0),
               fontWeight: FontWeight.w500,
               letterSpacing: 0.2,
               height: 1.2,
@@ -914,14 +989,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     Color textPrimaryColor,
     Color textSecondaryColor,
     Color cardColor,
-    bool isDarkMode,
-  ) {
+    bool isDarkMode, {
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       decoration: BoxDecoration(
         color:
             isDarkMode ? Colors.white.withAlpha(13) : const Color(0xFFF8F9FA),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 14.0),
         border: Border.all(
           color: isDarkMode ? Colors.white.withAlpha(25) : Colors.grey.shade200,
           width: 1,
@@ -930,14 +1007,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
             decoration: BoxDecoration(
               color: accentColor.withAlpha(38),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
             ),
-            child: Icon(icon, color: accentColor, size: 22),
+            child: Icon(icon, color: accentColor, size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0)),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: isSmallScreen ? 12.0 : 16.0),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -946,17 +1023,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   label,
                   style: TextStyle(
                     color: textSecondaryColor,
-                    fontSize: 13,
+                    fontSize: isSmallScreen ? 12.0 : 13.0,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.2,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: isSmallScreen ? 4.0 : 6.0),
                 Text(
                   value,
                   style: TextStyle(
                     color: textPrimaryColor,
-                    fontSize: 16,
+                    fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.3,
                   ),
@@ -970,8 +1047,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget _buildVehicleTrackingMap(
-      Color cardColor, Color textPrimary, Color textSecondary) {
-    // Determine center point
+      Color cardColor, Color textPrimary, Color textSecondary, {
+      bool isSmallScreen = false,
+      bool isMediumScreen = false,
+  }) {
     LatLng center = _baseStations.isNotEmpty
         ? LatLng(
             _baseStations[0]['latitude']?.toDouble() ?? 31.9522,
@@ -990,11 +1069,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       color: Colors.cyan,
       cardColor: cardColor,
       textPrimaryColor: textPrimary,
+      isSmallScreen: isSmallScreen,
+      isMediumScreen: isMediumScreen,
       headerAction: IconButton(
         icon: Icon(
           Icons.open_in_full,
           color: textSecondary,
-          size: 20,
+          size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
         ),
         onPressed: () {
           Navigator.push(
@@ -1010,9 +1091,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            height: 320,
+            height: isSmallScreen ? 240.0 : (isMediumScreen ? 280.0 : 320.0),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
               border: Border.all(
                 color: _isDarkMode
                     ? Colors.white.withAlpha(25)
@@ -1021,7 +1102,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
               child: _mapLoading
                   ? const Center(child: CircularProgressIndicator())
                   : FlutterMap(
@@ -1040,22 +1121,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                           userAgentPackageName:
                               'com.example.taxi_palestine_app',
                         ),
-                        // Base station markers
                         MarkerLayer(
                           markers: _baseStations.map((station) {
                             final lat = station['latitude']?.toDouble() ?? 0.0;
                             final lng = station['longitude']?.toDouble() ?? 0.0;
+                            final markerSize = isSmallScreen ? 35.0 : (isMediumScreen ? 40.0 : 45.0);
+                            final iconSize = isSmallScreen ? 18.0 : (isMediumScreen ? 21.0 : 24.0);
                             return Marker(
                               point: LatLng(lat, lng),
-                              width: 45,
-                              height: 45,
+                              width: markerSize,
+                              height: markerSize,
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.blue.withAlpha(230),
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: Colors.white,
-                                    width: 2,
+                                    width: isSmallScreen ? 1.5 : 2.0,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
@@ -1065,16 +1147,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     ),
                                   ],
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.location_city,
                                   color: Colors.white,
-                                  size: 24,
+                                  size: iconSize,
                                 ),
                               ),
                             );
                           }).toList(),
                         ),
-                        // Vehicle markers
                         MarkerLayer(
                           markers: _vehicleLocations.map((location) {
                             final lat = location['latitude']?.toDouble() ?? 0.0;
@@ -1084,17 +1165,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                 location['is_at_station'] == true;
                             final markerColor =
                                 isAtStation ? Colors.green : Colors.red;
+                            final vehicleMarkerSize = isSmallScreen ? 40.0 : (isMediumScreen ? 45.0 : 50.0);
+                            final vehicleIconSize = isSmallScreen ? 22.0 : (isMediumScreen ? 25.0 : 28.0);
                             return Marker(
                               point: LatLng(lat, lng),
-                              width: 50,
-                              height: 50,
+                              width: vehicleMarkerSize,
+                              height: vehicleMarkerSize,
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: markerColor.withAlpha(230),
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: Colors.white,
-                                    width: 2.5,
+                                    width: isSmallScreen ? 2.0 : 2.5,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
@@ -1104,10 +1187,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                                     ),
                                   ],
                                 ),
-                                child: const Icon(
+                                child: Icon(
                                   Icons.local_taxi,
                                   color: Colors.white,
-                                  size: 28,
+                                  size: vehicleIconSize,
                                 ),
                               ),
                             );
@@ -1123,7 +1206,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget _buildPredictionSummaryCard(
-      Color cardColor, Color textPrimary, Color textSecondary) {
+      Color cardColor, Color textPrimary, Color textSecondary, {
+      bool isSmallScreen = false,
+      bool isMediumScreen = false,
+  }) {
     final model = _predictionInsights?['model'] as Map<String, dynamic>?;
     final topLines = (_predictionInsights?['topLines'] as List<dynamic>?) ?? [];
 
@@ -1133,19 +1219,30 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       color: Colors.deepOrange,
       cardColor: cardColor,
       textPrimaryColor: textPrimary,
+      isSmallScreen: isSmallScreen,
+      isMediumScreen: isMediumScreen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_insightsLoading)
-            const Center(
-              child: CircularProgressIndicator(),
+            Center(
+              child: Padding(
+                padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
+                child: const CircularProgressIndicator(),
+              ),
             )
           else if (topLines.isEmpty)
-            Text(
-              _isArabic
-                  ? 'لا توجد بيانات كافية بعد لتوليد التوقعات'
-                  : 'No demand signals yet. Predictions will appear after bookings accumulate.',
-              style: TextStyle(color: textSecondary),
+            Padding(
+              padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+              child: Text(
+                _isArabic
+                    ? 'لا توجد بيانات كافية بعد لتوليد التوقعات'
+                    : 'No demand signals yet. Predictions will appear after bookings accumulate.',
+                style: TextStyle(
+                  color: textSecondary,
+                  fontSize: isSmallScreen ? 13.0 : 14.0,
+                ),
+              ),
             )
           else
             Column(
@@ -1154,15 +1251,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 final utilization =
                     ((data['avgUtilization'] ?? 0) as num).toStringAsFixed(2);
                 return ListTile(
-                  contentPadding: EdgeInsets.zero,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: isSmallScreen ? 4.0 : 0.0,
+                    vertical: isSmallScreen ? 4.0 : 8.0,
+                  ),
                   leading: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                     decoration: BoxDecoration(
                       color: Colors.deepOrange.withAlpha(26),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
                     ),
-                    child: const Icon(Icons.directions_transit,
-                        color: Colors.deepOrange),
+                    child: Icon(
+                      Icons.directions_transit,
+                      color: Colors.deepOrange,
+                      size: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+                    ),
                   ),
                   title: Text(
                     ((data['buckets'] as List?)?.isNotEmpty == true)
@@ -1171,22 +1274,30 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     style: TextStyle(
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
-                      fontSize: 15,
+                      fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0),
                     ),
                   ),
                   subtitle: Text(
                     '${_isArabic ? 'نسبة الإشغال' : 'Avg utilization'} $utilization',
-                    style: TextStyle(color: textSecondary),
+                    style: TextStyle(
+                      color: textSecondary,
+                      fontSize: isSmallScreen ? 12.0 : 13.0,
+                    ),
                   ),
                 );
               }).toList(),
             ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 10.0 : 12.0),
           if (!_insightsLoading && model != null)
-            Text(
-              '${_isArabic ? 'آخر تدريب' : 'Last trained'}: ${_formatTimestamp(model['lastTrainedAt'])}',
-              style: TextStyle(
-                  color: textSecondary.withOpacity(0.7), fontSize: 12),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 4.0 : 0.0),
+              child: Text(
+                '${_isArabic ? 'آخر تدريب' : 'Last trained'}: ${_formatTimestamp(model['lastTrainedAt'])}',
+                style: TextStyle(
+                  color: textSecondary.withOpacity(0.7), 
+                  fontSize: isSmallScreen ? 11.0 : 12.0,
+                ),
+              ),
             ),
         ],
       ),
@@ -1196,19 +1307,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   String _formatTimestamp(dynamic value) {
     if (value == null) return '-';
     try {
-      // Normalize Supabase timestamp format to ISO 8601 and convert to local time
       String normalized = value.toString();
-      // Replace space with T
       normalized = normalized.replaceFirst(' ', 'T');
-      // Replace +00 or +00:00 with Z (UTC indicator)
       normalized = normalized.replaceFirst(RegExp(r'\+00:?00?$'), 'Z');
-      // If no timezone indicator, assume UTC
       if (!normalized.contains('Z') &&
           !normalized.contains('+') &&
           !normalized.contains('-')) {
         normalized += 'Z';
       }
-      // Parse as UTC and convert to local timezone for display
       final parsed = DateTime.tryParse(normalized)?.toLocal();
       if (parsed == null) return value.toString();
       return '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')} '

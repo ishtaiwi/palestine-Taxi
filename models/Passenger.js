@@ -49,11 +49,19 @@ class Passenger {
   static async findAll(filters = {}) {
     let query = supabase.from('passenger').select('*, user(*)');
     
-    // Type filter removed - field no longer exists in database
-    
     const { data, error } = await query;
     if (error) throw error;
     return data;
+  }
+
+  static async delete(passengerid) {
+    const { error } = await supabase
+      .from('passenger')
+      .delete()
+      .eq('passengerid', passengerid);
+    
+    if (error) throw error;
+    return true;
   }
 }
 

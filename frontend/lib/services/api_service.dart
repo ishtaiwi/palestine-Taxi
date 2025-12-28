@@ -140,12 +140,15 @@ class ApiService {
           return {
             'success': false,
             'message': responseData['message'] ?? 'Login failed',
+            'approvalStatus': responseData['approvalStatus'],
           };
         }
       } else {
+        // Handle 403 (Forbidden) for non-approved drivers
         return {
           'success': false,
           'message': responseData['message'] ?? 'Login failed',
+          'approvalStatus': responseData['approvalStatus'],
         };
       }
     } catch (exception) {
@@ -256,6 +259,7 @@ class ApiService {
           print('[ApiService.register] ✅ Registration successful');
           print('  - User saved: ${responseData['user'] != null}');
           print('  - Token saved: ${responseData['token'] != null}');
+          print('  - Approval Status: ${responseData['approvalStatus'] ?? 'N/A'}');
 
           return {
             'success': true,
@@ -263,6 +267,7 @@ class ApiService {
             'token': responseData['token'],
             'user': responseData['user'],
             'vehicle': responseData['vehicle'],
+            'approvalStatus': responseData['approvalStatus'],
           };
         } catch (saveError) {
           print('[ApiService.register] ⚠️ Error saving data: $saveError');
@@ -273,6 +278,7 @@ class ApiService {
             'token': responseData['token'],
             'user': responseData['user'],
             'vehicle': responseData['vehicle'],
+            'approvalStatus': responseData['approvalStatus'],
           };
         }
       } else {

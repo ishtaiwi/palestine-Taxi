@@ -380,15 +380,21 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
+    
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: Text(
           'AI Predictions',
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
           ),
         ),
         backgroundColor: AppTheme.isDarkMode
@@ -396,22 +402,31 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
             : AppTheme.appBarColor,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        iconTheme: IconThemeData(
+          color: Colors.white,
+          size: isSmallScreen ? 20.0 : 24.0,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(isSmallScreen ? 16.0 : 20.0),
+          ),
         ),
         actions: [
           IconButton(
             onPressed: _isRetraining ? null : _triggerRetrain,
             tooltip: 'Retrain model',
             color: Colors.white,
+            iconSize: isSmallScreen ? 20.0 : 24.0,
             icon: _isRetraining
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ? SizedBox(
+                    width: isSmallScreen ? 16.0 : 18.0,
+                    height: isSmallScreen ? 16.0 : 18.0,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2, 
+                      color: Colors.white
+                    ),
                   )
-                : const Icon(Icons.refresh),
+                : Icon(Icons.refresh),
           ),
         ],
       ),
@@ -419,9 +434,16 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(
-                  child: Text(
-                    _error!,
-                    style: TextStyle(color: Colors.redAccent),
+                  child: Padding(
+                    padding: EdgeInsets.all(basePadding),
+                    child: Text(
+                      _error!,
+                      style: TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: isSmallScreen ? 14.0 : 16.0,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 )
               : RefreshIndicator(
@@ -429,7 +451,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                   color: Colors.deepPurple,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(basePadding),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -437,10 +459,10 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                           children: [
                             Expanded(
                               child: Container(
-                                padding: const EdgeInsets.all(16),
+                                padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
                                 decoration: BoxDecoration(
                                   color: AppTheme.isDarkMode ? AppTheme.cardBackground : Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
                                   border: Border.all(
                                     color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
                                   ),
@@ -460,17 +482,18 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                                     fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
                                     labelStyle: TextStyle(
                                       color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                                      fontSize: isSmallScreen ? 13.0 : 14.0,
                                     ),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                                       borderSide: BorderSide.none,
                                     ),
                                     enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                                       borderSide: BorderSide.none,
                                     ),
                                     focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                                       borderSide: BorderSide(
                                         color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
                                         width: 2,
@@ -479,7 +502,16 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                                     prefixIcon: Icon(
                                       Icons.directions_bus_rounded,
                                       color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+                                      size: isSmallScreen ? 20.0 : 24.0,
                                     ),
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: isSmallScreen ? 16.0 : 20.0,
+                                      vertical: isSmallScreen ? 12.0 : 16.0,
+                                    ),
+                                  ),
+                                  style: TextStyle(
+                                    color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                                    fontSize: isSmallScreen ? 14.0 : 16.0,
                                   ),
                                   dropdownColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
                                   isExpanded: true,
@@ -503,53 +535,61 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                                     
                                     return DropdownMenuItem<String>(
                                       value: line['lineid'] as String?,
-                                      child: Container(
-                                        width: double.infinity,
-                                        margin: const EdgeInsets.symmetric(vertical: 4),
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: isSelected 
-                                              ? (AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade100)
-                                              : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: isSelected 
-                                                ? lineAccentColor 
-                                                : Colors.transparent,
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              width: 4,
-                                              height: 24,
-                                              decoration: BoxDecoration(
-                                                color: lineAccentColor,
-                                                borderRadius: BorderRadius.circular(2),
+                                      child: Builder(
+                                        builder: (context) {
+                                          final screenWidth = MediaQuery.of(context).size.width;
+                                          final isSmallScreen = screenWidth < 360;
+                                          
+                                          return Container(
+                                            width: double.infinity,
+                                            margin: EdgeInsets.symmetric(vertical: isSmallScreen ? 3.0 : 4.0),
+                                            padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
+                                            decoration: BoxDecoration(
+                                              color: isSelected 
+                                                  ? (AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade100)
+                                                  : Colors.transparent,
+                                              borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                                              border: Border.all(
+                                                color: isSelected 
+                                                    ? lineAccentColor 
+                                                    : Colors.transparent,
+                                                width: 1.5,
                                               ),
                                             ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                line['name_en'] ?? line['linename'] ?? 'Line',
-                                                style: TextStyle(
-                                                  color: isSelected 
-                                                      ? (AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)
-                                                      : (AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
-                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  width: isSmallScreen ? 3.0 : 4.0,
+                                                  height: isSmallScreen ? 20.0 : 24.0,
+                                                  decoration: BoxDecoration(
+                                                    color: lineAccentColor,
+                                                    borderRadius: BorderRadius.circular(2),
+                                                  ),
                                                 ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
+                                                SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+                                                Expanded(
+                                                  child: Text(
+                                                    line['name_en'] ?? line['linename'] ?? 'Line',
+                                                    style: TextStyle(
+                                                      color: isSelected 
+                                                          ? (AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)
+                                                          : (AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                if (isSelected)
+                                                  Icon(
+                                                    Icons.check_rounded,
+                                                    color: lineAccentColor,
+                                                    size: isSmallScreen ? 18.0 : 20.0,
+                                                  ),
+                                              ],
                                             ),
-                                            if (isSelected)
-                                              Icon(
-                                                Icons.check_rounded,
-                                                color: lineAccentColor,
-                                                size: 20,
-                                              ),
-                                          ],
-                                        ),
+                                          );
+                                        },
                                       ),
                                     );
                                   }).toList(),
@@ -563,12 +603,12 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        _buildPredictionsSection(),
-                        const SizedBox(height: 16),
-                        _buildRecommendationsSection(),
-                        const SizedBox(height: 16),
-                        _buildInsightsSection(),
+                        SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                        _buildPredictionsSection(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                        SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                        _buildRecommendationsSection(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                        SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                        _buildInsightsSection(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                       ],
                     ),
                   ),
@@ -576,12 +616,14 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     );
   }
 
-  Widget _buildPredictionsSection() {
+  Widget _buildPredictionsSection({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final predictions =
         (_predictionData?['predictions'] as List<dynamic>?) ?? [];
 
     return _buildPanel(
       title: 'Upcoming Rush Hours',
+      isSmallScreen: isSmallScreen,
+      isMediumScreen: isMediumScreen,
       child: predictions.isEmpty
           ? Text(
               'No rush hour predictions available.',
@@ -593,10 +635,10 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
               itemBuilder: (context, index) {
                 final prediction = predictions[index] as Map<String, dynamic>;
                 return Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
                   decoration: BoxDecoration(
                     color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                     border: Border.all(
                       color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
                     ),
@@ -604,18 +646,18 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
                         decoration: BoxDecoration(
                           color: Colors.orangeAccent.withOpacity(0.1),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.trending_up_rounded,
                           color: Colors.orangeAccent,
-                          size: 24,
+                          size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,16 +667,16 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                               style: TextStyle(
                                 color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                             Text(
                               'Expected bookings: ${prediction['expectedBookings']?.toStringAsFixed(1) ?? prediction['expectedBookings']}\n'
                               'Confidence: ${(((prediction['confidence'] ?? 0) as num) * 100).toStringAsFixed(0)}%',
                               style: TextStyle(
                                 color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
-                                fontSize: 13,
+                                fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
                               ),
                             ),
                           ],
@@ -644,18 +686,20 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                   ),
                 );
               },
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, __) => SizedBox(height: isSmallScreen ? 10.0 : 12.0),
               itemCount: predictions.length.clamp(0, 5),
             ),
     );
   }
 
-  Widget _buildRecommendationsSection() {
+  Widget _buildRecommendationsSection({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final displayRecommendations =
         _isFilterActive ? _filteredRecommendations : _recommendations;
 
     return _buildPanel(
       title: 'Recommendations',
+      isSmallScreen: isSmallScreen,
+      isMediumScreen: isMediumScreen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1024,11 +1068,13 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     );
   }
 
-  Widget _buildInsightsSection() {
+  Widget _buildInsightsSection({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final topLines = (_insights?['topLines'] as List<dynamic>?) ?? [];
 
     return _buildPanel(
       title: 'Network Insights',
+      isSmallScreen: isSmallScreen,
+      isMediumScreen: isMediumScreen,
       child: topLines.isEmpty
           ? Text(
               'No demand insights yet.',
@@ -1093,13 +1139,13 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     );
   }
 
-  Widget _buildPanel({required String title, required Widget child}) {
+  Widget _buildPanel({required String title, required Widget child, bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
       decoration: BoxDecoration(
         color: AppTheme.isDarkMode ? AppTheme.cardBackground : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         border: Border.all(
           color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
         ),
@@ -1119,10 +1165,10 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
             style: TextStyle(
               color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
               fontWeight: FontWeight.bold,
-              fontSize: 18,
+              fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isSmallScreen ? 12.0 : 16.0),
           child,
         ],
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import '../../services/location_service.dart';
@@ -257,6 +258,23 @@ class _DriverLocationTrackingPageState
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Web-specific responsive breakpoints
+    final isWeb = kIsWeb;
+    final isDesktop = isWeb && screenWidth >= 1200;
+    final isTablet = screenWidth >= 600 && screenWidth < 1200;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    final double basePadding = isWeb 
+        ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
+        : (isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0));
+    
+    // Max width for web to prevent content from stretching too wide
+    final double maxContentWidth = isWeb ? 1200.0 : double.infinity;
+    
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
         : const Color.fromARGB(255, 224, 228, 231);
@@ -294,22 +312,22 @@ class _DriverLocationTrackingPageState
             ),
             child: AppBar(
               leading: Container(
-                margin: const EdgeInsets.all(8),
+                margin: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                  icon: Icon(Icons.arrow_back_ios_new, size: isSmallScreen ? 18.0 : 20.0),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
               title: Text(
                 t('title'),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 22,
+                  fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
                   letterSpacing: 0.5,
                 ),
               ),
@@ -320,42 +338,47 @@ class _DriverLocationTrackingPageState
             ),
           ),
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildTrackingStatusCard(),
-              const SizedBox(height: 20),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxContentWidth),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(basePadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+              _buildTrackingStatusCard(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+              SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
 
               if (_currentPosition != null) ...[
-                _buildLocationCard(_currentPosition!),
-                const SizedBox(height: 20),
+                _buildLocationCard(_currentPosition!, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
               ],
 
               if (_baseStation != null) ...[
-                _buildBaseStationCard(),
-                const SizedBox(height: 20),
+                _buildBaseStationCard(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
               ],
 
-              if (_linePath != null) _buildLinePathCard(),
-            ],
+              if (_linePath != null) _buildLinePathCard(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                ],
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCard({required Widget child, Color? color}) {
+  Widget _buildCard({required Widget child, Color? color, bool isSmallScreen = false, bool isMediumScreen = false}) {
     final cardColor = _isDarkMode
         ? const Color(0xFF1C2541)
         : const Color(0xFFFAFBFC);
     
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
       decoration: BoxDecoration(
         color: color ?? cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         border: Border.all(
           color: _isDarkMode
               ? Colors.white.withOpacity(0.1)
@@ -374,11 +397,13 @@ class _DriverLocationTrackingPageState
     );
   }
 
-  Widget _buildTrackingStatusCard() {
+  Widget _buildTrackingStatusCard({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final textPrimaryColor = _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
     final textSecondaryColor = _isDarkMode ? Colors.white.withOpacity(0.9) : const Color(0xFF546E7A);
     
     return _buildCard(
+      isSmallScreen: isSmallScreen,
+      isMediumScreen: isMediumScreen,
       child: Column(
         children: [
           Row(
@@ -387,20 +412,20 @@ class _DriverLocationTrackingPageState
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
                     decoration: BoxDecoration(
                       color: _isTracking 
                           ? Colors.green.withOpacity(0.2) 
                           : Colors.grey.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                     ),
                     child: Icon(
                       Icons.location_searching,
                       color: _isTracking ? Colors.green : Colors.grey,
-                      size: 24,
+                      size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -408,16 +433,17 @@ class _DriverLocationTrackingPageState
                         t('trackingStatus'),
                         style: TextStyle(
                           color: textPrimaryColor,
-                          fontSize: 18,
+                          fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                       Text(
                         _isTracking ? t('active') : t('inactive'),
                         style: TextStyle(
                           color: _isTracking ? Colors.green : textSecondaryColor,
                           fontWeight: FontWeight.w600,
+                          fontSize: isSmallScreen ? 13.0 : 14.0,
                         ),
                       ),
                     ],
@@ -437,14 +463,14 @@ class _DriverLocationTrackingPageState
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isSmallScreen ? 12.0 : 16.0),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
             decoration: BoxDecoration(
               color: _isTracking 
                   ? Colors.green.withOpacity(0.1) 
                   : _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
               border: Border.all(
                 color: _isTracking 
                     ? Colors.green.withOpacity(0.3) 
@@ -455,16 +481,16 @@ class _DriverLocationTrackingPageState
               children: [
                 Icon(
                   Icons.info_outline,
-                  size: 20,
+                  size: isSmallScreen ? 18.0 : 20.0,
                   color: _isTracking ? Colors.green : textSecondaryColor,
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: isSmallScreen ? 8.0 : 10.0),
                 Expanded(
                   child: Text(
                     _isTracking ? t('trackingActiveDesc') : t('trackingInactiveDesc'),
                     style: TextStyle(
                       color: _isTracking ? Colors.green.shade700 : textSecondaryColor,
-                      fontSize: 13,
+                      fontSize: isSmallScreen ? 12.0 : 13.0,
                     ),
                   ),
                 ),
@@ -476,28 +502,30 @@ class _DriverLocationTrackingPageState
     );
   }
 
-  Widget _buildLocationCard(Position position) {
+  Widget _buildLocationCard(Position position, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final textPrimaryColor = _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
     
     return _buildCard(
+      isSmallScreen: isSmallScreen,
+      isMediumScreen: isMediumScreen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.my_location, color: Colors.blue, size: 24),
-              const SizedBox(width: 12),
+              Icon(Icons.my_location, color: Colors.blue, size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0)),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
               Text(
                 t('currentLocation'),
                 style: TextStyle(
                   color: textPrimaryColor,
-                  fontSize: 18,
+                  fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
           Row(
             children: [
               Expanded(
@@ -506,37 +534,45 @@ class _DriverLocationTrackingPageState
                   position.latitude.toStringAsFixed(5),
                   Icons.explore,
                   Colors.blue,
+                  isSmallScreen: isSmallScreen,
+                  isMediumScreen: isMediumScreen,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
               Expanded(
                 child: _buildDataBox(
                   t('longitude'),
                   position.longitude.toStringAsFixed(5),
                   Icons.explore,
                   Colors.blue,
+                  isSmallScreen: isSmallScreen,
+                  isMediumScreen: isMediumScreen,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 10.0 : 12.0),
           _buildDataBox(
             t('accuracy'),
             '${position.accuracy.toStringAsFixed(1)} ${t('meters')}',
             Icons.gps_fixed,
             Colors.orange,
             fullWidth: true,
+            isSmallScreen: isSmallScreen,
+            isMediumScreen: isMediumScreen,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBaseStationCard() {
+  Widget _buildBaseStationCard({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final textPrimaryColor = _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
     final statusColor = _isAtBaseStation ? Colors.green : Colors.orange;
 
     return _buildCard(
+      isSmallScreen: isSmallScreen,
+      isMediumScreen: isMediumScreen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -545,39 +581,42 @@ class _DriverLocationTrackingPageState
             children: [
               Row(
                 children: [
-                  Icon(Icons.business, color: Colors.purple, size: 24),
-                  const SizedBox(width: 12),
+                  Icon(Icons.business, color: Colors.purple, size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0)),
+                  SizedBox(width: isSmallScreen ? 10.0 : 12.0),
                   Text(
                     t('baseStation'),
                     style: TextStyle(
                       color: textPrimaryColor,
-                      fontSize: 18,
+                      fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 8.0 : 10.0, 
+                  vertical: isSmallScreen ? 4.0 : 6.0
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
                   border: Border.all(color: statusColor.withOpacity(0.5)),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       _isAtBaseStation ? Icons.check_circle : Icons.near_me,
-                      size: 14,
+                      size: isSmallScreen ? 12.0 : 14.0,
                       color: statusColor,
                     ),
-                    const SizedBox(width: 6),
+                    SizedBox(width: isSmallScreen ? 4.0 : 6.0),
                     Text(
                       _isAtBaseStation ? t('atBase') : t('awayFromBase'),
                       style: TextStyle(
                         color: statusColor,
                         fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                        fontSize: isSmallScreen ? 10.0 : 12.0,
                       ),
                     ),
                   ],
@@ -585,7 +624,7 @@ class _DriverLocationTrackingPageState
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
           if (_distanceToBaseStation != null) ...[
             _buildDataBox(
               t('distance'),
@@ -593,20 +632,25 @@ class _DriverLocationTrackingPageState
               Icons.straighten,
               Colors.purple,
               fullWidth: true,
+              isSmallScreen: isSmallScreen,
+              isMediumScreen: isMediumScreen,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isSmallScreen ? 12.0 : 16.0),
           ],
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: isSmallScreen ? 44.0 : (isMediumScreen ? 46.0 : 48.0),
             child: FilledButton.icon(
               onPressed: _navigateToBaseStation,
-              icon: const Icon(Icons.navigation),
-              label: Text(t('navToBase')),
+              icon: Icon(Icons.navigation, size: isSmallScreen ? 18.0 : 20.0),
+              label: Text(
+                t('navToBase'),
+                style: TextStyle(fontSize: isSmallScreen ? 14.0 : 16.0),
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.purple,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                 ),
               ),
             ),
@@ -616,29 +660,31 @@ class _DriverLocationTrackingPageState
     );
   }
 
-  Widget _buildLinePathCard() {
+  Widget _buildLinePathCard({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final textPrimaryColor = _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
     final textSecondaryColor = _isDarkMode ? Colors.white.withOpacity(0.9) : const Color(0xFF546E7A);
 
     return _buildCard(
+      isSmallScreen: isSmallScreen,
+      isMediumScreen: isMediumScreen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.alt_route, color: Colors.indigo, size: 24),
-              const SizedBox(width: 12),
+              Icon(Icons.alt_route, color: Colors.indigo, size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0)),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
               Text(
                 t('linePath'),
                 style: TextStyle(
                   color: textPrimaryColor,
-                  fontSize: 18,
+                  fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
           if (_linePath!['distance_meters'] != null) ...[
             _buildDataBox(
               t('routeDistance'),
@@ -646,35 +692,40 @@ class _DriverLocationTrackingPageState
               Icons.map,
               Colors.indigo,
               fullWidth: true,
+              isSmallScreen: isSmallScreen,
+              isMediumScreen: isMediumScreen,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isSmallScreen ? 12.0 : 16.0),
           ],
           SizedBox(
             width: double.infinity,
-            height: 48,
+            height: isSmallScreen ? 44.0 : (isMediumScreen ? 46.0 : 48.0),
             child: FilledButton.icon(
               onPressed: _navigateAlongLinePath,
-              icon: const Icon(Icons.turn_right),
-              label: Text(t('navLine')),
+              icon: Icon(Icons.turn_right, size: isSmallScreen ? 18.0 : 20.0),
+              label: Text(
+                t('navLine'),
+                style: TextStyle(fontSize: isSmallScreen ? 14.0 : 16.0),
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.indigo,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 10.0 : 12.0),
           Row(
             children: [
-              Icon(Icons.offline_pin, size: 16, color: textSecondaryColor),
-              const SizedBox(width: 8),
+              Icon(Icons.offline_pin, size: isSmallScreen ? 14.0 : 16.0, color: textSecondaryColor),
+              SizedBox(width: isSmallScreen ? 6.0 : 8.0),
               Expanded(
                 child: Text(
                   t('offlineNote'),
                   style: TextStyle(
                     color: textSecondaryColor,
-                    fontSize: 12,
+                    fontSize: isSmallScreen ? 11.0 : 12.0,
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -691,7 +742,7 @@ class _DriverLocationTrackingPageState
     String value, 
     IconData icon, 
     Color color,
-    {bool fullWidth = false}
+    {bool fullWidth = false, bool isSmallScreen = false, bool isMediumScreen = false}
   ) {
     final boxColor = _isDarkMode
         ? Colors.white.withOpacity(0.05)
@@ -701,10 +752,10 @@ class _DriverLocationTrackingPageState
 
     return Container(
       width: fullWidth ? double.infinity : null,
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
       decoration: BoxDecoration(
         color: boxColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
         border: Border.all(
           color: _isDarkMode
               ? Colors.white.withOpacity(0.1)
@@ -716,24 +767,24 @@ class _DriverLocationTrackingPageState
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 8),
+              Icon(icon, size: isSmallScreen ? 14.0 : 16.0, color: color),
+              SizedBox(width: isSmallScreen ? 6.0 : 8.0),
               Text(
                 label,
                 style: TextStyle(
                   color: textSecondaryColor,
-                  fontSize: 12,
+                  fontSize: isSmallScreen ? 11.0 : 12.0,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isSmallScreen ? 6.0 : 8.0),
           Text(
             value,
             style: TextStyle(
               color: textPrimaryColor,
-              fontSize: 18,
+              fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
               fontWeight: FontWeight.bold,
               letterSpacing: 0.5,
             ),

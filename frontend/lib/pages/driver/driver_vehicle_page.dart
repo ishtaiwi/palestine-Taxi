@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
@@ -35,7 +36,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       'departure': 'موعد الانطلاق',
       'lastUpdated': 'آخر تحديث',
       'legendAvailable': 'متاح',
-      'legendReserved': 'محجوز',
       'legendBroken': 'عاطل',
       'noVehicles': 'لا توجد مركبات مرتبطة بحسابك',
       'addVehicle': 'إضافة مركبة',
@@ -50,7 +50,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       'unknown': 'غير معروف',
       'vehicleInfo': 'معلومات المركبة',
       'toggleBroken': 'تغيير حالة المقعد',
-      'tapSeat': 'اضغط لتغيير حالة المقعد (باستثناء المقعد المحجوز)',
+      'tapSeat': 'اضغط لتغيير حالة المقعد',
       'refresh': 'تحديث',
       'create': 'إنشاء',
       'cancel': 'إلغاء',
@@ -65,7 +65,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       'departure': 'Departure',
       'lastUpdated': 'Last update',
       'legendAvailable': 'Available',
-      'legendReserved': 'Reserved',
       'legendBroken': 'Out of service',
       'noVehicles': 'No vehicles linked to your account',
       'addVehicle': 'Add Vehicle',
@@ -80,7 +79,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       'unknown': 'Unknown',
       'vehicleInfo': 'Vehicle Information',
       'toggleBroken': 'Toggle seat status',
-      'tapSeat': 'Tap a seat to toggle its status (reserved seats locked)',
+      'tapSeat': 'Tap a seat to toggle its status',
       'refresh': 'Refresh',
       'create': 'Create',
       'cancel': 'Cancel',
@@ -187,13 +186,6 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
   }
 
   Future<void> _toggleSeatStatus(String seatId, String currentStatus) async {
-    if (currentStatus == 'reserved') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t('legendReserved'))),
-      );
-      return;
-    }
-
     final vehicleId = _selectedVehicle?['vehicleid']?.toString();
     if (vehicleId == null) return;
 
@@ -234,6 +226,25 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
     
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Web-specific responsive breakpoints
+    final isWeb = kIsWeb;
+    final isDesktop = isWeb && screenWidth >= 1200;
+    final isTablet = screenWidth >= 600 && screenWidth < 1200;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    final double basePadding = isWeb 
+        ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
+        : (isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0));
+    final double cardPadding = isWeb
+        ? (isDesktop ? 28.0 : (isTablet ? 24.0 : 20.0))
+        : (isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0));
+    
+    // Max width for web to prevent content from stretching too wide
+    final double maxContentWidth = isWeb ? 1400.0 : double.infinity;
+    
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
         : const Color.fromARGB(255, 224, 228, 231);
@@ -271,13 +282,13 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
             ),
             child: AppBar(
               leading: Container(
-                margin: const EdgeInsets.all(8),
+                margin: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                  icon: Icon(Icons.arrow_back_ios_new, size: isSmallScreen ? 18.0 : 20.0),
                   onPressed: () {
                     if (Navigator.canPop(context)) {
                       Navigator.pop(context);
@@ -294,10 +305,10 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
               ),
               title: Text(
                 t('title'),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 22,
+                  fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
                   letterSpacing: 0.5,
                 ),
               ),
@@ -309,13 +320,13 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
               actionsIconTheme: const IconThemeData(color: Colors.white),
               actions: [
                 Container(
-                  margin: const EdgeInsets.only(right: 8),
+                  margin: EdgeInsets.only(right: isSmallScreen ? 4.0 : 8.0),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    icon: Icon(Icons.refresh_rounded, size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0)),
                     onPressed: _loadVehicles,
                     tooltip: t('refresh'),
                   ),
@@ -326,7 +337,12 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
         ),
         body: _isLoadingVehicles
             ? const Center(child: CircularProgressIndicator())
-            : _buildBody(),
+            : Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxContentWidth),
+                  child: _buildBody(),
+                ),
+              ),
         bottomNavigationBar: DriverBottomNavBar(
           currentIndex: 3, // My Vehicle is index 3
           isDarkMode: _isDarkMode,
@@ -348,18 +364,25 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
         : const Color(0xFF546E7A);
     
     if (_error != null) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isSmallScreen = screenWidth < 360;
+      final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+      
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: textPrimaryColor),
+                style: TextStyle(
+                  color: textPrimaryColor,
+                  fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0),
+                ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
               FilledButton.tonal(
                 onPressed: _loadVehicles,
                 child: Text(t('refresh')),
@@ -371,36 +394,43 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     }
 
     if (_vehicles.isEmpty) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isSmallScreen = screenWidth < 360;
+      final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+      
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.directions_car_outlined,
-                size: 64,
+                size: isSmallScreen ? 48.0 : (isMediumScreen ? 56.0 : 64.0),
                 color: _isDarkMode
                     ? Colors.white.withOpacity(0.5)
                     : textSecondaryColor,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
               Text(
                 t('noVehicles'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: textPrimaryColor,
-                  fontSize: 16,
+                  fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: isSmallScreen ? 18.0 : 24.0),
               FilledButton.icon(
                 onPressed: _showAddVehicleDialog,
-                icon: const Icon(Icons.add),
+                icon: Icon(Icons.add, size: isSmallScreen ? 18.0 : 20.0),
                 label: Text(t('addVehicle')),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFFF57C00),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0), 
+                    vertical: isSmallScreen ? 10.0 : 12.0
+                  ),
                 ),
               ),
             ],
@@ -409,13 +439,19 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
+    final double cardPadding = isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0);
+    
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(basePadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(cardPadding),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -441,18 +477,18 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
                   decoration: BoxDecoration(
                     color: Colors.orange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.directions_car_rounded,
                     color: Colors.orange,
-                    size: 28,
+                    size: isSmallScreen ? 22.0 : (isMediumScreen ? 25.0 : 28.0),
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -461,17 +497,17 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                         t('title'),
                         style: TextStyle(
                           color: textPrimaryColor,
-                          fontSize: 22,
+                          fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                       Text(
                         t('subtitle'),
                         style: TextStyle(
                           color: textSecondaryColor,
-                          fontSize: 14,
+                          fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -481,18 +517,18 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
-          _buildVehicleSelector(),
-          const SizedBox(height: 20),
-          if (_selectedVehicle != null) _buildVehicleInfoCard(_selectedVehicle!),
-          const SizedBox(height: 20),
-          _buildSeatMap(),
+          SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
+          _buildVehicleSelector(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+          SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
+          if (_selectedVehicle != null) _buildVehicleInfoCard(_selectedVehicle!, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+          SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
+          _buildSeatMap(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
         ],
       ),
     );
   }
 
-  Widget _buildVehicleSelector() {
+  Widget _buildVehicleSelector({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final cardColor = _isDarkMode
         ? const Color(0xFF1C2541)
         : const Color(0xFFFAFBFC);
@@ -501,10 +537,10 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
         : const Color(0xFF1E3A5F);
     
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         border: Border.all(
           color: _isDarkMode
               ? Colors.white.withOpacity(0.1)
@@ -525,38 +561,41 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                 decoration: BoxDecoration(
                   color: Colors.orange.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.list_alt_rounded,
                   color: Colors.orange,
-                  size: 20,
+                  size: isSmallScreen ? 18.0 : 20.0,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
               Text(
                 t('vehicles'),
                 style: TextStyle(
                   color: textPrimaryColor,
-                  fontSize: 18,
+                  fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isSmallScreen ? 12.0 : 16.0),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 12.0 : 16.0, 
+              vertical: isSmallScreen ? 12.0 : 16.0
+            ),
             decoration: BoxDecoration(
               color: _isDarkMode
                   ? Colors.white.withOpacity(0.05)
                   : Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
               border: Border.all(
                 color: _isDarkMode
                     ? Colors.white.withOpacity(0.1)
@@ -568,15 +607,15 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                 Icon(
                   Icons.directions_car_rounded,
                   color: Colors.orange,
-                  size: 20,
+                  size: isSmallScreen ? 18.0 : 20.0,
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: isSmallScreen ? 10.0 : 12.0),
                 Expanded(
                   child: Text(
                     '${t('plate')}: ${_selectedVehicle?['plateno'] ?? t('unknown')}',
                     style: TextStyle(
                       color: textPrimaryColor,
-                      fontSize: 16,
+                      fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                       fontWeight: FontWeight.w600,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -590,7 +629,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     );
   }
 
-  Widget _buildVehicleInfoCard(Map<String, dynamic> vehicle) {
+  Widget _buildVehicleInfoCard(Map<String, dynamic> vehicle, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final cardColor = _isDarkMode
         ? const Color(0xFF1C2541)
         : const Color(0xFFFAFBFC);
@@ -600,10 +639,10 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         border: Border.all(
           color: _isDarkMode
               ? Colors.white.withOpacity(0.1)
@@ -624,7 +663,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -632,38 +671,38 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                       Colors.orange.withOpacity(0.1),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.info_outline_rounded,
                   color: Colors.orange,
-                  size: 24,
+                  size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
               Text(
                 t('vehicleInfo'),
                 style: TextStyle(
                   color: textPrimaryColor,
-                  fontSize: 20,
+                  fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          _buildInfoRow(Icons.directions_car_rounded, t('plate'), vehicle['plateno'] ?? t('unknown')),
-          const SizedBox(height: 12),
-          _buildInfoRow(Icons.event_seat_rounded, t('seats'), vehicle['seatnum']?.toString() ?? '--'),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
+          _buildInfoRow(Icons.directions_car_rounded, t('plate'), vehicle['plateno'] ?? t('unknown'), isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+          SizedBox(height: isSmallScreen ? 10.0 : 12.0),
+          _buildInfoRow(Icons.event_seat_rounded, t('seats'), vehicle['seatnum']?.toString() ?? '--', isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+          SizedBox(height: isSmallScreen ? 10.0 : 12.0),
           _buildInfoRow(Icons.alt_route_rounded, t('line'), _isArabic
               ? (vehicle['line']?['name_ar']?.toString() ?? vehicle['line']?['linename']?.toString() ?? vehicle['line']?['name_en']?.toString() ?? t('unknown'))
-              : (vehicle['line']?['name_en']?.toString() ?? vehicle['line']?['linename']?.toString() ?? vehicle['line']?['name_ar']?.toString() ?? t('unknown'))),
+              : (vehicle['line']?['name_en']?.toString() ?? vehicle['line']?['linename']?.toString() ?? vehicle['line']?['name_ar']?.toString() ?? t('unknown')), isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
           if (_upcomingTrip != null) ...[
-            const SizedBox(height: 20),
+            SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -673,7 +712,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                     Colors.orange.withOpacity(0.05),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                 border: Border.all(
                   color: Colors.orange.withOpacity(0.3),
                   width: 1,
@@ -687,24 +726,26 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                       Icon(
                         Icons.schedule_rounded,
                         color: Colors.orange,
-                        size: 20,
+                        size: isSmallScreen ? 18.0 : 20.0,
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                       Text(
                         t('upcomingTrip'),
                         style: TextStyle(
                           color: textPrimaryColor,
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: isSmallScreen ? 10.0 : 12.0),
                   _buildInfoRow(
                     Icons.access_time_rounded,
                     t('departure'),
                     _formatDateTime(_upcomingTrip?['deptime']),
+                    isSmallScreen: isSmallScreen,
+                    isMediumScreen: isMediumScreen,
                   ),
                 ],
               ),
@@ -715,7 +756,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     );
   }
 
-  Widget _buildSeatMap() {
+  Widget _buildSeatMap({bool isSmallScreen = false, bool isMediumScreen = false}) {
     if (_isLoadingSeatMap) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -741,12 +782,12 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
           decoration: BoxDecoration(
             color: _isDarkMode
                 ? Colors.white.withOpacity(0.05)
                 : Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
             border: Border.all(
               color: _isDarkMode
                   ? Colors.white.withOpacity(0.1)
@@ -758,9 +799,9 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
               Icon(
                 Icons.info_outline_rounded,
                 color: Colors.orange,
-                size: 20,
+                size: isSmallScreen ? 18.0 : 20.0,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
               Expanded(
                 child: Text(
                   t('tapSeat'),
@@ -768,7 +809,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                     color: _isDarkMode
                         ? Colors.white.withOpacity(0.9)
                         : textSecondaryColor,
-                    fontSize: 14,
+                    fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -776,10 +817,10 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
@@ -794,7 +835,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                       Colors.white,
                     ],
             ),
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 20.0 : 24.0),
             border: Border.all(
               color: _isDarkMode
                   ? Colors.white.withOpacity(0.2)
@@ -812,22 +853,22 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
           ),
           child: Column(
             children: [
-              _buildFrontRow(),
-              const SizedBox(height: 20),
+              _buildFrontRow(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+              SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
               if (is4Plus1)
-                _buildBackRow4Plus1()
+                _buildBackRow4Plus1(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen)
               else
-                _buildBackRows7Plus1(),
+                _buildBackRows7Plus1(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        _buildLegend(),
+        SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+        _buildLegend(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
       ],
     );
   }
 
-  Widget _buildFrontRow() {
+  Widget _buildFrontRow({bool isSmallScreen = false, bool isMediumScreen = false}) {
     Map<String, dynamic>? seat1;
     Map<String, dynamic>? seat2;
     
@@ -843,19 +884,19 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (seat1 != null)
-          _buildSeatWidget(seat1, isDriver: true)
+          _buildSeatWidget(seat1, isDriver: true, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen)
         else
-          _buildEmptySeat(),
-        const SizedBox(width: 40),
+          _buildEmptySeat(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+        SizedBox(width: isSmallScreen ? 30.0 : (isMediumScreen ? 35.0 : 40.0)),
         if (seat2 != null)
-          _buildSeatWidget(seat2, isDriver: false)
+          _buildSeatWidget(seat2, isDriver: false, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen)
         else
-          _buildEmptySeat(),
+          _buildEmptySeat(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
       ],
     );
   }
 
-  Widget _buildBackRow4Plus1() {
+  Widget _buildBackRow4Plus1({bool isSmallScreen = false, bool isMediumScreen = false}) {
     List<Map<String, dynamic>> backSeats = [];
     
     for (var row in _seatRows) {
@@ -876,16 +917,16 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (backSeats.length >= 1) _buildSeatWidget(backSeats[0], isDriver: false) else _buildEmptySeat(),
-        const SizedBox(width: 12),
-        if (backSeats.length >= 2) _buildSeatWidget(backSeats[1], isDriver: false) else _buildEmptySeat(),
-        const SizedBox(width: 12),
-        if (backSeats.length >= 3) _buildSeatWidget(backSeats[2], isDriver: false) else _buildEmptySeat(),
+        if (backSeats.length >= 1) _buildSeatWidget(backSeats[0], isDriver: false, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen) else _buildEmptySeat(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+        SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+        if (backSeats.length >= 2) _buildSeatWidget(backSeats[1], isDriver: false, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen) else _buildEmptySeat(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+        SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+        if (backSeats.length >= 3) _buildSeatWidget(backSeats[2], isDriver: false, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen) else _buildEmptySeat(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
       ],
     );
   }
 
-  Widget _buildBackRows7Plus1() {
+  Widget _buildBackRows7Plus1({bool isSmallScreen = false, bool isMediumScreen = false}) {
     List<Map<String, dynamic>> firstRow = [];
     List<Map<String, dynamic>> secondRow = [];
     
@@ -917,29 +958,29 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (firstRow.length >= 1) _buildSeatWidget(firstRow[0], isDriver: false) else _buildEmptySeat(),
-            const SizedBox(width: 12),
-            if (firstRow.length >= 2) _buildSeatWidget(firstRow[1], isDriver: false) else _buildEmptySeat(),
-            const SizedBox(width: 12),
-            if (firstRow.length >= 3) _buildSeatWidget(firstRow[2], isDriver: false) else _buildEmptySeat(),
+            if (firstRow.length >= 1) _buildSeatWidget(firstRow[0], isDriver: false, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen) else _buildEmptySeat(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+            if (firstRow.length >= 2) _buildSeatWidget(firstRow[1], isDriver: false, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen) else _buildEmptySeat(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+            if (firstRow.length >= 3) _buildSeatWidget(firstRow[2], isDriver: false, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen) else _buildEmptySeat(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: isSmallScreen ? 12.0 : 16.0),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (secondRow.length >= 1) _buildSeatWidget(secondRow[0], isDriver: false) else _buildEmptySeat(),
-            const SizedBox(width: 12),
-            if (secondRow.length >= 2) _buildSeatWidget(secondRow[1], isDriver: false) else _buildEmptySeat(),
-            const SizedBox(width: 12),
-            if (secondRow.length >= 3) _buildSeatWidget(secondRow[2], isDriver: false) else _buildEmptySeat(),
+            if (secondRow.length >= 1) _buildSeatWidget(secondRow[0], isDriver: false, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen) else _buildEmptySeat(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+            if (secondRow.length >= 2) _buildSeatWidget(secondRow[1], isDriver: false, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen) else _buildEmptySeat(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+            if (secondRow.length >= 3) _buildSeatWidget(secondRow[2], isDriver: false, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen) else _buildEmptySeat(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildSeatWidget(Map<String, dynamic> seat, {required bool isDriver}) {
+  Widget _buildSeatWidget(Map<String, dynamic> seat, {required bool isDriver, bool isSmallScreen = false, bool isMediumScreen = false}) {
     final status = (seat['status']?.toString() ?? 'available').toLowerCase();
     final seatNumber = seat['number']?.toString() ?? '--';
     final seatId = seat['id']?.toString() ?? '';
@@ -956,27 +997,33 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       seatColor = const Color(0xFF2C2C2C); // Dark gray instead of pure black
       textColor = Colors.white;
       seatIcon = Icons.block;
-    } else if (status == 'reserved') {
-      seatColor = const Color(0xFFE53935); // Bright red - more visible
-      textColor = Colors.white;
-      seatIcon = Icons.event_seat;
     } else {
       seatColor = const Color(0xFF4CAF50); // Bright green - more visible
       textColor = Colors.white;
       seatIcon = Icons.event_seat;
     }
 
+    final seatSize = isDriver 
+        ? (isSmallScreen ? 60.0 : (isMediumScreen ? 68.0 : 75.0))
+        : (isSmallScreen ? 52.0 : (isMediumScreen ? 59.0 : 65.0));
+    final iconSize = isDriver
+        ? (isSmallScreen ? 22.0 : (isMediumScreen ? 25.0 : 28.0))
+        : (isSmallScreen ? 18.0 : (isMediumScreen ? 21.0 : 24.0));
+    final fontSize = isDriver
+        ? (isSmallScreen ? 8.0 : (isMediumScreen ? 9.0 : 10.0))
+        : (isSmallScreen ? 10.0 : (isMediumScreen ? 11.0 : 12.0));
+    
     return GestureDetector(
       onTap: () => _toggleSeatStatus(seatId, status),
       child: Container(
-        width: isDriver ? 75 : 65,
-        height: isDriver ? 75 : 65,
+        width: seatSize,
+        height: seatSize,
         decoration: BoxDecoration(
           color: seatColor,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
           border: Border.all(
             color: Colors.white.withOpacity(0.4),
-            width: 2.5,
+            width: isSmallScreen ? 2.0 : 2.5,
           ),
           boxShadow: [
             BoxShadow(
@@ -999,15 +1046,15 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
             Icon(
               seatIcon,
               color: textColor,
-              size: isDriver ? 28 : 24,
+              size: iconSize,
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: isSmallScreen ? 2.0 : 4.0),
             Text(
               isDriver ? (_isArabic ? 'سائق' : 'Driver') : seatNumber,
               style: TextStyle(
                 color: textColor,
                 fontWeight: FontWeight.bold,
-                fontSize: isDriver ? 10 : 12,
+                fontSize: fontSize,
               ),
             ),
           ],
@@ -1016,13 +1063,14 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     );
   }
 
-  Widget _buildEmptySeat() {
+  Widget _buildEmptySeat({bool isSmallScreen = false, bool isMediumScreen = false}) {
+    final size = isSmallScreen ? 48.0 : (isMediumScreen ? 54.0 : 60.0);
     return Container(
-      width: 60,
-      height: 60,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
         border: Border.all(
           color: Colors.white.withOpacity(0.1),
           width: 1,
@@ -1032,7 +1080,7 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     );
   }
 
-  Widget _buildLegend() {
+  Widget _buildLegend({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final textPrimaryColor = _isDarkMode
         ? Colors.white
         : const Color(0xFF1E3A5F);
@@ -1045,10 +1093,13 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
     
     Widget legendItem(Color color, String label) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 10.0 : 12.0, 
+          vertical: isSmallScreen ? 6.0 : 8.0
+        ),
         decoration: BoxDecoration(
           color: legendBgColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
           border: Border.all(
             color: legendBorderColor,
             width: 1,
@@ -1058,11 +1109,11 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 20,
-              height: 20,
+              width: isSmallScreen ? 16.0 : 20.0,
+              height: isSmallScreen ? 16.0 : 20.0,
               decoration: BoxDecoration(
                 color: color,
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(isSmallScreen ? 5.0 : 6.0),
                 border: Border.all(
                   color: _isDarkMode
                       ? Colors.white.withOpacity(0.4)
@@ -1078,13 +1129,13 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: isSmallScreen ? 8.0 : 10.0),
             Text(
               label,
               style: TextStyle(
                 color: textPrimaryColor,
                 fontWeight: FontWeight.w600,
-                fontSize: 14,
+                fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
               ),
             ),
           ],
@@ -1097,13 +1148,12 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       runSpacing: 12,
       children: [
         legendItem(const Color(0xFF4CAF50), t('legendAvailable')),
-        legendItem(const Color(0xFFE53935), t('legendReserved')),
         legendItem(const Color(0xFF2C2C2C), t('legendBroken')),
       ],
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(IconData icon, String label, String value, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final textPrimaryColor = _isDarkMode
         ? Colors.white
         : const Color(0xFF1E3A5F);
@@ -1112,12 +1162,12 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
         : const Color(0xFF546E7A);
     
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(isSmallScreen ? 10.0 : (isMediumScreen ? 12.0 : 14.0)),
       decoration: BoxDecoration(
         color: _isDarkMode
             ? Colors.white.withOpacity(0.05)
             : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
         border: Border.all(
           color: _isDarkMode
               ? Colors.white.withOpacity(0.1)
@@ -1128,18 +1178,18 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
             decoration: BoxDecoration(
               color: Colors.orange.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
             ),
             child: Icon(
               icon,
               color: Colors.orange,
-              size: 20,
+              size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
             ),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: isSmallScreen ? 12.0 : 14.0),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1148,17 +1198,17 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                   label,
                   style: TextStyle(
                     color: textSecondaryColor,
-                    fontSize: 12,
+                    fontSize: isSmallScreen ? 11.0 : 12.0,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: isSmallScreen ? 3.0 : 4.0),
                 Text(
                   value,
                   style: TextStyle(
                     color: textPrimaryColor,
                     fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                    fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                   ),
                 ),
               ],
@@ -1185,6 +1235,9 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
   Future<void> _showAddVehicleDialog() async {
     final plateController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
 
     await showDialog(
       context: context,
@@ -1196,7 +1249,10 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
             backgroundColor: const Color(0xFF0B132B),
             title: Text(
               t('addVehicleTitle'),
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+              ),
             ),
             content: Form(
               key: formKey,
@@ -1206,12 +1262,21 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                   children: [
                     TextFormField(
                       controller: plateController,
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isSmallScreen ? 14.0 : 16.0,
+                      ),
                       decoration: InputDecoration(
                         labelText: t('plateNumber'),
                         hintText: t('plateHint'),
-                        labelStyle: const TextStyle(color: Colors.white), // نص أبيض على خلفية غامقة
-                        hintStyle: const TextStyle(color: Colors.white70),
+                        labelStyle: TextStyle(
+                          color: Colors.white,
+                          fontSize: isSmallScreen ? 13.0 : 14.0,
+                        ),
+                        hintStyle: TextStyle(
+                          color: Colors.white70,
+                          fontSize: isSmallScreen ? 13.0 : 14.0,
+                        ),
                         enabledBorder: const UnderlineInputBorder(
                           borderSide: BorderSide(color: Colors.white38),
                         ),
@@ -1230,19 +1295,23 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 24.0)),
                     Text(
                       t('seatLayout'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
+                        fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: isSmallScreen ? 10.0 : 12.0),
                     RadioListTile<String>(
                       title: Text(
                         t('seatLayout4'),
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isSmallScreen ? 13.0 : 14.0,
+                        ),
                       ),
                       value: '4+1',
                       groupValue: selectedLayout,
@@ -1252,11 +1321,18 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                         });
                       },
                       activeColor: const Color(0xFFF57C00),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 8.0 : 16.0,
+                        vertical: isSmallScreen ? 4.0 : 8.0,
+                      ),
                     ),
                     RadioListTile<String>(
                       title: Text(
                         t('seatLayout7'),
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isSmallScreen ? 13.0 : 14.0,
+                        ),
                       ),
                       value: '7+1',
                       groupValue: selectedLayout,
@@ -1266,15 +1342,23 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                         });
                       },
                       activeColor: const Color(0xFFF57C00),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 8.0 : 16.0,
+                        vertical: isSmallScreen ? 4.0 : 8.0,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
+            actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text(t('cancel')),
+                child: Text(
+                  t('cancel'),
+                  style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                ),
               ),
               FilledButton(
                 onPressed: () async {
@@ -1288,8 +1372,15 @@ class _DriverVehiclePageState extends State<DriverVehiclePage> {
                 },
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFFF57C00),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSmallScreen ? 16.0 : 20.0,
+                    vertical: isSmallScreen ? 10.0 : 12.0,
+                  ),
                 ),
-                child: Text(t('create')),
+                child: Text(
+                  t('create'),
+                  style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                ),
               ),
             ],
           );

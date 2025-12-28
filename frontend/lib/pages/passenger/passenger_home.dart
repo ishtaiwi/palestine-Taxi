@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
 import '../../config/app_config.dart';
 import '../../screens/auth/login_page.dart';
@@ -24,7 +23,6 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   bool _isLoading = true;
   bool _isArabic = true;
   bool _isDarkMode = false; 
-  String? _profileImagePath; 
   final ImagePicker _imagePicker = ImagePicker();
 
   List<Map<String, dynamic>> _favoriteTrips = [];
@@ -345,7 +343,11 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     return AppBar(
       backgroundColor: _isDarkMode
           ? const Color(0xFF1C2541)
@@ -355,10 +357,10 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       automaticallyImplyLeading: false,
       title: Text(
         t('title'),
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
-          fontSize: 20,
+          fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0),
         ),
       ),
       actions: [
@@ -378,6 +380,31 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Web-specific responsive breakpoints
+    final isWeb = kIsWeb;
+    final isDesktop = isWeb && screenWidth >= 1200;
+    final isTablet = screenWidth >= 600 && screenWidth < 1200;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    
+    // Responsive sizing - enhanced for web
+    final double basePadding = isWeb 
+        ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
+        : (isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0));
+    final double cardPadding = isWeb
+        ? (isDesktop ? 40.0 : (isTablet ? 32.0 : 28.0))
+        : (isSmallScreen ? 20.0 : (isMediumScreen ? 24.0 : 32.0));
+    final double avatarSize = isWeb
+        ? (isDesktop ? 100.0 : (isTablet ? 90.0 : 80.0))
+        : (isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0));
+    final double iconSize = isWeb
+        ? (isDesktop ? 28.0 : 24.0)
+        : (isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0));
+    
+    // Max width for web to prevent content from stretching too wide
+    final double maxContentWidth = isWeb ? 1400.0 : double.infinity;
 
     
     final backgroundColor = _isDarkMode
@@ -398,7 +425,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: backgroundColor,
-        appBar: _buildAppBar(),
+        appBar: _buildAppBar(context),
         body: _isLoading
             ? Center(
                 child: CircularProgressIndicator(
@@ -406,14 +433,17 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                 ),
               )
             : SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(basePadding),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                       
                       Container(
-                        padding: const EdgeInsets.all(32),
+                        padding: EdgeInsets.all(cardPadding),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
@@ -425,7 +455,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                             ],
                             stops: [0.0, 0.5, 1.0],
                           ),
-                          borderRadius: BorderRadius.circular(28),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 20.0 : 28.0),
                           boxShadow: [
                             BoxShadow(
                               color: const Color(0xFF2C5F8D).withAlpha(102),
@@ -453,13 +483,13 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                     children: [
                                       
                                       Container(
-                                        width: 80,
-                                        height: 80,
+                                        width: avatarSize,
+                                        height: avatarSize,
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           border: Border.all(
                                             color: Colors.white,
-                                            width: 3,
+                                            width: isSmallScreen ? 2.0 : 3.0,
                                           ),
                                           boxShadow: [
                                             BoxShadow(
@@ -527,23 +557,23 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                     children: [
                                       Text(
                                         _isArabic ? 'مرحباً بك!' : 'Hello!',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 18,
+                                          fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 18.0),
                                           fontWeight: FontWeight.w600,
                                           letterSpacing: 0.5,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                                       
                                       Row(
                                         children: [
                                           Flexible(
                                             child: Text(
                                               _userData?['fullname'] ?? t('passenger'),
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 color: Colors.white,
-                                                fontSize: 28,
+                                                fontSize: isSmallScreen ? 20.0 : (isMediumScreen ? 24.0 : 28.0),
                                                 fontWeight: FontWeight.bold,
                                                 letterSpacing: 0.3,
                                                 height: 1.2,
@@ -552,11 +582,11 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
-                                          const Icon(
+                                          SizedBox(width: isSmallScreen ? 4.0 : 8.0),
+                                          Icon(
                                             Icons.waving_hand_rounded,
                                             color: Colors.amber,
-                                            size: 28,
+                                            size: isSmallScreen ? 20.0 : (isMediumScreen ? 24.0 : 28.0),
                                           ),
                                         ],
                                       ),
@@ -565,7 +595,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 24),
+                            SizedBox(height: isSmallScreen ? 16.0 : 24.0),
                             
                             Container(
                               height: 1,
@@ -579,31 +609,31 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            SizedBox(height: isSmallScreen ? 16.0 : 24.0),
                             
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(10),
+                                  padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withAlpha(26),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.local_taxi_rounded,
                                     color: Colors.white,
-                                    size: 24,
+                                    size: iconSize,
                                   ),
                                 ),
-                                const SizedBox(width: 14),
+                                SizedBox(width: isSmallScreen ? 10.0 : 14.0),
                                 Expanded(
                                   child: Text(
                                     _isArabic
                                         ? 'رحلتك القادمة على بعد نقرة واحدة'
                                         : 'Your next ride is just a tap away',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: 15,
+                                      fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 15.0),
                                       fontWeight: FontWeight.w500,
                                       letterSpacing: 0.3,
                                       height: 1.4,
@@ -612,7 +642,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 20),
+                            SizedBox(height: isSmallScreen ? 14.0 : 20.0),
                             
                             Row(
                               children: [
@@ -621,14 +651,18 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                     icon: Icons.route_rounded,
                                     label: _isArabic ? 'رحلات متاحة' : 'Available Trips',
                                     value: '24/7',
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                                 Expanded(
                                   child: _buildWelcomeStatCard(
                                     icon: Icons.verified_user_rounded,
                                     label: _isArabic ? 'آمن وموثوق' : 'Safe & Secure',
                                     value: '100%',
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                   ),
                                 ),
                               ],
@@ -636,11 +670,14 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      SizedBox(height: isSmallScreen ? 20.0 : 32.0),
 
                       
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12.0 : 16.0, 
+                          vertical: isSmallScreen ? 10.0 : 12.0
+                        ),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -650,7 +687,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                           ),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                           border: Border.all(
                             color: accentColor.withAlpha(51),
                             width: 1.5,
@@ -659,10 +696,10 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                         child: Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                               decoration: BoxDecoration(
                                 color: accentColor,
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
                                 boxShadow: [
                                   BoxShadow(
                                     color: accentColor.withAlpha(76),
@@ -671,18 +708,18 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                   ),
                                 ],
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.dashboard_rounded,
                                 color: Colors.white,
-                                size: 22,
+                                size: isSmallScreen ? 18.0 : 22.0,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                             Text(
                               t('quickActions'),
                               style: TextStyle(
                                 color: textPrimaryColor,
-                                fontSize: 20,
+                                fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0),
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.5,
                               ),
@@ -690,95 +727,202 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.directions_bus_rounded,
-                              title: t('viewTrips'),
-                              color: const Color(0xFF2196F3),
-                              cardColor: cardColor,
-                              textColor: textPrimaryColor,
-                              isDarkMode: _isDarkMode,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const PassengerTripsPage(),
-                                  ),
-                                );
-                              },
+                      SizedBox(height: isSmallScreen ? 14.0 : 20.0),
+                      // Use Grid for web, Rows for mobile
+                      isWeb && (isDesktop || isTablet)
+                          ? GridView.count(
+                              crossAxisCount: isDesktop ? 4 : 2,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              crossAxisSpacing: 16.0,
+                              mainAxisSpacing: 16.0,
+                              childAspectRatio: isDesktop ? 1.1 : 1.0,
+                              children: [
+                                _buildActionCard(
+                                  icon: Icons.directions_bus_rounded,
+                                  title: t('viewTrips'),
+                                  color: const Color(0xFF2196F3),
+                                  cardColor: cardColor,
+                                  textColor: textPrimaryColor,
+                                  isDarkMode: _isDarkMode,
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
+                                  isWeb: isWeb,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const PassengerTripsPage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                _buildActionCard(
+                                  icon: Icons.book_online_rounded,
+                                  title: t('myReservations'),
+                                  color: const Color(0xFF4CAF50),
+                                  cardColor: cardColor,
+                                  textColor: textPrimaryColor,
+                                  isDarkMode: _isDarkMode,
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
+                                  isWeb: isWeb,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const PassengerReservationsPage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                _buildActionCard(
+                                  icon: Icons.account_balance_wallet_rounded,
+                                  title: t('myWallet'),
+                                  color: const Color(0xFFFF9800),
+                                  cardColor: cardColor,
+                                  textColor: textPrimaryColor,
+                                  isDarkMode: _isDarkMode,
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
+                                  isWeb: isWeb,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const PassengerWalletPage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                _buildActionCard(
+                                  icon: Icons.person_rounded,
+                                  title: t('profile'),
+                                  color: const Color(0xFF9C27B0),
+                                  cardColor: cardColor,
+                                  textColor: textPrimaryColor,
+                                  isDarkMode: _isDarkMode,
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
+                                  isWeb: isWeb,
+                                  onTap: () {
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const PassengerProfilePage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            )
+                          : Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildActionCard(
+                                        icon: Icons.directions_bus_rounded,
+                                        title: t('viewTrips'),
+                                        color: const Color(0xFF2196F3),
+                                        cardColor: cardColor,
+                                        textColor: textPrimaryColor,
+                                        isDarkMode: _isDarkMode,
+                                        isSmallScreen: isSmallScreen,
+                                        isMediumScreen: isMediumScreen,
+                                        isWeb: isWeb,
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => const PassengerTripsPage(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    SizedBox(width: isSmallScreen ? 10.0 : 14.0),
+                                    Expanded(
+                                      child: _buildActionCard(
+                                        icon: Icons.book_online_rounded,
+                                        title: t('myReservations'),
+                                        color: const Color(0xFF4CAF50),
+                                        cardColor: cardColor,
+                                        textColor: textPrimaryColor,
+                                        isDarkMode: _isDarkMode,
+                                        isSmallScreen: isSmallScreen,
+                                        isMediumScreen: isMediumScreen,
+                                        isWeb: isWeb,
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => const PassengerReservationsPage(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: isSmallScreen ? 10.0 : 14.0),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildActionCard(
+                                        icon: Icons.account_balance_wallet_rounded,
+                                        title: t('myWallet'),
+                                        color: const Color(0xFFFF9800),
+                                        cardColor: cardColor,
+                                        textColor: textPrimaryColor,
+                                        isDarkMode: _isDarkMode,
+                                        isSmallScreen: isSmallScreen,
+                                        isMediumScreen: isMediumScreen,
+                                        isWeb: isWeb,
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => const PassengerWalletPage(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    SizedBox(width: isSmallScreen ? 10.0 : 14.0),
+                                    Expanded(
+                                      child: _buildActionCard(
+                                        icon: Icons.person_rounded,
+                                        title: t('profile'),
+                                        color: const Color(0xFF9C27B0),
+                                        cardColor: cardColor,
+                                        textColor: textPrimaryColor,
+                                        isDarkMode: _isDarkMode,
+                                        isSmallScreen: isSmallScreen,
+                                        isMediumScreen: isMediumScreen,
+                                        isWeb: isWeb,
+                                        onTap: () {
+                                          Navigator.pushReplacement(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => const PassengerProfilePage(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.book_online_rounded,
-                              title: t('myReservations'),
-                              color: const Color(0xFF4CAF50),
-                              cardColor: cardColor,
-                              textColor: textPrimaryColor,
-                              isDarkMode: _isDarkMode,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const PassengerReservationsPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.account_balance_wallet_rounded,
-                              title: t('myWallet'),
-                              color: const Color(0xFFFF9800),
-                              cardColor: cardColor,
-                              textColor: textPrimaryColor,
-                              isDarkMode: _isDarkMode,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const PassengerWalletPage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.person_rounded,
-                              title: t('profile'),
-                              color: const Color(0xFF9C27B0),
-                              cardColor: cardColor,
-                              textColor: textPrimaryColor,
-                              isDarkMode: _isDarkMode,
-                              onTap: () {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const PassengerProfilePage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
+                      SizedBox(height: isSmallScreen ? 20.0 : 32.0),
 
                       
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12.0 : 16.0, 
+                          vertical: isSmallScreen ? 10.0 : 12.0
+                        ),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -788,7 +932,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                           ),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                           border: Border.all(
                             color: const Color(0xFFE91E63).withAlpha(51),
                             width: 1.5,
@@ -797,10 +941,10 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                         child: Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFE91E63),
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
                                 boxShadow: [
                                   BoxShadow(
                                     color: const Color(0xFFE91E63).withAlpha(76),
@@ -809,18 +953,18 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                   ),
                                 ],
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.favorite_rounded,
                                 color: Colors.white,
-                                size: 22,
+                                size: isSmallScreen ? 18.0 : 22.0,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                             Text(
                               t('favoriteTrips'),
                               style: TextStyle(
                                 color: textPrimaryColor,
-                                fontSize: 20,
+                                fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0),
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.5,
                               ),
@@ -828,13 +972,13 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      SizedBox(height: isSmallScreen ? 14.0 : 20.0),
                       if (_favoriteTrips.isEmpty)
                         Container(
-                          padding: const EdgeInsets.all(24),
+                          padding: EdgeInsets.all(isWeb ? (isDesktop ? 32.0 : 24.0) : (isSmallScreen ? 16.0 : 24.0)),
                           decoration: BoxDecoration(
                             color: cardColor,
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(isWeb ? (isDesktop ? 20.0 : 18.0) : (isSmallScreen ? 16.0 : 20.0)),
                             border: Border.all(
                               color: _isDarkMode
                                   ? Colors.white.withAlpha(38)
@@ -853,15 +997,15 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               Icon(
                                 Icons.favorite_border_rounded,
                                 color: textSecondaryColor,
-                                size: 28,
+                                size: isWeb ? (isDesktop ? 32.0 : 28.0) : (isSmallScreen ? 22.0 : 28.0),
                               ),
-                              const SizedBox(width: 16),
+                              SizedBox(width: isWeb ? (isDesktop ? 20.0 : 16.0) : (isSmallScreen ? 12.0 : 16.0)),
                               Expanded(
                                 child: Text(
                                   t('noFavorites'),
                                   style: TextStyle(
                                     color: textSecondaryColor,
-                                    fontSize: 15,
+                                    fontSize: isWeb ? (isDesktop ? 18.0 : 16.0) : (isSmallScreen ? 13.0 : 15.0),
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -870,12 +1014,21 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                           ),
                         )
                       else
-                        Column(
-                          children: _favoriteTrips
-                              .map(
-                                (trip) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 14),
-                                  child: _buildFavoriteTripCard(
+                        isWeb && (isDesktop || isTablet)
+                            ? GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: isDesktop ? 3 : 2,
+                                  crossAxisSpacing: 16.0,
+                                  mainAxisSpacing: 16.0,
+                                  childAspectRatio: isDesktop ? 1.1 : 1.0,
+                                ),
+                                itemCount: _favoriteTrips.length,
+                                itemBuilder: (context, index) {
+                                  final trip = _favoriteTrips[index];
+                                  return _buildFavoriteTripCard(
+                                    context: context,
                                     from: _isArabic
                                         ? trip['fromAr'] as String
                                         : trip['fromEn'] as String,
@@ -891,19 +1044,50 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                     textColor: textPrimaryColor,
                                     textSecondaryColor: textSecondaryColor,
                                     isDarkMode: _isDarkMode,
-                                  ),
-                                ),
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
+                                    isWeb: isWeb,
+                                  );
+                                },
                               )
-                              .toList(),
-                        ),
-                      const SizedBox(height: 28),
+                            : Column(
+                                children: _favoriteTrips
+                                    .map(
+                                      (trip) => Padding(
+                                        padding: EdgeInsets.only(bottom: isSmallScreen ? 10.0 : 14.0),
+                                        child: _buildFavoriteTripCard(
+                                          context: context,
+                                          from: _isArabic
+                                              ? trip['fromAr'] as String
+                                              : trip['fromEn'] as String,
+                                          to: _isArabic
+                                              ? trip['toAr'] as String
+                                              : trip['toEn'] as String,
+                                          line: trip['line'] as String,
+                                          lastBooked: _isArabic
+                                              ? trip['lastBookedAr'] as String
+                                              : trip['lastBookedEn'] as String,
+                                          accentColor: trip['color'] as Color? ?? Colors.blue,
+                                          cardColor: cardColor,
+                                          textColor: textPrimaryColor,
+                                          textSecondaryColor: textSecondaryColor,
+                                          isDarkMode: _isDarkMode,
+                                          isSmallScreen: isSmallScreen,
+                                          isMediumScreen: isMediumScreen,
+                                          isWeb: isWeb,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                      SizedBox(height: isSmallScreen ? 20.0 : 28.0),
 
                       
                       Container(
-                        padding: const EdgeInsets.all(24),
+                        padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
                         decoration: BoxDecoration(
                           color: cardColor,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
                           border: Border.all(
                             color: _isDarkMode
                                 ? Colors.white.withAlpha(38)
@@ -924,30 +1108,30 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(10),
+                                  padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
                                   decoration: BoxDecoration(
                                     color: accentColor.withAlpha(51),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                                   ),
                                   child: Icon(
                                     Icons.person_outline_rounded,
                                     color: accentColor,
-                                    size: 24,
+                                    size: iconSize,
                                   ),
                                 ),
-                                const SizedBox(width: 14),
+                                SizedBox(width: isSmallScreen ? 10.0 : 14.0),
                                 Text(
                                   t('accountInfo'),
                                   style: TextStyle(
                                     color: textPrimaryColor,
-                                    fontSize: 20,
+                                    fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0),
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 0.5,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 20),
+                            SizedBox(height: isSmallScreen ? 14.0 : 20.0),
                             _buildInfoRow(
                               Icons.email_outlined,
                               t('email'),
@@ -957,8 +1141,10 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               textSecondaryColor,
                               cardColor,
                               _isDarkMode,
+                              isSmallScreen: isSmallScreen,
+                              isMediumScreen: isMediumScreen,
                             ),
-                            const SizedBox(height: 14),
+                            SizedBox(height: isSmallScreen ? 10.0 : 14.0),
                             _buildInfoRow(
                               Icons.phone_outlined,
                               t('phone'),
@@ -968,8 +1154,10 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               textSecondaryColor,
                               cardColor,
                               _isDarkMode,
+                              isSmallScreen: isSmallScreen,
+                              isMediumScreen: isMediumScreen,
                             ),
-                            const SizedBox(height: 14),
+                            SizedBox(height: isSmallScreen ? 10.0 : 14.0),
                             _buildInfoRow(
                               Icons.badge_outlined,
                               t('role'),
@@ -979,11 +1167,15 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                               textSecondaryColor,
                               cardColor,
                               _isDarkMode,
+                              isSmallScreen: isSmallScreen,
+                              isMediumScreen: isMediumScreen,
                             ),
                           ],
                         ),
                       ),
                     ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1010,16 +1202,23 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     required Color textColor,
     required bool isDarkMode,
     required VoidCallback onTap,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+    bool isWeb = false,
   }) {
     
     final Color lightShade = Color.lerp(color, Colors.white, 0.15)!;
     final Color darkShade = Color.lerp(color, Colors.black, 0.2)!;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 22),
+    Widget cardContent = Container(
+        padding: EdgeInsets.symmetric(
+          vertical: isWeb 
+              ? (isSmallScreen ? 24.0 : 32.0)
+              : (isSmallScreen ? 20.0 : (isMediumScreen ? 26.0 : 32.0)), 
+          horizontal: isWeb 
+              ? (isSmallScreen ? 18.0 : 24.0)
+              : (isSmallScreen ? 14.0 : (isMediumScreen ? 18.0 : 22.0))
+        ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -1031,7 +1230,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
             end: Alignment.bottomRight,
             stops: const [0.0, 0.5, 1.0],
           ),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 18.0 : 24.0),
           boxShadow: [
             
             BoxShadow(
@@ -1060,13 +1259,15 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
           children: [
             
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isWeb 
+                  ? (isSmallScreen ? 20.0 : 24.0)
+                  : (isSmallScreen ? 14.0 : (isMediumScreen ? 17.0 : 20.0))),
               decoration: BoxDecoration(
                 color: Colors.white.withAlpha(64),
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: Colors.white.withAlpha(102),
-                  width: 2.5,
+                  width: isSmallScreen ? 2.0 : 2.5,
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -1076,15 +1277,21 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                   ),
                 ],
               ),
-              child: Icon(icon, color: Colors.white, size: 38),
+              child: Icon(icon, color: Colors.white, size: isWeb 
+                  ? (isSmallScreen ? 38.0 : 44.0)
+                  : (isSmallScreen ? 28.0 : (isMediumScreen ? 33.0 : 38.0))),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: isWeb 
+                ? (isSmallScreen ? 15.0 : 20.0)
+                : (isSmallScreen ? 12.0 : (isMediumScreen ? 15.0 : 18.0))),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
-                fontSize: 15.5,
+                fontSize: isWeb 
+                    ? (isSmallScreen ? 15.5 : 17.0)
+                    : (isSmallScreen ? 12.0 : (isMediumScreen ? 13.5 : 15.5)),
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
                 height: 1.3,
@@ -1104,8 +1311,27 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
             ),
           ],
         ),
-      ),
+      );
+
+    // Wrap with hover effects for web
+    Widget interactiveCard = InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(isSmallScreen ? 18.0 : 24.0),
+      child: cardContent,
     );
+
+    if (isWeb) {
+      return MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: interactiveCard,
+        ),
+      );
+    }
+
+    return interactiveCard;
   }
 
   Widget _buildInfoRow(
@@ -1116,15 +1342,17 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     Color textPrimaryColor,
     Color textSecondaryColor,
     Color cardColor,
-    bool isDarkMode,
-  ) {
+    bool isDarkMode, {
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       decoration: BoxDecoration(
         color: isDarkMode
             ? Colors.white.withAlpha(13)
             : const Color(0xFFF8F9FA),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 14.0),
         border: Border.all(
           color: isDarkMode
               ? Colors.white.withAlpha(25)
@@ -1135,14 +1363,18 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
             decoration: BoxDecoration(
               color: accentColor.withAlpha(38),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
             ),
-            child: Icon(icon, color: accentColor, size: 22),
+            child: Icon(
+              icon, 
+              color: accentColor, 
+              size: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0)
+            ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: isSmallScreen ? 12.0 : 16.0),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1151,17 +1383,17 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                   label,
                   style: TextStyle(
                     color: textSecondaryColor,
-                    fontSize: 13,
+                    fontSize: isSmallScreen ? 11.0 : 13.0,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.2,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: isSmallScreen ? 4.0 : 6.0),
                 Text(
                   value,
                   style: TextStyle(
                     color: textPrimaryColor,
-                    fontSize: 16,
+                    fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.3,
                   ),
@@ -1175,6 +1407,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   }
 
   Widget _buildFavoriteTripCard({
+    required BuildContext context,
     required String from,
     required String to,
     required String line,
@@ -1184,17 +1417,26 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     required Color textColor,
     required Color textSecondaryColor,
     required bool isDarkMode,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+    bool isWeb = false,
   }) {
     final isRtl = _isArabic;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = isWeb && screenWidth >= 1200;
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: EdgeInsets.all(isWeb 
+          ? (isDesktop ? 28.0 : 24.0)
+          : (isSmallScreen ? 16.0 : (isMediumScreen ? 19.0 : 22.0))),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isWeb 
+            ? (isDesktop ? 24.0 : 20.0)
+            : (isSmallScreen ? 16.0 : 20.0)),
         border: Border.all(
           color: accentColor.withAlpha(102),
-          width: 2,
+          width: isSmallScreen ? 1.5 : 2.0,
         ),
         boxShadow: [
           BoxShadow(
@@ -1216,7 +1458,10 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 12.0 : 16.0, 
+                  vertical: isSmallScreen ? 7.0 : 9.0
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
@@ -1224,7 +1469,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                       accentColor.withAlpha(51),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 20.0 : 25.0),
                   border: Border.all(
                     color: accentColor.withAlpha(128),
                     width: 1.5,
@@ -1236,15 +1481,15 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                     Icon(
                       Icons.route_rounded,
                       color: accentColor,
-                      size: 16,
+                      size: isSmallScreen ? 14.0 : 16.0,
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                     Text(
                       line,
                       style: TextStyle(
                         color: accentColor,
                         fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                        fontSize: isSmallScreen ? 11.0 : 13.0,
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -1253,7 +1498,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                 decoration: BoxDecoration(
                   color: accentColor.withAlpha(51),
                   shape: BoxShape.circle,
@@ -1261,26 +1506,26 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                 child: Icon(
                   Icons.favorite_rounded,
                   color: accentColor,
-                  size: 20,
+                  size: isSmallScreen ? 16.0 : 20.0,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: isSmallScreen ? 12.0 : 18.0),
           Row(
             children: [
               Icon(
                 Icons.location_on_rounded,
                 color: accentColor,
-                size: 20,
+                size: isSmallScreen ? 16.0 : 20.0,
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: isSmallScreen ? 8.0 : 10.0),
               Expanded(
                 child: Text(
                   t('fromTo', {'from': from, 'to': to}),
                   style: TextStyle(
                     color: textColor,
-                    fontSize: 17,
+                    fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.5 : 17.0),
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.3,
                     height: 1.3,
@@ -1289,46 +1534,46 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 8.0 : 12.0),
           Row(
             children: [
               Icon(
                 Icons.access_time_rounded,
                 color: textSecondaryColor,
-                size: 18,
+                size: isSmallScreen ? 14.0 : 18.0,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: isSmallScreen ? 6.0 : 8.0),
               Text(
                 '${t('lastBooked')}: $lastBooked',
                 style: TextStyle(
                   color: textSecondaryColor,
-                  fontSize: 14,
+                  fontSize: isSmallScreen ? 12.0 : 14.0,
                   fontWeight: FontWeight.w500,
                   letterSpacing: 0.2,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: isSmallScreen ? 12.0 : 18.0),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
               onPressed: () {},
-              icon: const Icon(Icons.flash_on_rounded, size: 20),
+              icon: Icon(Icons.flash_on_rounded, size: isSmallScreen ? 16.0 : 20.0),
               label: Text(
                 t('bookThisTrip'),
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 15,
+                  fontSize: isSmallScreen ? 13.0 : 15.0,
                   letterSpacing: 0.5,
                 ),
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: accentColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 12.0 : 16.0),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 14.0),
                 ),
                 elevation: 4,
               ),
@@ -1365,12 +1610,14 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     required IconData icon,
     required String label,
     required String value,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(isSmallScreen ? 10.0 : 14.0),
       decoration: BoxDecoration(
         color: Colors.white.withAlpha(38),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         border: Border.all(
           color: Colors.white.withAlpha(77),
           width: 1.5,
@@ -1381,25 +1628,25 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
           Icon(
             icon,
             color: Colors.white,
-            size: 26,
+            size: isSmallScreen ? 20.0 : (isMediumScreen ? 23.0 : 26.0),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isSmallScreen ? 6.0 : 8.0),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 18,
+              fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 18.0),
               fontWeight: FontWeight.bold,
               letterSpacing: 0.3,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: isSmallScreen ? 2.0 : 4.0),
           Text(
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withAlpha(217),
-              fontSize: 11,
+              fontSize: isSmallScreen ? 9.0 : 11.0,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.2,
               height: 1.2,

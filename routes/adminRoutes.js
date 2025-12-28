@@ -21,6 +21,10 @@ import {
   getLinePerformance,
   getTimezoneConfig,
   updateTimezoneConfig,
+  getPendingDrivers,
+  getAllDriversWithApprovalStatus,
+  approveDriver,
+  rejectDriver,
 } from '../controllers/adminController.js';
 import {
   getAllBaseStations,
@@ -64,7 +68,6 @@ router.put('/users/:userid', updateUser);
 router.delete('/users/:userid', deleteUser);
 router.put('/admins/:adminid/permissions', updateAdminPermissions);
 
-// Base station routes
 router.get('/base-station', getAllBaseStations);
 router.get('/base-station/:stationid', getBaseStationById);
 router.post('/base-station', createBaseStation);
@@ -72,14 +75,17 @@ router.put('/base-station/:stationid', updateBaseStation);
 router.delete('/base-station/:stationid', deleteBaseStation);
 router.get('/base-station/check-driver/:driverid', checkDriverAtStation);
 
-// Line path routes
 router.get('/lines/:lineid/path', getLinePath);
 router.post('/lines/:lineid/path', createOrUpdateLinePath);
 router.delete('/lines/:lineid/path', deleteLinePath);
 
-// Timezone configuration routes
 router.get('/config/timezone', getTimezoneConfig);
 router.put('/config/timezone', updateTimezoneConfig);
+
+router.get('/drivers/pending', getPendingDrivers);
+router.get('/drivers', getAllDriversWithApprovalStatus);
+router.post('/drivers/:driverid/approve', approveDriver);
+router.post('/drivers/:driverid/reject', rejectDriver);
 
 export default router;
 

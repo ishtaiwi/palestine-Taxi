@@ -66,6 +66,16 @@ class PasswordResetToken {
     if (error) throw error;
     return data;
   }
+
+  static async deleteByUserId(userid) {
+    const { error } = await supabase
+      .from('password_reset_token')
+      .delete()
+      .eq('userid', userid);
+    
+    if (error) throw error;
+    return true;
+  }
 }
 
 export default PasswordResetToken;

@@ -98,6 +98,16 @@ class Rating {
     if (error) throw error;
     return true;
   }
+
+  static async deleteByPassengerId(passengerid) {
+    const { error } = await supabase
+      .from('trip_rating')
+      .delete()
+      .eq('passengerid', passengerid);
+    
+    if (error) throw error;
+    return true;
+  }
 }
 
 export default Rating;

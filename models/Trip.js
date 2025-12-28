@@ -16,7 +16,7 @@ class Trip {
   static async findById(tripid) {
     const { data, error } = await supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*))), schedule_template(*)')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*))), schedule_template(*)')
       .eq('tripid', tripid)
       .single();
 
@@ -27,7 +27,7 @@ class Trip {
   static async findAll(filters = {}) {
     let query = supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*))), schedule_template(*)');
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*))), schedule_template(*)');
 
     if (filters.lineid) {
       query = query.eq('lineid', filters.lineid);
@@ -38,19 +38,13 @@ class Trip {
     }
 
     if (filters.date) {
-      // Filter by date: get trips on the specified date only
-      // Parse the date string (could be YYYY-MM-DD or full ISO string)
       const dateStr = filters.date;
       let startDate, endDate;
 
-      // If date is in YYYY-MM-DD format, convert to date range
       if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        // Start of the day (00:00:00)
         startDate = new Date(dateStr + 'T00:00:00.000Z');
-        // End of the day (23:59:59.999)
         endDate = new Date(dateStr + 'T23:59:59.999Z');
       } else {
-        // If it's already a full ISO string, use it as start and calculate end
         startDate = new Date(dateStr);
         startDate = new Date(startDate);
         startDate.setHours(0, 0, 0, 0);
@@ -74,21 +68,16 @@ class Trip {
   static async findUpcoming(filters = {}) {
     let query = supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))');
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))');
 
-    // Support date filtering for upcoming trips
     if (filters.date) {
       const dateStr = filters.date;
       let startDate, endDate;
 
-      // If date is in YYYY-MM-DD format, convert to date range
       if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        // Start of the day (00:00:00)
         startDate = new Date(dateStr + 'T00:00:00.000Z');
-        // End of the day (23:59:59.999)
         endDate = new Date(dateStr + 'T23:59:59.999Z');
       } else {
-        // If it's already a full ISO string, use it as start and calculate end
         startDate = new Date(dateStr);
         startDate = new Date(startDate);
         startDate.setHours(0, 0, 0, 0);
@@ -100,13 +89,11 @@ class Trip {
       const dateEndISO = endDate.toISOString();
       const now = getUtcNow().toISOString();
 
-      // Use the later of "now" or "startDate" to ensure we only show upcoming trips
       const filterStart = dateStartISO > now ? dateStartISO : now;
 
       query = query.gte('deptime', filterStart)
         .lte('deptime', dateEndISO);
     } else {
-      // No date filter - only show upcoming trips from now
       const now = getUtcNow().toISOString();
       query = query.gte('deptime', now);
     }
@@ -128,7 +115,7 @@ class Trip {
     const now = getUtcNow().toISOString();
     const { data, error } = await supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))')
       .eq('vehicleid', vehicleid)
       .in('status', ['scheduled', 'open', 'in_progress'])
       .gte('deptime', now)
@@ -147,7 +134,7 @@ class Trip {
 
     let query = supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))')
       .in('vehicleid', vehicleIds);
 
     if (filters.status) {
@@ -168,7 +155,7 @@ class Trip {
       .from('trip')
       .update(updates)
       .eq('tripid', tripid)
-      .select('*, line(*), vehicle(*, driver(*, user(*))), schedule_template(*)')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*))), schedule_template(*)')
       .single();
 
     if (error) throw error;
@@ -205,7 +192,7 @@ class Trip {
     const now = getUtcNow().toISOString();
     let query = supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))')
       .lte('trip_opening_time', now)
       .eq('status', 'open');
 
@@ -222,10 +209,6 @@ class Trip {
     const now = getUtcNow();
     const openingTime = new Date(now.getTime() + openingWindowMinutes * 60 * 1000);
 
-    // Find trips that need opening:
-    // - Status is 'scheduled'
-    // - trip_opening_time is NULL (not yet opened) OR trip_opening_time is set but status not updated
-    // - deptime is within the opening window (45 minutes from now)
     const { data, error } = await supabase
       .from('trip')
       .select('*')
@@ -235,15 +218,11 @@ class Trip {
 
     if (error) throw error;
 
-    // Filter trips that either:
-    // 1. Have no trip_opening_time set, OR
-    // 2. Have trip_opening_time set but it's in the past (should be opened)
     const nowISO = now.toISOString();
     const tripsToOpen = (data || []).filter(trip => {
       if (!trip.trip_opening_time) {
-        return true; // No opening time set, needs opening
+        return true;
       }
-      // If opening time is set and in the past, trip should be opened
       const openingTime = parseUtcDate(trip.trip_opening_time);
       return openingTime && openingTime.getTime() <= now.getTime();
     });
@@ -255,7 +234,7 @@ class Trip {
     const now = getUtcNow().toISOString();
     const { data, error } = await supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))')
       .in('status', ['scheduled', 'open', 'delayed'])
       .lte('deptime', now)
       .order('deptime', { ascending: true });
@@ -274,7 +253,7 @@ class Trip {
   static async findAssignedTrips(driverid, filters = {}) {
     let query = supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))')
       .eq('assigned_driverid', driverid);
 
     if (filters.status) {

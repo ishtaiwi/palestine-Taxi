@@ -201,12 +201,18 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
 
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        appBar: _buildAppBar(),
+        appBar: _buildAppBar(context),
         body: _isLoading
             ? Center(
                 child: CircularProgressIndicator(
@@ -215,18 +221,27 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
               )
             : Column(
                 children: [
-                  _buildSearchBar(),
-                  _buildFilterSection(),
+                  _buildSearchBar(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                  _buildFilterSection(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                   Expanded(
                     child: _filteredUsers.isEmpty
-                        ? _buildEmptyState()
+                        ? _buildEmptyState(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen)
                         : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            padding: EdgeInsets.fromLTRB(
+                              basePadding, 
+                              0, 
+                              basePadding, 
+                              basePadding
+                            ),
                             itemCount: _filteredUsers.length,
                             separatorBuilder: (context, index) =>
-                                const SizedBox(height: 12),
+                                SizedBox(height: isSmallScreen ? 10.0 : 12.0),
                             itemBuilder: (context, index) {
-                              return _buildUserCard(_filteredUsers[index]);
+                              return _buildUserCard(
+                                _filteredUsers[index],
+                                isSmallScreen: isSmallScreen,
+                                isMediumScreen: isMediumScreen,
+                              );
                             },
                           ),
                   ),
@@ -236,7 +251,11 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     return AppBar(
       backgroundColor: AppTheme.isDarkMode
           ? const Color(0xFF1C2541) // Dark card color for better integration
@@ -244,15 +263,19 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        icon: Icon(
+          Icons.arrow_back_ios_new_rounded, 
+          color: Colors.white,
+          size: isSmallScreen ? 18.0 : 20.0,
+        ),
         onPressed: () => Navigator.pop(context),
       ),
       title: Text(
         t('title'),
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
-          fontSize: 20,
+          fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
         ),
       ),
       actions: [
@@ -260,6 +283,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
           icon: Icon(
             _isArabic ? Icons.language : Icons.translate,
             color: Colors.white,
+            size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 24.0),
           ),
           onPressed: () {
             setState(() {
@@ -268,20 +292,27 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
             });
           },
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: isSmallScreen ? 4.0 : 8.0),
       ],
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(isSmallScreen ? 16.0 : 20.0),
+        ),
       ),
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      margin: EdgeInsets.fromLTRB(
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        isSmallScreen ? 16.0 : 20.0, 
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        0
+      ),
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 15.0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -292,16 +323,33 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       ),
       child: TextField(
         controller: _searchController,
-        style: TextStyle(color: AppTheme.textPrimary),
+        style: TextStyle(
+          color: AppTheme.textPrimary,
+          fontSize: isSmallScreen ? 14.0 : 16.0,
+        ),
         decoration: InputDecoration(
           hintText: t('search'),
-          hintStyle: TextStyle(color: AppTheme.textSecondary),
-          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textSecondary),
+          hintStyle: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: isSmallScreen ? 14.0 : 16.0,
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded, 
+            color: AppTheme.textSecondary,
+            size: isSmallScreen ? 20.0 : 24.0,
+          ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 16.0 : 20.0, 
+            vertical: isSmallScreen ? 12.0 : 15.0
+          ),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                  icon: Icon(
+                    Icons.close_rounded, 
+                    color: AppTheme.textSecondary,
+                    size: isSmallScreen ? 20.0 : 24.0,
+                  ),
                   onPressed: () {
                     _searchController.clear();
                     FocusScope.of(context).unfocus();
@@ -313,27 +361,30 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     );
   }
 
-  Widget _buildFilterSection() {
+  Widget _buildFilterSection({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      padding: EdgeInsets.symmetric(
+        vertical: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0), 
+        horizontal: isSmallScreen ? 12.0 : 16.0
+      ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildFilterChip(null, t('filterAll'), Icons.people_alt_rounded),
-            const SizedBox(width: 12),
-            _buildFilterChip('admin', t('filterAdmin'), Icons.admin_panel_settings_rounded),
-            const SizedBox(width: 12),
-            _buildFilterChip('driver', t('filterDriver'), Icons.directions_car_rounded),
-            const SizedBox(width: 12),
-            _buildFilterChip('passenger', t('filterPassenger'), Icons.person_rounded),
+            _buildFilterChip(null, t('filterAll'), Icons.people_alt_rounded, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+            _buildFilterChip('admin', t('filterAdmin'), Icons.admin_panel_settings_rounded, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+            _buildFilterChip('driver', t('filterDriver'), Icons.directions_car_rounded, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+            _buildFilterChip('passenger', t('filterPassenger'), Icons.person_rounded, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFilterChip(String? role, String label, IconData icon) {
+  Widget _buildFilterChip(String? role, String label, IconData icon, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final isSelected = _selectedRoleFilter == role;
     // Use BlueAccent for 'All' in dark mode for better visibility
     final color = role == null
@@ -349,17 +400,20 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
             _applyFilter();
           });
         },
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 24.0 : 30.0),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+            vertical: isSmallScreen ? 8.0 : 10.0
+          ),
           decoration: BoxDecoration(
             color: isSelected
                 ? color
                 : (AppTheme.isDarkMode
                     ? Colors.white.withOpacity(0.05)
                     : AppTheme.cardBackground),
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 24.0 : 30.0),
             border: Border.all(
               color: isSelected
                   ? color
@@ -383,14 +437,14 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
             children: [
               Icon(
                 icon,
-                size: 18,
+                size: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                 color: isSelected
                     ? Colors.white
                     : (AppTheme.isDarkMode
                         ? Colors.white
                         : AppTheme.textSecondary),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: isSmallScreen ? 6.0 : 8.0),
               Text(
                 label,
                 style: TextStyle(
@@ -400,7 +454,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                           ? Colors.white
                           : AppTheme.textSecondary),
                   fontWeight: FontWeight.w600,
-                  fontSize: 14,
+                  fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
                 ),
               ),
             ],
@@ -410,7 +464,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     );
   }
 
-  Widget _buildUserCard(Map<String, dynamic> user) {
+  Widget _buildUserCard(Map<String, dynamic> user, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final role = user['role']?.toString();
     final roleColor = _getRoleColor(role);
     final roleIcon = _getRoleIcon(role);
@@ -418,7 +472,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         boxShadow: [
           BoxShadow(
             color: AppTheme.isDarkMode
@@ -434,17 +488,17 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         child: InkWell(
           onTap: () {}, 
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
             child: Row(
               children: [
                 Container(
-                  width: 50,
-                  height: 50,
+                  width: isSmallScreen ? 42.0 : (isMediumScreen ? 46.0 : 50.0),
+                  height: isSmallScreen ? 42.0 : (isMediumScreen ? 46.0 : 50.0),
                   decoration: BoxDecoration(
                     color: roleColor.withOpacity(0.1),
                     shape: BoxShape.circle,
@@ -452,10 +506,10 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                   child: Icon(
                     roleIcon,
                     color: roleColor,
-                    size: 24,
+                    size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -464,41 +518,41 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                         user['fullname'] ?? t('name'),
                         style: TextStyle(
                           color: AppTheme.textPrimary,
-                          fontSize: 16,
+                          fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                       Text(
                         user['email'] ?? '',
                         style: TextStyle(
                           color: AppTheme.isDarkMode
                               ? Colors.white.withOpacity(0.9)
                               : AppTheme.textSecondary,
-                          fontSize: 13,
+                          fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (user['phone'] != null && user['phone'].toString().isNotEmpty) ...[
-                        const SizedBox(height: 4),
+                        SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                         Row(
                           children: [
                             Icon(
                               Icons.phone_iphone_rounded,
-                              size: 12,
+                              size: isSmallScreen ? 10.0 : 12.0,
                               color: AppTheme.isDarkMode
                                   ? Colors.blueAccent.shade100
                                   : AppTheme.textSecondary,
                             ),
-                            const SizedBox(width: 4),
+                            SizedBox(width: isSmallScreen ? 3.0 : 4.0),
                             Text(
                               user['phone'].toString(),
                               style: TextStyle(
                                 color: AppTheme.isDarkMode
                                     ? Colors.blueAccent.shade100
                                     : AppTheme.textSecondary,
-                                fontSize: 12,
+                                fontSize: isSmallScreen ? 10.0 : (isMediumScreen ? 11.0 : 12.0),
                               ),
                             ),
                           ],
@@ -512,12 +566,16 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                     _buildActionButton(
                       icon: Icons.edit_rounded,
                       color: Colors.blueAccent,
+                      isSmallScreen: isSmallScreen,
+                      isMediumScreen: isMediumScreen,
                       onTap: () => _handleEdit(user),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: isSmallScreen ? 6.0 : 8.0),
                     _buildActionButton(
                       icon: Icons.delete_outline_rounded,
                       color: Colors.redAccent,
+                      isSmallScreen: isSmallScreen,
+                      isMediumScreen: isMediumScreen,
                       onTap: () => _handleDelete(user['userid']),
                     ),
                   ],
@@ -534,18 +592,20 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     return Material(
       color: AppTheme.isDarkMode ? color.withOpacity(0.2) : color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
           child: Icon(
             icon,
-            size: 20,
+            size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
             color: color,
           ),
         ),
@@ -553,13 +613,13 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(30),
+            padding: EdgeInsets.all(isSmallScreen ? 24.0 : (isMediumScreen ? 27.0 : 30.0)),
             decoration: BoxDecoration(
               color: AppTheme.cardBackground,
               shape: BoxShape.circle,
@@ -573,16 +633,16 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
             ),
             child: Icon(
               Icons.people_outline_rounded,
-              size: 80,
+              size: isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0),
               color: AppTheme.textSecondary.withOpacity(0.5),
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isSmallScreen ? 16.0 : 20.0),
           Text(
             t('noUsers'),
             style: TextStyle(
               color: AppTheme.textPrimary,
-              fontSize: 18,
+              fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
               fontWeight: FontWeight.w600,
             ),
           ),

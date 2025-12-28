@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/driver_bottom_nav_bar.dart';
@@ -201,7 +202,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
     }
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String? value, {Color? valueColor}) {
+  Widget _buildInfoRow(IconData icon, String label, String? value, {Color? valueColor, bool isSmallScreen = false, bool isMediumScreen = false}) {
     final textPrimaryColor = _isDarkMode
         ? Colors.white
         : const Color(0xFF1E3A5F);
@@ -211,13 +212,13 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
     final accentColor = Colors.orange;
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? 10.0 : 12.0),
+      padding: EdgeInsets.all(isSmallScreen ? 10.0 : (isMediumScreen ? 12.0 : 14.0)),
       decoration: BoxDecoration(
         color: _isDarkMode
             ? Colors.white.withOpacity(0.05)
             : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
         border: Border.all(
           color: _isDarkMode
               ? Colors.white.withOpacity(0.1)
@@ -228,14 +229,14 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
             decoration: BoxDecoration(
               color: accentColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
             ),
-            child: Icon(icon, color: accentColor, size: 20),
+            child: Icon(icon, color: accentColor, size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0)),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: isSmallScreen ? 12.0 : 14.0),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,16 +245,16 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                   label,
                   style: TextStyle(
                     color: textSecondaryColor,
-                    fontSize: 12,
+                    fontSize: isSmallScreen ? 11.0 : 12.0,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: isSmallScreen ? 3.0 : 4.0),
                 Text(
                   value ?? t('unknown'),
                   style: TextStyle(
                     color: valueColor ?? textPrimaryColor,
-                    fontSize: 16,
+                    fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -265,7 +266,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
     );
   }
 
-  Widget _buildSection(String title, Widget child) {
+  Widget _buildSection(String title, Widget child, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final cardColor = _isDarkMode
         ? const Color(0xFF1C2541)
         : const Color(0xFFFAFBFC);
@@ -286,11 +287,11 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
     }
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(20),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
+      padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         border: Border.all(
           color: _isDarkMode
               ? Colors.white.withOpacity(0.1)
@@ -341,7 +342,7 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
     );
   }
 
-  Widget _buildSettingsSection() {
+  Widget _buildSettingsSection({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final cardColor = _isDarkMode
         ? const Color(0xFF1C2541)
         : const Color(0xFFFAFBFC);
@@ -354,11 +355,11 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
     final accentColor = Colors.orange;
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(20),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
+      padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         border: Border.all(
           color: _isDarkMode
               ? Colors.white.withOpacity(0.1)
@@ -379,53 +380,69 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                 decoration: BoxDecoration(
                   color: accentColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
                 ),
                 child: Icon(
                   Icons.settings,
                   color: accentColor,
-                  size: 20,
+                  size: isSmallScreen ? 18.0 : 20.0,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
               Text(
                 t('settings'),
                 style: TextStyle(
                   color: textPrimaryColor,
-                  fontSize: 20,
+                  fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
           _buildSettingTile(
             icon: Icons.language,
             title: t('language'),
             subtitle: _isArabic ? t('arabic') : t('english'),
+            isSmallScreen: isSmallScreen,
+            isMediumScreen: isMediumScreen,
             onTap: () {
+              final screenWidth = MediaQuery.of(context).size.width;
+              final isSmallScreenDialog = screenWidth < 360;
+              final isMediumScreenDialog = screenWidth >= 360 && screenWidth < 400;
+              
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
                   backgroundColor: cardColor,
+                  titlePadding: EdgeInsets.all(isSmallScreenDialog ? 16.0 : (isMediumScreenDialog ? 18.0 : 20.0)),
+                  contentPadding: EdgeInsets.all(isSmallScreenDialog ? 12.0 : 16.0),
                   title: Text(
                     t('language'),
                     style: TextStyle(
                       color: textPrimaryColor,
                       fontWeight: FontWeight.bold,
+                      fontSize: isSmallScreenDialog ? 18.0 : (isMediumScreenDialog ? 20.0 : 22.0),
                     ),
                   ),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       ListTile(
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreenDialog ? 8.0 : 16.0,
+                          vertical: isSmallScreenDialog ? 4.0 : 8.0,
+                        ),
                         title: Text(
                           t('arabic'),
-                          style: TextStyle(color: textPrimaryColor),
+                          style: TextStyle(
+                            color: textPrimaryColor,
+                            fontSize: isSmallScreenDialog ? 14.0 : 16.0,
+                          ),
                         ),
                         leading: Radio<bool>(
                           value: true,
@@ -438,9 +455,16 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                         ),
                       ),
                       ListTile(
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreenDialog ? 8.0 : 16.0,
+                          vertical: isSmallScreenDialog ? 4.0 : 8.0,
+                        ),
                         title: Text(
                           t('english'),
-                          style: TextStyle(color: textPrimaryColor),
+                          style: TextStyle(
+                            color: textPrimaryColor,
+                            fontSize: isSmallScreenDialog ? 14.0 : 16.0,
+                          ),
                         ),
                         leading: Radio<bool>(
                           value: false,
@@ -471,6 +495,8 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
             icon: _isDarkMode ? Icons.light_mode : Icons.dark_mode,
             title: t('theme'),
             subtitle: _isDarkMode ? t('darkMode') : t('lightMode'),
+            isSmallScreen: isSmallScreen,
+            isMediumScreen: isMediumScreen,
             onTap: _toggleTheme,
             textPrimaryColor: textPrimaryColor,
             textSecondaryColor: textSecondaryColor,
@@ -495,22 +521,24 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
     required Color textSecondaryColor,
     required Color accentColor,
     Widget? trailing,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Container(
-        padding: const EdgeInsets.all(10),
+        padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
         decoration: BoxDecoration(
           color: accentColor.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
         ),
-        child: Icon(icon, color: accentColor, size: 20),
+        child: Icon(icon, color: accentColor, size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0)),
       ),
       title: Text(
         title,
         style: TextStyle(
           color: textPrimaryColor,
-          fontSize: 16,
+          fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -518,13 +546,14 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
         subtitle,
         style: TextStyle(
           color: textSecondaryColor,
-          fontSize: 14,
+          fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
         ),
       ),
       trailing: trailing ??
           Icon(
             Icons.chevron_right,
             color: textSecondaryColor,
+            size: isSmallScreen ? 20.0 : 24.0,
           ),
       onTap: onTap,
     );
@@ -533,6 +562,22 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Web-specific responsive breakpoints
+    final isWeb = kIsWeb;
+    final isDesktop = isWeb && screenWidth >= 1200;
+    final isTablet = screenWidth >= 600 && screenWidth < 1200;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    final double basePadding = isWeb 
+        ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
+        : (isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0));
+    
+    // Max width for web to prevent content from stretching too wide
+    final double maxContentWidth = isWeb ? 1200.0 : double.infinity;
     
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
@@ -577,13 +622,13 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
             ),
             child: AppBar(
               leading: Container(
-                margin: const EdgeInsets.all(8),
+                margin: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                  icon: Icon(Icons.arrow_back_ios_new, size: isSmallScreen ? 18.0 : 20.0),
                   onPressed: () {
                     if (Navigator.canPop(context)) {
                       Navigator.pop(context);
@@ -600,10 +645,10 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
               ),
               title: Text(
                 t('title'),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 22,
+                  fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
                   letterSpacing: 0.5,
                 ),
               ),
@@ -614,13 +659,13 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
               iconTheme: const IconThemeData(color: Colors.white),
               actions: [
                 Container(
-                  margin: const EdgeInsets.only(right: 8),
+                  margin: EdgeInsets.only(right: isSmallScreen ? 4.0 : 8.0),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    icon: Icon(Icons.refresh_rounded, size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0)),
                     onPressed: _loadProfile,
                     tooltip: t('refresh'),
                   ),
@@ -685,11 +730,14 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                           final hasVehicle = _profileData?['hasVehicle'] == true;
                           final hasLine = _profileData?['hasLine'] == true;
                           
-                          return SingleChildScrollView(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
+                          return Center(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(maxWidth: maxContentWidth),
+                              child: SingleChildScrollView(
+                                padding: EdgeInsets.all(basePadding),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                 _buildSection(
                                   t('driverInfo'),
                                   Column(
@@ -698,29 +746,39 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                                     Icons.person,
                                     t('name'),
                                     user?['fullname']?.toString(),
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                   ),
                                   _buildInfoRow(
                                     Icons.email,
                                     t('email'),
                                     user?['email']?.toString(),
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                   ),
                                   if (user?['phone'] != null)
                                     _buildInfoRow(
                                       Icons.phone,
                                       t('phone'),
                                       user?['phone']?.toString(),
+                                      isSmallScreen: isSmallScreen,
+                                      isMediumScreen: isMediumScreen,
                                     ),
                                   if (driver?['licenseid'] != null)
                                     _buildInfoRow(
                                       Icons.card_membership,
                                       t('licenseId'),
                                       driver?['licenseid']?.toString(),
+                                      isSmallScreen: isSmallScreen,
+                                      isMediumScreen: isMediumScreen,
                                     ),
                                   _buildInfoRow(
                                     Icons.assessment,
                                     t('status'),
                                     _getStatusText(driver?['status']?.toString()),
                                     valueColor: _getStatusColor(driver?['status']?.toString()),
+                                    isSmallScreen: isSmallScreen,
+                                    isMediumScreen: isMediumScreen,
                                   ),
                                   if (driver?['rating'] != null)
                                     _buildInfoRow(
@@ -728,9 +786,13 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                                       t('rating'),
                                       '${driver?['rating']}/5.0',
                                       valueColor: Colors.orange,
+                                      isSmallScreen: isSmallScreen,
+                                      isMediumScreen: isMediumScreen,
                                     ),
                                 ],
                               ),
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
                             ),
 
                                 _buildSection(
@@ -750,37 +812,50 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                                              line['linename']?.toString() ?? 
                                              line['name_ar']?.toString() ?? 
                                              t('unknown')),
+                                      isSmallScreen: isSmallScreen,
+                                      isMediumScreen: isMediumScreen,
                                     ),
                                     _buildInfoRow(
                                       Icons.attach_money,
                                       '${t('price')} (${t('base')})',
                                       '${line['baseprice'] ?? 0} ₪',
+                                      isSmallScreen: isSmallScreen,
+                                      isMediumScreen: isMediumScreen,
                                     ),
                                     if (line['distance'] != null)
                                       _buildInfoRow(
                                         Icons.straighten,
                                         '${t('distance')} (km)',
                                         '${line['distance']}',
+                                        isSmallScreen: isSmallScreen,
+                                        isMediumScreen: isMediumScreen,
                                       ),
                                     if (line['estduration'] != null)
                                       _buildInfoRow(
                                         Icons.access_time,
                                         '${t('duration')} (min)',
                                         '${line['estduration']}',
+                                        isSmallScreen: isSmallScreen,
+                                        isMediumScreen: isMediumScreen,
                                       ),
                                   ] else ...[
                                     Center(
                                       child: Padding(
-                                        padding: const EdgeInsets.all(16.0),
+                                        padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
                                         child: Text(
                                           t('noLine'),
-                                          style: TextStyle(color: _isDarkMode ? Colors.white : Colors.grey.shade600),
+                                          style: TextStyle(
+                                            color: _isDarkMode ? Colors.white : Colors.grey.shade600,
+                                            fontSize: isSmallScreen ? 13.0 : 14.0,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ],
                                 ],
                               ),
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
                             ),
 
                                 _buildSection(
@@ -796,40 +871,53 @@ class _DriverProfilePageState extends State<DriverProfilePage> {
                                             Icons.directions_car,
                                             t('plateNumber'),
                                             v['plateno']?.toString() ?? t('unknown'),
+                                            isSmallScreen: isSmallScreen,
+                                            isMediumScreen: isMediumScreen,
                                           ),
                                           _buildInfoRow(
                                             Icons.event_seat,
                                             t('seatLayout'),
                                             v['seatlayout']?.toString() ?? t('unknown'),
+                                            isSmallScreen: isSmallScreen,
+                                            isMediumScreen: isMediumScreen,
                                           ),
                                           _buildInfoRow(
                                             Icons.confirmation_number,
                                             t('seatNumber'),
                                             v['seatnum']?.toString() ?? t('unknown'),
+                                            isSmallScreen: isSmallScreen,
+                                            isMediumScreen: isMediumScreen,
                                           ),
                                           if (vehicles.length > 1 && vehicles.indexOf(vehicle) < vehicles.length - 1)
-                                            const Divider(color: Colors.white, height: 32),
+                                            SizedBox(height: isSmallScreen ? 24.0 : 32.0),
                                         ],
                                       );
                                     }),
                                   ] else ...[
                                     Center(
                                       child: Padding(
-                                        padding: const EdgeInsets.all(16.0),
+                                        padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
                                         child: Text(
                                           t('noVehicle'),
-                                          style: TextStyle(color: _isDarkMode ? Colors.white : Colors.grey.shade600),
+                                          style: TextStyle(
+                                            color: _isDarkMode ? Colors.white : Colors.grey.shade600,
+                                            fontSize: isSmallScreen ? 13.0 : 14.0,
+                                          ),
                                         ),
                                       ),
                                     ),
                                       ],
                                     ],
                                   ),
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
                                 ),
-                                const SizedBox(height: 20),
+                                SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
 
-                                _buildSettingsSection(),
-                              ],
+                                _buildSettingsSection(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                                  ],
+                                ),
+                              ),
                             ),
                           );
                         },

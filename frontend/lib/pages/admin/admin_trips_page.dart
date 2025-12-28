@@ -224,12 +224,18 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
   Widget build(BuildContext context) {
     final textDirection =
         _isArabic ? material.TextDirection.rtl : material.TextDirection.ltr;
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
 
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        appBar: _buildAppBar(),
+        appBar: _buildAppBar(context),
         body: _isLoading
             ? Center(
                 child: CircularProgressIndicator(
@@ -238,18 +244,22 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
               )
             : Column(
                 children: [
-                  _buildSearchBar(),
-                  _buildFilterSection(),
+                  _buildSearchBar(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                  _buildFilterSection(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                   Expanded(
                     child: _filteredTrips.isEmpty
-                        ? _buildEmptyState()
+                        ? _buildEmptyState(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen)
                         : ListView.separated(
-                            padding: const EdgeInsets.all(16),
+                            padding: EdgeInsets.all(basePadding),
                             itemCount: _filteredTrips.length,
                             separatorBuilder: (context, index) =>
-                                const SizedBox(height: 12),
+                                SizedBox(height: isSmallScreen ? 10.0 : 12.0),
                             itemBuilder: (context, index) {
-                              return _buildTripCard(_filteredTrips[index]);
+                              return _buildTripCard(
+                                _filteredTrips[index],
+                                isSmallScreen: isSmallScreen,
+                                isMediumScreen: isMediumScreen,
+                              );
                             },
                           ),
                   ),
@@ -259,7 +269,11 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     return AppBar(
       backgroundColor: AppTheme.isDarkMode
           ? const Color(0xFF1C2541) // Dark card color for better integration
@@ -267,15 +281,19 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        icon: Icon(
+          Icons.arrow_back_ios_new_rounded, 
+          color: Colors.white,
+          size: isSmallScreen ? 18.0 : 20.0,
+        ),
         onPressed: () => Navigator.pop(context),
       ),
       title: Text(
         t('title'),
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
-          fontSize: 20,
+          fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
         ),
       ),
       actions: [
@@ -283,6 +301,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
           icon: Icon(
             _isArabic ? Icons.language : Icons.translate,
             color: Colors.white,
+            size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 24.0),
           ),
           onPressed: () {
             setState(() {
@@ -291,20 +310,27 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
             });
           },
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: isSmallScreen ? 4.0 : 8.0),
       ],
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(isSmallScreen ? 16.0 : 20.0),
+        ),
       ),
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      margin: EdgeInsets.fromLTRB(
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        isSmallScreen ? 16.0 : 20.0, 
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        0
+      ),
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 15.0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -328,8 +354,10 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                   ? Colors.white70
                   : AppTheme.textSecondary),
           border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 16.0 : 20.0, 
+            vertical: isSmallScreen ? 12.0 : 15.0
+          ),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   icon: Icon(Icons.close_rounded,
@@ -347,32 +375,35 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
     );
   }
 
-  Widget _buildFilterSection() {
+  Widget _buildFilterSection({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      padding: EdgeInsets.symmetric(
+        vertical: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0), 
+        horizontal: isSmallScreen ? 12.0 : 16.0
+      ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildFilterChip(null, t('filterAll')),
-            const SizedBox(width: 8),
+            _buildFilterChip(null, t('filterAll'), isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 6.0 : 8.0),
             _buildFilterChip('scheduled', t('scheduled'),
-                color: Colors.blueAccent),
-            const SizedBox(width: 8),
+                color: Colors.blueAccent, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 6.0 : 8.0),
             _buildFilterChip('in_progress', t('in_progress'),
-                color: Colors.orangeAccent),
-            const SizedBox(width: 8),
-            _buildFilterChip('completed', t('completed'), color: Colors.green),
-            const SizedBox(width: 8),
+                color: Colors.orangeAccent, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+            _buildFilterChip('completed', t('completed'), color: Colors.green, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 6.0 : 8.0),
             _buildFilterChip('cancelled', t('cancelled'),
-                color: Colors.redAccent),
+                color: Colors.redAccent, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFilterChip(String? status, String label, {Color? color}) {
+  Widget _buildFilterChip(String? status, String label, {Color? color, bool isSmallScreen = false, bool isMediumScreen = false}) {
     final isSelected = _statusFilter == status;
     final activeColor = color ?? AppTheme.appBarColor;
     final isDark = AppTheme.isDarkMode;
@@ -386,12 +417,15 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+          vertical: isSmallScreen ? 6.0 : 8.0
+        ),
         decoration: BoxDecoration(
           color: isSelected
               ? (isDark && status == null ? Colors.blueAccent : activeColor)
               : AppTheme.cardBackground,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
           border: Border.all(
             color: isSelected
                 ? (isDark && status == null ? Colors.blueAccent : activeColor)
@@ -420,14 +454,14 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                 ? Colors.white
                 : (isDark ? Colors.white : AppTheme.textSecondary),
             fontWeight: FontWeight.bold,
-            fontSize: 14,
+            fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildTripCard(Map<String, dynamic> trip) {
+  Widget _buildTripCard(Map<String, dynamic> trip, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final line = trip['line'] as Map<String, dynamic>?;
     final vehicle = trip['vehicle'] as Map<String, dynamic>?;
     final driver = vehicle?['driver']?['user'] as Map<String, dynamic>?;
@@ -449,7 +483,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -464,16 +498,16 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.1),
                       shape: BoxShape.circle,
@@ -481,10 +515,10 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                     child: Icon(
                       Icons.route_rounded,
                       color: statusColor,
-                      size: 24,
+                      size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -493,26 +527,26 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                           lineName.isNotEmpty ? lineName : 'Unknown Line',
                           style: TextStyle(
                             color: isDark ? Colors.white : AppTheme.textPrimary,
-                            fontSize: 18,
+                            fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                         Row(
                           children: [
                             Icon(Icons.calendar_today_rounded,
-                                size: 14,
+                                size: isSmallScreen ? 12.0 : 14.0,
                                 color: isDark
                                     ? Colors.white70
                                     : AppTheme.textSecondary),
-                            const SizedBox(width: 4),
+                            SizedBox(width: isSmallScreen ? 3.0 : 4.0),
                             Text(
                               _formatDate(trip['deptime']),
                               style: TextStyle(
                                 color: isDark
                                     ? Colors.white70
                                     : AppTheme.textSecondary,
-                                fontSize: 13,
+                                fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -522,39 +556,41 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                     ),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 8.0 : 10.0, 
+                      vertical: isSmallScreen ? 3.0 : 4.0
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
                       border: Border.all(color: statusColor.withOpacity(0.2)),
                     ),
                     child: Text(
                       _getStatusText(status),
                       style: TextStyle(
                         color: statusColor,
-                        fontSize: 12,
+                        fontSize: isSmallScreen ? 10.0 : (isMediumScreen ? 11.0 : 12.0),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
               Divider(
                   color: isDark
                       ? Colors.white12
                       : AppTheme.textSecondary.withOpacity(0.1)),
-              const SizedBox(height: 12),
+              SizedBox(height: isSmallScreen ? 10.0 : 12.0),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _buildInfoColumn(Icons.directions_car_rounded, t('vehicle'),
-                      vehicle?['plateno'] ?? 'N/A'),
+                      vehicle?['plateno'] ?? 'N/A', isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                   _buildInfoColumn(Icons.person_rounded, t('driver'),
-                      driver?['fullname'] ?? 'N/A'),
+                      driver?['fullname'] ?? 'N/A', isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                   _buildInfoColumn(Icons.event_seat_rounded, t('bookings'),
-                      '${trip['totalbookings'] ?? 0}'),
+                      '${trip['totalbookings'] ?? 0}', isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                 ],
               ),
             ],
@@ -564,41 +600,41 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
     );
   }
 
-  Widget _buildInfoColumn(IconData icon, String label, String value) {
+  Widget _buildInfoColumn(IconData icon, String label, String value, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final isDark = AppTheme.isDarkMode;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Icon(icon,
-            size: 20,
+            size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
             color: isDark ? Colors.blueAccent : AppTheme.textSecondary),
-        const SizedBox(height: 6),
+        SizedBox(height: isSmallScreen ? 4.0 : 6.0),
         Text(
           value,
           style: TextStyle(
             color: isDark ? Colors.white : AppTheme.textPrimary,
             fontWeight: FontWeight.bold,
-            fontSize: 14,
+            fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
           ),
         ),
         Text(
           label,
           style: TextStyle(
             color: isDark ? Colors.white70 : AppTheme.textSecondary,
-            fontSize: 11,
+            fontSize: isSmallScreen ? 10.0 : 11.0,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(30),
+            padding: EdgeInsets.all(isSmallScreen ? 24.0 : (isMediumScreen ? 27.0 : 30.0)),
             decoration: BoxDecoration(
               color: AppTheme.cardBackground,
               shape: BoxShape.circle,
@@ -612,18 +648,18 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
             ),
             child: Icon(
               Icons.directions_bus_outlined,
-              size: 80,
+              size: isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0),
               color: AppTheme.isDarkMode
                   ? Colors.white24
                   : AppTheme.textSecondary.withOpacity(0.5),
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isSmallScreen ? 16.0 : 20.0),
           Text(
             t('noTrips'),
             style: TextStyle(
               color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
-              fontSize: 18,
+              fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
               fontWeight: FontWeight.w600,
             ),
           ),

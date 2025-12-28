@@ -72,6 +72,26 @@ class Admin {
     if (!admin) return false;
     return admin.permissions && admin.permissions.includes(permission);
   }
+
+  static async delete(id) {
+    const { error } = await supabase
+      .from('admin')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
+  }
+
+  static async deleteByUserId(userid) {
+    const { error } = await supabase
+      .from('admin')
+      .delete()
+      .eq('userid', userid);
+    
+    if (error) throw error;
+    return true;
+  }
 }
 
 export default Admin;

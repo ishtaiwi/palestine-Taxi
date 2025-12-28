@@ -47,8 +47,19 @@ export const requireDriver = async (req, res, next) => {
       });
     }
     
+    if (driver.approval_status !== 'approved') {
+      const status = driver.approval_status || 'pending';
+      return res.status(403).json({ 
+        message: status === 'rejected'
+          ? (req.t?.('auth.driver_rejected') || 'Your driver account has been rejected. Please contact support.')
+          : (req.t?.('auth.driver_pending_approval') || 'Your driver account is pending admin approval.'),
+        approvalStatus: status,
+      });
+    }
+    
     req.user.driverid = driver.driverid;
     req.user.driverStatus = driver.status;
+    req.user.driverApprovalStatus = driver.approval_status;
     next();
   } catch (error) {
     next(error);

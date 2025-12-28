@@ -269,6 +269,12 @@ class _AdminReportsPageState extends State<AdminReportsPage>
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
 
     return Directionality(
       textDirection: textDirection,
@@ -277,10 +283,10 @@ class _AdminReportsPageState extends State<AdminReportsPage>
       appBar: AppBar(
         title: Text(
           t('title'),
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
           ),
         ),
         backgroundColor: AppTheme.isDarkMode
@@ -288,9 +294,14 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             : AppTheme.appBarColor,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        iconTheme: IconThemeData(
+          color: Colors.white,
+          size: isSmallScreen ? 20.0 : 24.0,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(isSmallScreen ? 16.0 : 20.0),
+          ),
         ),
         bottom: TabBar(
           controller: _tabController,
@@ -298,10 +309,19 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
           indicatorColor: Colors.white,
-          indicatorWeight: 3,
+          indicatorWeight: isSmallScreen ? 2.5 : 3.0,
           indicatorSize: TabBarIndicatorSize.label,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 15),
+          labelStyle: TextStyle(
+            fontWeight: FontWeight.bold, 
+            fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0)
+          ),
+          unselectedLabelStyle: TextStyle(
+            fontWeight: FontWeight.normal, 
+            fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0)
+          ),
+          labelPadding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 10.0 : (isMediumScreen ? 12.0 : 16.0)
+          ),
           tabs: [
             Tab(text: t('revenue')),
             Tab(text: t('bookings')),
@@ -315,7 +335,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
         body: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: EdgeInsets.all(basePadding),
               child: DateRangePicker(
                 startDate: _startDate,
                 endDate: _endDate,
@@ -327,12 +347,12 @@ class _AdminReportsPageState extends State<AdminReportsPage>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildRevenueTab(),
-                  _buildBookingTab(),
-                  _buildTripTab(),
-                  _buildUserTab(),
-                  _buildVehicleTab(),
-                  _buildLineTab(),
+                  _buildRevenueTab(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                  _buildBookingTab(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                  _buildTripTab(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                  _buildUserTab(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                  _buildVehicleTab(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                  _buildLineTab(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                 ],
               ),
             ),
@@ -342,9 +362,9 @@ class _AdminReportsPageState extends State<AdminReportsPage>
     );
   }
 
-  Widget _buildRevenueTab() {
+  Widget _buildRevenueTab({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       child: Column(
         children: [
           ChartCard(
@@ -360,7 +380,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
                   )
                 : const SizedBox.shrink(),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isSmallScreen ? 12.0 : 16.0),
           ChartCard(
             title: _isArabic ? 'الإيرادات حسب الخط' : 'Revenue by Line',
             icon: Icons.pie_chart_rounded,
@@ -379,9 +399,9 @@ class _AdminReportsPageState extends State<AdminReportsPage>
     );
   }
 
-  Widget _buildBookingTab() {
+  Widget _buildBookingTab({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       child: Column(
         children: [
           ChartCard(
@@ -416,9 +436,9 @@ class _AdminReportsPageState extends State<AdminReportsPage>
     );
   }
 
-  Widget _buildTripTab() {
+  Widget _buildTripTab({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       child: Column(
         children: [
           ChartCard(
@@ -467,9 +487,9 @@ class _AdminReportsPageState extends State<AdminReportsPage>
     );
   }
 
-  Widget _buildUserTab() {
+  Widget _buildUserTab({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       child: Column(
         children: [
           ChartCard(
@@ -504,9 +524,9 @@ class _AdminReportsPageState extends State<AdminReportsPage>
     );
   }
 
-  Widget _buildVehicleTab() {
+  Widget _buildVehicleTab({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       child: Column(
         children: [
           ChartCard(
@@ -541,9 +561,9 @@ class _AdminReportsPageState extends State<AdminReportsPage>
     );
   }
 
-  Widget _buildLineTab() {
+  Widget _buildLineTab({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       child: Column(
         children: [
           ChartCard(

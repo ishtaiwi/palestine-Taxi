@@ -160,15 +160,20 @@ class _AdminMapPageState extends State<AdminMapPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: Text(
           'Vehicle Tracking Map',
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 20,
+            fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
           ),
         ),
         backgroundColor: AppTheme.isDarkMode
@@ -176,14 +181,20 @@ class _AdminMapPageState extends State<AdminMapPage> {
             : AppTheme.appBarColor,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        iconTheme: IconThemeData(
+          color: Colors.white,
+          size: isSmallScreen ? 20.0 : 24.0,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(isSmallScreen ? 16.0 : 20.0),
+          ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: Icon(Icons.refresh),
             color: Colors.white,
+            iconSize: isSmallScreen ? 20.0 : 24.0,
             onPressed: _loadData,
             tooltip: 'Refresh',
           ),
@@ -195,31 +206,57 @@ class _AdminMapPageState extends State<AdminMapPage> {
               children: [
                 // Filter bar
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+                    vertical: isSmallScreen ? 6.0 : 8.0
+                  ),
                   color: AppTheme.getCardBackground(0.1),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Row(
                         children: [
-                          const Text('Filter by Line: '),
-                          const SizedBox(width: 8),
+                          Text(
+                            'Filter by Line: ',
+                            style: TextStyle(
+                              fontSize: isSmallScreen ? 13.0 : 14.0,
+                              color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                            ),
+                          ),
+                          SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                           Expanded(
                             child: DropdownButton<String>(
                               value: _selectedLineId,
                               isExpanded: true,
-                              hint: const Text('All Lines'),
+                              hint: Text(
+                                'All Lines',
+                                style: TextStyle(
+                                  fontSize: isSmallScreen ? 13.0 : 14.0,
+                                ),
+                              ),
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 13.0 : 14.0,
+                                color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                              ),
                               items: [
-                                const DropdownMenuItem<String>(
+                                DropdownMenuItem<String>(
                                   value: null,
-                                  child: Text('All Lines'),
+                                  child: Text(
+                                    'All Lines',
+                                    style: TextStyle(
+                                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                                    ),
+                                  ),
                                 ),
                                 ..._lines.map((line) =>
                                     DropdownMenuItem<String>(
                                       value: line['lineid'].toString(),
-                                      child:
-                                          Text(line['linename'] ?? 'Unknown'),
+                                      child: Text(
+                                        line['linename'] ?? 'Unknown',
+                                        style: TextStyle(
+                                          fontSize: isSmallScreen ? 13.0 : 14.0,
+                                        ),
+                                      ),
                                     )),
                               ],
                               onChanged: (value) {
@@ -231,10 +268,16 @@ class _AdminMapPageState extends State<AdminMapPage> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: isSmallScreen ? 6.0 : 8.0),
                       Row(
                         children: [
-                          const Text('Show Geofence: '),
+                          Text(
+                            'Show Geofence: ',
+                            style: TextStyle(
+                              fontSize: isSmallScreen ? 13.0 : 14.0,
+                              color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                            ),
+                          ),
                           Switch(
                             value: _showBaseStationGeofence,
                             onChanged: (value) {

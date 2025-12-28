@@ -13,11 +13,11 @@ class DriverQueue {
         lineid,
         status,
         joined_at,
-        driver:driverid (
+        driver (
           driverid,
           licenseid,
           lineid,
-          user:userid (
+          user!driver_userid_fkey (
             userid,
             fullname,
             phone,
@@ -68,11 +68,11 @@ class DriverQueue {
         lineid,
         status,
         joined_at,
-        driver:driverid (
+        driver (
           driverid,
           licenseid,
           lineid,
-          user:userid (
+          user!driver_userid_fkey (
             userid,
             fullname,
             phone,

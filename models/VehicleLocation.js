@@ -7,17 +7,14 @@ class VehicleLocation {
     static async upsert(vehicleid, driverid, locationData) {
         const { latitude, longitude, heading, speed, accuracy } = locationData;
 
-        // Get vehicle to find its lineid
         const vehicle = await Vehicle.findById(vehicleid);
         const vehicleLineid = vehicle?.lineid || null;
 
-        // Get all active stations
         const allStations = await BaseStation.findAll({ is_active: true });
 
         let currentStationid = null;
         let isAtStation = false;
 
-        // Check if vehicle is at any station (main station or line-specific base station)
         for (const station of allStations) {
             const distance = BaseStation.calculateDistance(
                 latitude,
@@ -29,14 +26,13 @@ class VehicleLocation {
             const isWithinGeofence = distance <= station.geofence_radius_meters;
 
             if (isWithinGeofence) {
-                // Check if this is the main station (lineid is null) or the vehicle's line station
                 const isMainStation = station.lineid === null;
                 const isVehicleLineStation = station.lineid === vehicleLineid;
 
                 if (isMainStation || isVehicleLineStation) {
                     currentStationid = station.stationid;
                     isAtStation = true;
-                    break; // Vehicle can only be at one station at a time
+                    break;
                 }
             }
         }
@@ -53,7 +49,6 @@ class VehicleLocation {
             is_at_station: isAtStation,
         };
 
-        // Use upsert to update if exists, insert if not
         const { data, error } = await supabase
             .from('vehicle_location')
             .upsert(location, {

@@ -80,6 +80,32 @@ class Payment {
 
     return data || null;
   }
+
+  static async deleteByWalletId(walletid) {
+    const { error } = await supabase
+      .from('payment')
+      .delete()
+      .or(`fromwalletid.eq.${walletid},towalletid.eq.${walletid}`);
+    
+    if (error) throw error;
+    return true;
+  }
+
+  static async deleteByWalletIds(walletIds) {
+    if (!walletIds || walletIds.length === 0) {
+      return true;
+    }
+    
+    const conditions = walletIds.map(id => `fromwalletid.eq.${id},towalletid.eq.${id}`).join(',');
+    
+    const { error } = await supabase
+      .from('payment')
+      .delete()
+      .or(conditions);
+    
+    if (error) throw error;
+    return true;
+  }
 }
 
 export default Payment;

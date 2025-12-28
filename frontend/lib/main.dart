@@ -8,12 +8,16 @@ import 'utils/server_time_sync.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  
-  Stripe.publishableKey = AppConfig.stripePublishableKey;
-  await Stripe.instance.applySettings();
+  try {
+    Stripe.publishableKey = AppConfig.stripePublishableKey;
+    await Stripe.instance.applySettings();
+    print('Stripe initialized successfully');
+  } catch (e) {
+    print('Warning: Stripe initialization failed: $e');
+  }
 
   runApp(const TaxiPalestineApp());
   TimeSyncService.sync();
   
-  print('app started');
+  print('App started');
 }

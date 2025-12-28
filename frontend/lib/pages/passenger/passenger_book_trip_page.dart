@@ -304,6 +304,13 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
+    // Responsive sizing
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0);
+    final double titleFontSize = isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0);
 
     return Directionality(
       textDirection: textDirection,
@@ -312,9 +319,10 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
         appBar: AppBar(
           title: Text(
             t('title'),
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
+              fontSize: titleFontSize,
             ),
           ),
           backgroundColor: const Color(0xFF1E3A5F),
@@ -327,15 +335,15 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
             ? const Center(child: CircularProgressIndicator())
             : SafeArea(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(basePadding),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: EdgeInsets.all(isSmallScreen ? 14.0 : (isMediumScreen ? 17.0 : 20.0)),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 14.0 : 18.0),
                           border: Border.all(
                             color: Colors.grey.shade200,
                             width: 1.5,
@@ -522,10 +530,10 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
                       ),
                       const SizedBox(height: 16),
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: EdgeInsets.all(isSmallScreen ? 14.0 : (isMediumScreen ? 17.0 : 20.0)),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 14.0 : 18.0),
                           border: Border.all(
                               color: Colors.grey.shade200, width: 1.5),
                           boxShadow: [

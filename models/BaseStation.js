@@ -73,7 +73,6 @@ class BaseStation {
   }
 
   static async findNearestStation(latitude, longitude) {
-    // Get all active stations and calculate distance to find nearest
     const stations = await this.findAll({ is_active: true });
     
     if (stations.length === 0) return null;
@@ -99,8 +98,7 @@ class BaseStation {
   }
 
   static calculateDistance(lat1, lng1, lat2, lng2) {
-    // Haversine formula to calculate distance between two points
-    const R = 6371000; // Earth's radius in meters
+    const R = 6371000;
     const dLat = this.toRadians(lat2 - lat1);
     const dLng = this.toRadians(lng2 - lng1);
     

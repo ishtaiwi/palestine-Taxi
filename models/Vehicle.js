@@ -122,7 +122,7 @@ class Vehicle {
   static async findById(vehicleid) {
     const { data, error } = await supabase
       .from('vehicle')
-      .select('*, driver(*, user(*)), line(*)')
+      .select('*, driver(*, user!driver_userid_fkey(*)), line(*)')
       .eq('vehicleid', vehicleid)
       .single();
     
@@ -133,7 +133,7 @@ class Vehicle {
   static async findByDriverId(driverid) {
     const { data, error } = await supabase
       .from('vehicle')
-      .select('*, driver(*, user(*)), line(*)')
+      .select('*, driver(*, user!driver_userid_fkey(*)), line(*)')
       .eq('driverid', driverid);
     
     if (error) throw error;
@@ -143,7 +143,7 @@ class Vehicle {
   static async findByLineId(lineid) {
     const { data, error } = await supabase
       .from('vehicle')
-      .select('*, driver(*, user(*)), line(*)')
+      .select('*, driver(*, user!driver_userid_fkey(*)), line(*)')
       .eq('lineid', lineid);
     
     if (error) throw error;
@@ -153,7 +153,7 @@ class Vehicle {
   static async findByPlateNumber(plateno) {
     const { data, error } = await supabase
       .from('vehicle')
-      .select('*, driver(*, user(*)), line(*)')
+      .select('*, driver(*, user!driver_userid_fkey(*)), line(*)')
       .eq('plateno', plateno)
       .maybeSingle();
     
@@ -186,7 +186,7 @@ class Vehicle {
   }
 
   static async findAll(filters = {}) {
-    let query = supabase.from('vehicle').select('*, driver(*, user(*)), line(*)');
+    let query = supabase.from('vehicle').select('*, driver(*, user!driver_userid_fkey(*)), line(*)');
     
     if (filters.status) {
       query = query.eq('status', filters.status);

@@ -79,19 +79,27 @@ class _QRScannerPageState extends State<QRScannerPage> {
     try {
       // Show processing dialog
       if (!mounted) return;
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isSmallScreen = screenWidth < 360;
+      final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+      
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
           backgroundColor: const Color(0xFF1E3A5F),
+          contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const CircularProgressIndicator(),
-              const SizedBox(height: 16),
+              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
               Text(
                 t('processing'),
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isSmallScreen ? 14.0 : 16.0,
+                ),
               ),
             ],
           ),
@@ -106,24 +114,41 @@ class _QRScannerPageState extends State<QRScannerPage> {
       if (result['success'] == true) {
         // Show success message
         if (!mounted) return;
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isSmallScreen = screenWidth < 360;
+        final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+        
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             backgroundColor: const Color(0xFF1E3A5F),
+            titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+            contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+            actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
             title: Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.green),
-                const SizedBox(width: 8),
+                Icon(
+                  Icons.check_circle, 
+                  color: Colors.green,
+                  size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
+                ),
+                SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                 Text(
                   t('success'),
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+                  ),
                 ),
               ],
             ),
             content: Text(
               result['reservation']?['passenger']?['user']?['fullname']?.toString() ??
                   'Passenger',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: isSmallScreen ? 14.0 : 16.0,
+              ),
             ),
             actions: [
               TextButton(
@@ -131,7 +156,13 @@ class _QRScannerPageState extends State<QRScannerPage> {
                   Navigator.pop(context); // Close success dialog
                   Navigator.pop(context); // Go back to trips page
                 },
-                child: Text(t('close'), style: const TextStyle(color: Colors.white)),
+                child: Text(
+                  t('close'), 
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isSmallScreen ? 13.0 : 14.0,
+                  ),
+                ),
               ),
             ],
           ),
@@ -140,23 +171,40 @@ class _QRScannerPageState extends State<QRScannerPage> {
         // Show error message
         if (!mounted) return;
         final errorMessage = result['message']?.toString() ?? t('error');
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isSmallScreen = screenWidth < 360;
+        final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+        
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             backgroundColor: const Color(0xFF1E3A5F),
+            titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+            contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+            actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
             title: Row(
               children: [
-                const Icon(Icons.error, color: Colors.red),
-                const SizedBox(width: 8),
+                Icon(
+                  Icons.error, 
+                  color: Colors.red,
+                  size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
+                ),
+                SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                 Text(
                   t('error'),
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+                  ),
                 ),
               ],
             ),
             content: Text(
               errorMessage,
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: isSmallScreen ? 14.0 : 16.0,
+              ),
             ),
             actions: [
               TextButton(
@@ -167,14 +215,26 @@ class _QRScannerPageState extends State<QRScannerPage> {
                   });
                   controller.start(); // Resume scanning
                 },
-                child: Text(t('tryAgain'), style: const TextStyle(color: Colors.white)),
+                child: Text(
+                  t('tryAgain'), 
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isSmallScreen ? 13.0 : 14.0,
+                  ),
+                ),
               ),
               TextButton(
                 onPressed: () {
                   Navigator.pop(context); // Close error dialog
                   Navigator.pop(context); // Go back
                 },
-                child: Text(t('close'), style: const TextStyle(color: Colors.white)),
+                child: Text(
+                  t('close'), 
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isSmallScreen ? 13.0 : 14.0,
+                  ),
+                ),
               ),
             ],
           ),
@@ -184,23 +244,40 @@ class _QRScannerPageState extends State<QRScannerPage> {
       if (!mounted) return;
       Navigator.pop(context); // Close processing dialog
       
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isSmallScreen = screenWidth < 360;
+      final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+      
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
           backgroundColor: const Color(0xFF1E3A5F),
+          titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+          contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+          actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
           title: Row(
             children: [
-              const Icon(Icons.error, color: Colors.red),
-              const SizedBox(width: 8),
+              Icon(
+                Icons.error, 
+                color: Colors.red,
+                size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
+              ),
+              SizedBox(width: isSmallScreen ? 6.0 : 8.0),
               Text(
                 t('error'),
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+                ),
               ),
             ],
           ),
           content: Text(
             e.toString(),
-            style: const TextStyle(color: Colors.white70),
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: isSmallScreen ? 14.0 : 16.0,
+            ),
           ),
           actions: [
             TextButton(
@@ -211,14 +288,26 @@ class _QRScannerPageState extends State<QRScannerPage> {
                 });
                 controller.start(); // Resume scanning
               },
-              child: Text(t('tryAgain'), style: const TextStyle(color: Colors.white)),
+              child: Text(
+                t('tryAgain'), 
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isSmallScreen ? 13.0 : 14.0,
+                ),
+              ),
             ),
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Close error dialog
                 Navigator.pop(context); // Go back
               },
-              child: Text(t('close'), style: const TextStyle(color: Colors.white)),
+              child: Text(
+                t('close'), 
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isSmallScreen ? 13.0 : 14.0,
+                ),
+              ),
             ),
           ],
         ),
@@ -235,6 +324,12 @@ class _QRScannerPageState extends State<QRScannerPage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 18.0 : 24.0);
 
     return Directionality(
       textDirection: textDirection,
@@ -243,7 +338,11 @@ class _QRScannerPageState extends State<QRScannerPage> {
         appBar: AppBar(
           title: Text(
             t('title'),
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Colors.white, 
+              fontWeight: FontWeight.bold,
+              fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+            ),
           ),
           backgroundColor: const Color(0xFF1E3A5F),
           iconTheme: const IconThemeData(color: Colors.white),
@@ -259,7 +358,7 @@ class _QRScannerPageState extends State<QRScannerPage> {
               left: 0,
               right: 0,
               child: Container(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(basePadding),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
@@ -274,22 +373,26 @@ class _QRScannerPageState extends State<QRScannerPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                         border: Border.all(color: Colors.white24),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.info_outline, color: Colors.white, size: 24),
-                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.info_outline, 
+                            color: Colors.white, 
+                            size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0)
+                          ),
+                          SizedBox(width: isSmallScreen ? 10.0 : 12.0),
                           Expanded(
                             child: Text(
                               t('instructions'),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 16,
+                                fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),

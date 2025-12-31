@@ -1,4 +1,5 @@
 import ScheduleTemplate from '../models/ScheduleTemplate.js';
+import Trip from '../models/Trip.js';
 import { createTripsForTemplate, createDailyTrips } from '../services/dailyTripService.js';
 import logger from '../utils/logger.js';
 
@@ -92,6 +93,15 @@ export const createSchedule = async (req, res, next) => {
       });
     }
     
+    // Check if a schedule already exists for this line
+    const scheduleExists = await ScheduleTemplate.existsForLine(lineid);
+    if (scheduleExists) {
+      return res.status(400).json({
+        success: false,
+        message: req.t('schedule.duplicate_line') || 'A schedule already exists for this line. Only one schedule per line is allowed.',
+      });
+    }
+    
     const scheduleData = {
       lineid,
       start_hour: parseInt(start_hour, 10),
@@ -174,12 +184,30 @@ export const updateSchedule = async (req, res, next) => {
 export const deleteSchedule = async (req, res, next) => {
   try {
     const { templateid } = req.params;
+    
+    // Check if there are any trips referencing this schedule template
+    const trips = await Trip.findAll({ templateid });
+    if (trips && trips.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: req.t('schedule.has_trips') || `Cannot delete schedule. There are ${trips.length} trip(s) associated with this schedule. Please delete or reassign the trips first.`,
+      });
+    }
+    
     await ScheduleTemplate.delete(templateid);
     
     res.json({
+      success: true,
       message: req.t('schedule.deleted') || 'Schedule template deleted successfully',
     });
   } catch (error) {
+    // Handle foreign key constraint error
+    if (error.code === '23503' || error.message?.includes('foreign key constraint')) {
+      return res.status(400).json({
+        success: false,
+        message: req.t('schedule.has_trips') || 'Cannot delete schedule. There are trips associated with this schedule. Please delete or reassign the trips first.',
+      });
+    }
     next(error);
   }
 };

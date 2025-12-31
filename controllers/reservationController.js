@@ -98,6 +98,60 @@ export const createReservation = async (req, res, next) => {
       });
     }
 
+    // Check for duplicate reservations - prevent passenger from booking same trip multiple times
+    const existingReservations = await Reservation.findByPassengerId(passengerid);
+    const activeStatuses = [RESERVATION_STATUS.CONFIRMED, RESERVATION_STATUS.CHECKED_IN, RESERVATION_STATUS.PENDING];
+    
+    if (bookingType === BOOKING_TYPE.INSTANT && tripid) {
+      // Check if passenger already has an active reservation for this trip
+      const duplicateReservation = existingReservations.find(
+        r => r.tripid === tripid && activeStatuses.includes(r.status)
+      );
+      
+      if (duplicateReservation) {
+        return res.status(400).json({
+          message: req.t('reservation.duplicate_booking') || 'Cannot make reservation: You already have an active reservation for this trip. Please cancel your existing reservation first or wait for it to complete.',
+        });
+      }
+    }
+    
+    if (bookingType === BOOKING_TYPE.FUTURE && scheduled_trip_time) {
+      // Normalize scheduled_trip_time for comparison
+      const scheduledTime = new Date(scheduled_trip_time);
+      if (!Number.isNaN(scheduledTime.getTime())) {
+        const scheduledTimeISO = scheduledTime.toISOString();
+        
+        // Check if passenger already has an active reservation for this scheduled time
+        const duplicateReservation = existingReservations.find(
+          r => r.booking_type === BOOKING_TYPE.FUTURE &&
+               activeStatuses.includes(r.status) &&
+               r.scheduled_trip_time && (
+                 r.scheduled_trip_time === scheduled_trip_time ||
+                 (new Date(r.scheduled_trip_time).toISOString() === scheduledTimeISO)
+               )
+        );
+        
+        if (duplicateReservation) {
+          return res.status(400).json({
+            message: req.t('reservation.duplicate_booking') || 'Cannot make reservation: You already have an active reservation for this trip time. Please cancel your existing reservation first or wait for it to complete.',
+          });
+        }
+      }
+      
+      // Also check if tripid is provided and passenger already has a reservation for that trip
+      if (tripid) {
+        const duplicateTripReservation = existingReservations.find(
+          r => r.tripid === tripid && activeStatuses.includes(r.status)
+        );
+        
+        if (duplicateTripReservation) {
+          return res.status(400).json({
+            message: req.t('reservation.duplicate_booking') || 'Cannot make reservation: You already have an active reservation for this trip. Please cancel your existing reservation first or wait for it to complete.',
+          });
+        }
+      }
+    }
+
 
     if (bookingType === BOOKING_TYPE.FUTURE) {
       if (!scheduled_trip_time) {
@@ -473,7 +527,7 @@ export const cancelReservation = async (req, res, next) => {
           await Payment.create({
             paymentid: uuidv4(),
             amount: refundAmount,
-            method: 'refund',
+            method: PAYMENT_METHOD.WALLET,
             status: PAYMENT_STATUS.REFUNDED,
             type: 'refund',
             fromwalletid: wallets[0].walletid,

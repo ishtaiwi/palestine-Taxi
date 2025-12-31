@@ -17,6 +17,11 @@ const shouldDepartEarly = async (trip) => {
       return false;
     }
 
+    // Validate trip has required IDs
+    if (!trip.tripid || !trip.vehicleid) {
+      return false;
+    }
+
     // Get vehicle details
     const vehicle = await Vehicle.findById(trip.vehicleid);
     if (!vehicle) {
@@ -79,6 +84,11 @@ const shouldDepartScheduled = async (trip) => {
  */
 const hasFutureBooking = async (trip) => {
   try {
+    // Validate trip has required ID
+    if (!trip.tripid) {
+      return false;
+    }
+
     const reservations = await Reservation.findByTripId(trip.tripid);
     const futureBookings = reservations.filter(
       r => r.booking_type === 'future' && (r.status === 'confirmed' || r.status === 'checked_in')
@@ -186,12 +196,16 @@ export const checkAndDepartTrips = async () => {
             reason = 'scheduled_departure_with_future_booking';
           } else {
             // Check if trip has any bookings at all
-            const reservations = await Reservation.findByTripId(trip.tripid);
-            if (reservations.length > 0) {
-              shouldDepart = true;
-              reason = 'scheduled_departure_with_bookings';
+            if (!trip.tripid) {
+              console.log(`[DepartureService] ⚠️ Trip ${trip.tripid} scheduled time arrived but no trip ID`);
             } else {
-              console.log(`[DepartureService] ⚠️ Trip ${trip.tripid} scheduled time arrived but no bookings`);
+              const reservations = await Reservation.findByTripId(trip.tripid);
+              if (reservations.length > 0) {
+                shouldDepart = true;
+                reason = 'scheduled_departure_with_bookings';
+              } else {
+                console.log(`[DepartureService] ⚠️ Trip ${trip.tripid} scheduled time arrived but no bookings`);
+              }
             }
           }
         }

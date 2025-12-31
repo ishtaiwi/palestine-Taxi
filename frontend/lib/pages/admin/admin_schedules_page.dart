@@ -79,6 +79,9 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'endBeforeStart': 'ساعة النهاية يجب أن تكون بعد ساعة البداية',
       'trips': 'الرحلات',
       'search': 'بحث عن جدول...',
+      'duplicateSchedule': 'جدول موجود بالفعل لهذا الخط',
+      'allLinesHaveSchedules': 'جميع الخطوط لديها جداول بالفعل',
+      'hasTrips': 'لا يمكن حذف الجدول. يوجد رحلات مرتبطة بهذا الجدول',
     },
     'en': {
       'title': 'Daily Schedules',
@@ -127,6 +130,9 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'endBeforeStart': 'End time must be after start time',
       'trips': 'Trips',
       'search': 'Search schedules...',
+      'duplicateSchedule': 'A schedule already exists for this line',
+      'allLinesHaveSchedules': 'All lines already have schedules',
+      'hasTrips': 'Cannot delete schedule. There are trips associated with this schedule',
     },
   };
 
@@ -197,6 +203,25 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     }).toList();
   }
 
+  List<Map<String, dynamic>> _getAvailableLines() {
+    // Always return all lines - we'll disable the ones with schedules in the UI
+    return _lines;
+  }
+
+  bool _lineHasSchedule(String? lineId) {
+    if (lineId == null) return false;
+    // When editing, don't consider the current schedule as blocking
+    if (_editingTemplateId != null) {
+      final currentSchedule = _schedules.firstWhere(
+        (s) => s['templateid']?.toString() == _editingTemplateId,
+        orElse: () => {},
+      );
+      final currentLineId = currentSchedule['lineid']?.toString();
+      if (currentLineId == lineId) return false;
+    }
+    return _schedules.any((s) => s['lineid']?.toString() == lineId);
+  }
+
   void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -213,6 +238,12 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedLineId == null) {
       _showSnackBar(t('selectLine'), isError: true);
+      return;
+    }
+
+    // Check if line already has a schedule (only when creating new schedule)
+    if (_editingTemplateId == null && _lineHasSchedule(_selectedLineId)) {
+      _showSnackBar(t('duplicateSchedule'), isError: true);
       return;
     }
 
@@ -449,28 +480,70 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                 key: _formKey,
                 child: Column(
                   children: [
+                    if (_editingTemplateId == null)
+                      Container(
+                        padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+                        margin: EdgeInsets.only(bottom: isSmallScreen ? 12.0 : 16.0),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                          border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Colors.blue,
+                              size: isSmallScreen ? 18.0 : 20.0,
+                            ),
+                            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                            Expanded(
+                              child: Text(
+                                _isArabic
+                                    ? 'الخطوط التي لديها جدول بالفعل معطلة ولا يمكن اختيارها'
+                                    : 'Lines with existing schedules are disabled and cannot be selected',
+                                style: TextStyle(
+                                  color: AppTheme.isDarkMode ? Colors.blueAccent : Colors.blue.shade800,
+                                  fontSize: isSmallScreen ? 12.0 : 13.0,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     _buildDropdown(
                       label: t('line'),
                       value: _selectedLineId,
-                      items: _lines.map((line) {
+                      items: _getAvailableLines().map((line) {
+                        final lineId = line['lineid']?.toString();
                         final name = _isArabic
                             ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? 'Unknown')
                             : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? 'Unknown');
+                        final isDisabled = _editingTemplateId == null && _lineHasSchedule(lineId);
                         return DropdownMenuItem<String>(
-                          value: line['lineid'],
+                          value: lineId,
+                          enabled: !isDisabled,
                           child: Container(
                             width: double.infinity,
                             margin: EdgeInsets.symmetric(vertical: isSmallScreen ? 3.0 : 4.0),
                             padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
                             decoration: BoxDecoration(
-                              color: AppTheme.isDarkMode
-                                  ? Colors.white.withOpacity(0.05)
-                                  : Colors.grey.shade50,
+                              color: isDisabled
+                                  ? (AppTheme.isDarkMode
+                                      ? Colors.white.withOpacity(0.02)
+                                      : Colors.grey.shade100)
+                                  : (AppTheme.isDarkMode
+                                      ? Colors.white.withOpacity(0.05)
+                                      : Colors.grey.shade50),
                               borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                               border: Border.all(
-                                color: AppTheme.isDarkMode
-                                    ? Colors.white.withOpacity(0.1)
-                                    : Colors.grey.shade200,
+                                color: isDisabled
+                                    ? (AppTheme.isDarkMode
+                                        ? Colors.white.withOpacity(0.05)
+                                        : Colors.grey.shade300)
+                                    : (AppTheme.isDarkMode
+                                        ? Colors.white.withOpacity(0.1)
+                                        : Colors.grey.shade200),
                               ),
                             ),
                             child: Row(
@@ -478,17 +551,25 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                                 Container(
                                   padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                                   decoration: BoxDecoration(
-                                    color: AppTheme.isDarkMode
-                                        ? Colors.blueAccent.withOpacity(0.2)
-                                        : AppTheme.appBarColor.withOpacity(0.1),
+                                    color: isDisabled
+                                        ? (AppTheme.isDarkMode
+                                            ? Colors.grey.withOpacity(0.1)
+                                            : Colors.grey.shade200)
+                                        : (AppTheme.isDarkMode
+                                            ? Colors.blueAccent.withOpacity(0.2)
+                                            : AppTheme.appBarColor.withOpacity(0.1)),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
                                     Icons.directions_bus_rounded,
                                     size: isSmallScreen ? 16.0 : 18.0,
-                                    color: AppTheme.isDarkMode
-                                        ? Colors.blueAccent
-                                        : AppTheme.appBarColor,
+                                    color: isDisabled
+                                        ? (AppTheme.isDarkMode
+                                            ? Colors.grey
+                                            : Colors.grey.shade600)
+                                        : (AppTheme.isDarkMode
+                                            ? Colors.blueAccent
+                                            : AppTheme.appBarColor),
                                   ),
                                 ),
                                 SizedBox(width: isSmallScreen ? 10.0 : 12.0),
@@ -496,27 +577,48 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                                   child: Text(
                                     name.toString(),
                                     style: TextStyle(
-                                      color: AppTheme.textPrimary,
+                                      color: isDisabled
+                                          ? (AppTheme.isDarkMode
+                                              ? Colors.white38
+                                              : Colors.grey.shade500)
+                                          : AppTheme.textPrimary,
                                       fontWeight: FontWeight.w600,
                                       fontSize: isSmallScreen ? 13.0 : 14.0,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                if (isDisabled)
+                                  Padding(
+                                    padding: EdgeInsets.only(left: isSmallScreen ? 6.0 : 8.0),
+                                    child: Icon(
+                                      Icons.check_circle,
+                                      size: isSmallScreen ? 14.0 : 16.0,
+                                      color: AppTheme.isDarkMode
+                                          ? Colors.orangeAccent
+                                          : Colors.orange.shade700,
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
                         );
                       }).toList(),
                       selectedItemBuilder: (context) {
-                        return _lines.map((line) {
+                        return _getAvailableLines().map((line) {
+                          final lineId = line['lineid']?.toString();
                           final name = _isArabic
                               ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? 'Unknown')
                               : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? 'Unknown');
+                          final isDisabled = _editingTemplateId == null && _lineHasSchedule(lineId);
                           return Text(
                             name.toString(),
                             style: TextStyle(
-                              color: AppTheme.textPrimary,
+                              color: isDisabled
+                                  ? (AppTheme.isDarkMode
+                                      ? Colors.white38
+                                      : Colors.grey.shade500)
+                                  : AppTheme.textPrimary,
                               fontWeight: FontWeight.w500,
                               fontSize: isSmallScreen ? 14.0 : 15.0,
                             ),
@@ -524,7 +626,13 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                           );
                         }).toList();
                       },
-                      onChanged: (val) => setState(() => _selectedLineId = val),
+                      onChanged: (val) {
+                        if (val != null && _editingTemplateId == null && _lineHasSchedule(val)) {
+                          _showSnackBar(t('duplicateSchedule'), isError: true);
+                          return;
+                        }
+                        setState(() => _selectedLineId = val);
+                      },
                       isSmallScreen: isSmallScreen,
                       isMediumScreen: isMediumScreen,
                     ),

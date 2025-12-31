@@ -48,6 +48,9 @@ export const assignVehicleFromQueue = async (tripid, lineid) => {
     // Assign driver to trip
     await Trip.assignDriver(tripid, driverid);
 
+    // Remove driver from queue after successful assignment
+    await DriverQueue.removeDriverFromQueue(driverid);
+
     logger.info(`[TripOpeningService] ✅ Vehicle ${vehicle.vehicleid} and driver ${driverid} assigned to trip ${tripid}`);
 
     return {

@@ -53,6 +53,18 @@ class ScheduleTemplate {
     return data;
   }
 
+  static async existsForLine(lineid) {
+    const { data, error } = await supabase
+      .from('schedule_template')
+      .select('templateid')
+      .eq('lineid', lineid)
+      .limit(1)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "not found" which is fine
+    return data !== null;
+  }
+
   static async getActiveTemplates() {
     const { data, error } = await supabase
       .from('schedule_template')

@@ -685,7 +685,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxContentWidth),
           child: isWeb && (isDesktop || isTablet) && _trips.isNotEmpty
-              ? Padding(
+              ? SingleChildScrollView(
                   padding: EdgeInsets.all(basePadding),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

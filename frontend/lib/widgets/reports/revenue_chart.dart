@@ -6,11 +6,13 @@ import '../../utils/report_data_processor.dart';
 class RevenueChart extends StatelessWidget {
   final Map<String, dynamic> data;
   final bool isArabic;
+  final bool showSummary;
 
   const RevenueChart({
     super.key,
     required this.data,
     this.isArabic = false,
+    this.showSummary = true,
   });
 
   @override
@@ -31,24 +33,26 @@ class RevenueChart extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildStatItem(
-              isArabic ? 'إجمالي الإيرادات' : 'Total Revenue',
-              ReportDataProcessor.formatCurrencyCompact(totalRevenue),
-              Colors.green,
-            ),
-            _buildStatItem(
-              isArabic ? 'إجمالي المعاملات' : 'Total Transactions',
-              totalTransactions.toString(),
-              Colors.blue,
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
+        if (showSummary) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatItem(
+                isArabic ? 'إجمالي الإيرادات' : 'Total Revenue',
+                ReportDataProcessor.formatCurrencyCompact(totalRevenue),
+                Colors.green,
+              ),
+              _buildStatItem(
+                isArabic ? 'إجمالي المعاملات' : 'Total Transactions',
+                totalTransactions.toString(),
+                Colors.blue,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
         SizedBox(
-          height: 250,
+          height: 170,
           child: LineChart(
             LineChartData(
               gridData: FlGridData(
@@ -73,21 +77,19 @@ class RevenueChart extends StatelessWidget {
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    reservedSize: 30,
+                    reservedSize: 20,
+                    interval: chartData.length > 10
+                        ? (chartData.length / 5).ceilToDouble()
+                        : 1,
                     getTitlesWidget: (value, meta) {
-                      if (value.toInt() >= 0 &&
-                          value.toInt() < chartData.length) {
-                        final date = chartData[value.toInt()]['date'] as String;
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            date.length > 10
-                                ? date.substring(5, 10)
-                                : date.substring(5),
-                            style: TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontSize: 10,
-                            ),
+                      final idx = value.toInt();
+                      if (idx >= 0 && idx < chartData.length) {
+                        final date = chartData[idx]['date'] as String;
+                        return Text(
+                          date.substring(5, 10),
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 8,
                           ),
                         );
                       }
@@ -98,13 +100,14 @@ class RevenueChart extends StatelessWidget {
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
-                    reservedSize: 50,
+                    reservedSize: 35,
+                    interval: _getMaxRevenue(chartData) / 3,
                     getTitlesWidget: (value, meta) {
                       return Text(
                         ReportDataProcessor.formatCurrencyCompact(value),
                         style: TextStyle(
                           color: AppTheme.textSecondary,
-                          fontSize: 10,
+                          fontSize: 8,
                         ),
                       );
                     },
@@ -289,7 +292,8 @@ class RevenueByLineChart extends StatelessWidget {
                   toY: (entry.value.value as num).toDouble(),
                   color: Colors.green,
                   width: 20,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(4)),
                 ),
               ],
             );
@@ -309,4 +313,3 @@ class RevenueByLineChart extends StatelessWidget {
     return max > 0 ? max : 1000;
   }
 }
-

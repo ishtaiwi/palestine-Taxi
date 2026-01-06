@@ -26,7 +26,7 @@ class TripTimeSeriesChart extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 250,
+      height: 170,
       child: LineChart(
         LineChartData(
           gridData: FlGridData(
@@ -51,18 +51,19 @@ class TripTimeSeriesChart extends StatelessWidget {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 30,
+                reservedSize: 20,
+                interval: overTime.length > 10
+                    ? (overTime.length / 5).ceilToDouble()
+                    : 1,
                 getTitlesWidget: (value, meta) {
-                  if (value.toInt() >= 0 && value.toInt() < overTime.length) {
-                    final date = overTime[value.toInt()]['date'] as String;
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(
-                        date.length > 10 ? date.substring(5, 10) : date.substring(5),
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 10,
-                        ),
+                  final idx = value.toInt();
+                  if (idx >= 0 && idx < overTime.length) {
+                    final date = overTime[idx]['date'] as String;
+                    return Text(
+                      date.substring(5, 10),
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 8,
                       ),
                     );
                   }
@@ -73,13 +74,14 @@ class TripTimeSeriesChart extends StatelessWidget {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 40,
+                reservedSize: 30,
+                interval: _getMaxTrips(overTime) / 3,
                 getTitlesWidget: (value, meta) {
                   return Text(
                     value.toInt().toString(),
                     style: TextStyle(
                       color: AppTheme.textSecondary,
-                      fontSize: 10,
+                      fontSize: 8,
                     ),
                   );
                 },
@@ -161,10 +163,26 @@ class TripStatusChart extends StatelessWidget {
     final inProgress = data['inProgress'] ?? 0;
 
     final statusData = [
-      {'label': isArabic ? 'مكتمل' : 'Completed', 'value': completed, 'color': Colors.green},
-      {'label': isArabic ? 'ملغي' : 'Cancelled', 'value': cancelled, 'color': Colors.red},
-      {'label': isArabic ? 'مجدول' : 'Scheduled', 'value': scheduled, 'color': Colors.blue},
-      {'label': isArabic ? 'قيد التنفيذ' : 'In Progress', 'value': inProgress, 'color': Colors.orange},
+      {
+        'label': isArabic ? 'مكتمل' : 'Completed',
+        'value': completed,
+        'color': Colors.green
+      },
+      {
+        'label': isArabic ? 'ملغي' : 'Cancelled',
+        'value': cancelled,
+        'color': Colors.red
+      },
+      {
+        'label': isArabic ? 'مجدول' : 'Scheduled',
+        'value': scheduled,
+        'color': Colors.blue
+      },
+      {
+        'label': isArabic ? 'قيد التنفيذ' : 'In Progress',
+        'value': inProgress,
+        'color': Colors.orange
+      },
     ].where((item) => (item['value'] as num) > 0).toList();
 
     if (statusData.isEmpty) {
@@ -260,7 +278,8 @@ class TripStatusChart extends StatelessWidget {
                   toY: (entry.value['value'] as num).toDouble(),
                   color: color,
                   width: 30,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(4)),
                 ),
               ],
             );
@@ -330,4 +349,3 @@ class UtilizationGaugeChart extends StatelessWidget {
     );
   }
 }
-

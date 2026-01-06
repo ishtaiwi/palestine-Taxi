@@ -108,7 +108,7 @@ class Reservation {
       .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))), payment(*)')
       .eq('booking_type', 'future')
       .eq('scheduled_trip_time', scheduledTripTime)
-      .in('status', ['confirmed', 'pending']);
+      .eq('status', 'confirmed');
 
     if (filters.tripid) {
       query = query.eq('tripid', filters.tripid);
@@ -125,7 +125,7 @@ class Reservation {
       .select('*, passenger(*, user(*)), payment(*)')
       .eq('tripid', tripid)
       .eq('booking_type', 'instant')
-      .in('status', ['confirmed', 'pending']);
+      .eq('status', 'confirmed');
 
     const { data, error } = await query.order('bookedat', { ascending: true });
     if (error) throw error;

@@ -187,7 +187,6 @@ class BookingByStatusChart extends StatelessWidget {
     final statusColors = {
       'confirmed': Colors.green,
       'cancelled': Colors.red,
-      'pending': Colors.orange,
     };
 
     return SizedBox(

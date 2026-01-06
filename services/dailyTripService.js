@@ -6,7 +6,7 @@ import logger from '../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';
 import supabase from '../config/dbcon.js';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
-import { getServerTimezoneOffset, parseUtcDate } from '../utils/timeUtils.js';
+import { getServerTimezoneOffset, parseUtcDate, getUtcNow } from '../utils/timeUtils.js';
 
 /**
  * Generate trip times based on schedule template
@@ -122,8 +122,19 @@ async function createTripsForDate(template, targetDate) {
     const errors = [];
 
     // Create trips for each time
+    const now = getUtcNow();
     for (const deptime of tripTimes) {
       try {
+        // Skip trips in the past
+        if (deptime.getTime() <= now.getTime()) {
+          logger.debug('Skipping trip in the past', {
+            lineid,
+            deptime: deptime.toISOString(),
+            now: now.toISOString(),
+          });
+          continue;
+        }
+
         // Check if trip already exists for this time and line
         // Use a time window of ±5 minutes to avoid duplicates
         const timeWindowStart = new Date(deptime.getTime() - 5 * 60 * 1000);

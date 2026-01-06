@@ -206,22 +206,30 @@ export const findWaitingTrips = async (lineid = null) => {
       const openingTimePassed = openingTime ? openingTime.getTime() <= now.getTime() : false;
       const departureTimePassed = deptime.getTime() <= now.getTime();
 
-      // If departure time has passed, only include if trip has reservations
-      if (departureTimePassed) {
-        try {
-          const reservations = await Reservation.findByTripId(trip.tripid);
-          logger.debug(`[TripOpeningService] Trip ${trip.tripid} reservations check: found ${reservations?.length || 0} reservations, totalbookings: ${trip.totalbookings || 0}`);
-          const hasReservations = reservations && reservations.length > 0;
-          if (!hasReservations) {
-            skippedCount.noReservations++;
-            logger.info(`[TripOpeningService] ⚠️ Trip ${trip.tripid} (line: ${trip.lineid}) passed departure time but has no reservations (found ${reservations?.length || 0}, totalbookings: ${trip.totalbookings || 0}), skipping assignment`);
-            continue; // Skip trips without reservations that have passed departure
-          }
-          logger.debug(`[TripOpeningService] Trip ${trip.tripid} has ${reservations.length} reservation(s), proceeding with assignment`);
-        } catch (error) {
-          logger.error(`[TripOpeningService] Error checking reservations for trip ${trip.tripid}:`, error);
-          continue; // Skip on error
-        }
+      // Check for reservations - trips without reservations should not be assigned vehicles
+      // Drivers should stay in queue waiting for trips with actual bookings
+      let hasReservations = false;
+      try {
+        const reservations = await Reservation.findByTripId(trip.tripid);
+        hasReservations = reservations && reservations.length > 0;
+        logger.debug(`[TripOpeningService] Trip ${trip.tripid} reservations check: found ${reservations?.length || 0} reservations, totalbookings: ${trip.totalbookings || 0}`);
+      } catch (error) {
+        logger.error(`[TripOpeningService] Error checking reservations for trip ${trip.tripid}:`, error);
+        continue; // Skip on error
+      }
+
+      // If departure time has passed, ONLY include if trip has reservations
+      if (departureTimePassed && !hasReservations) {
+        skippedCount.noReservations++;
+        logger.info(`[TripOpeningService] ⚠️ Trip ${trip.tripid} (line: ${trip.lineid}) passed departure time but has no reservations (totalbookings: ${trip.totalbookings || 0}), skipping assignment`);
+        continue; // Skip trips without reservations that have passed departure
+      }
+
+      // If opening time passed but departure hasn't, ONLY include if trip has reservations
+      if (openingTimePassed && !departureTimePassed && !hasReservations) {
+        skippedCount.noReservations++;
+        logger.info(`[TripOpeningService] ⚠️ Trip ${trip.tripid} (line: ${trip.lineid}) opening time passed but has no reservations, skipping assignment - driver should wait in queue`);
+        continue; // Skip trips without reservations even if opening time passed
       }
 
       // Check if time conditions are met
@@ -231,9 +239,13 @@ export const findWaitingTrips = async (lineid = null) => {
         continue;
       }
 
-      // Include if opening time passed (normal case, before departure) OR departure time passed with reservations
-      waitingTrips.push(trip);
-      logger.debug(`[TripOpeningService] ✅ Trip ${trip.tripid} (line: ${trip.lineid}) added to waiting list - openingTimePassed: ${openingTimePassed}, departureTimePassed: ${departureTimePassed}`);
+      // Include if:
+      // 1. Opening time passed AND has reservations, OR
+      // 2. Departure time passed AND has reservations
+      if (hasReservations && (openingTimePassed || departureTimePassed)) {
+        waitingTrips.push(trip);
+        logger.debug(`[TripOpeningService] ✅ Trip ${trip.tripid} (line: ${trip.lineid}) added to waiting list - openingTimePassed: ${openingTimePassed}, departureTimePassed: ${departureTimePassed}, hasReservations: ${hasReservations}`);
+      }
     }
 
     logger.info(`[TripOpeningService] Filtered ${allTrips.length} trips: ${waitingTrips.length} waiting, ${skippedCount.hasVehicle} have vehicles, ${skippedCount.noDeptime} no deptime, ${skippedCount.timeNotPassed} time not passed, ${skippedCount.noReservations} no reservations`);

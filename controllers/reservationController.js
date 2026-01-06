@@ -100,7 +100,7 @@ export const createReservation = async (req, res, next) => {
 
     // Check for duplicate reservations - prevent passenger from booking same trip multiple times
     const existingReservations = await Reservation.findByPassengerId(passengerid);
-    const activeStatuses = [RESERVATION_STATUS.CONFIRMED, RESERVATION_STATUS.CHECKED_IN, RESERVATION_STATUS.PENDING];
+    const activeStatuses = [RESERVATION_STATUS.CONFIRMED, RESERVATION_STATUS.CHECKED_IN];
     
     if (bookingType === BOOKING_TYPE.INSTANT && tripid) {
       // Check if passenger already has an active reservation for this trip
@@ -364,7 +364,7 @@ export const createReservation = async (req, res, next) => {
       dropoffpoint: dropoffpoint || null,
       aging: aging || null,
       status: reservationStatus,
-      driver_status: 'pending',
+      driver_status: 'approved',
       booking_type: bookingType,
       scheduled_trip_time: bookingType === BOOKING_TYPE.FUTURE ? scheduled_trip_time : null,
     };
@@ -373,7 +373,30 @@ export const createReservation = async (req, res, next) => {
 
 
     if (bookingType === BOOKING_TYPE.INSTANT && tripid) {
-      await Trip.updateAvailableSeats(tripid, trip.availableseats - 1);
+      // Fetch latest trip data to ensure we have current seat count
+      const currentTrip = await Trip.findById(tripid);
+      if (!currentTrip) {
+        throw new Error('Trip not found when updating seats');
+      }
+
+      // Validate seat availability before updating
+      if (currentTrip.availableseats <= 0) {
+        // Rollback: delete reservation and refund payment
+        await Reservation.delete(bookingid);
+        if (walletUsed && walletChargeAmount > 0) {
+          await Wallet.updateBalance(walletUsed, walletChargeAmount, 'add').catch(() => { });
+        }
+        if (paymentRecord) {
+          await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.FAILED }).catch(() => { });
+        }
+        return res.status(400).json({
+          message: req.t('reservation.no_seats') || 'No available seats',
+        });
+      }
+
+      // Update available seats (decrease by 1)
+      const newSeatCount = currentTrip.availableseats - 1;
+      await Trip.updateAvailableSeats(tripid, newSeatCount);
       seatsUpdated = true;
       await Trip.incrementBookings(tripid);
       bookingsIncremented = true;
@@ -424,11 +447,13 @@ export const createReservation = async (req, res, next) => {
     if (paymentRecord) {
       await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.FAILED }).catch(() => { });
     }
-    if (seatsUpdated) {
+    if (seatsUpdated && req.body.tripid) {
       await Trip.findById(req.body.tripid)
         .then((currentTrip) => {
           if (!currentTrip || typeof currentTrip.availableseats !== 'number') return null;
-          return Trip.updateAvailableSeats(req.body.tripid, currentTrip.availableseats + 1);
+          // Rollback: increase seats back (undo the booking)
+          const newSeatCount = currentTrip.availableseats + 1;
+          return Trip.updateAvailableSeats(req.body.tripid, newSeatCount);
         })
         .catch(() => { });
     }
@@ -541,8 +566,26 @@ export const cancelReservation = async (req, res, next) => {
     await Reservation.update(bookingid, { status: RESERVATION_STATUS.CANCELLED });
 
 
-    if (reservation.tripid && trip && (reservation.status === RESERVATION_STATUS.CONFIRMED || reservation.status === RESERVATION_STATUS.CHECKED_IN)) {
-      await Trip.updateAvailableSeats(reservation.tripid, trip.availableseats + 1);
+    // Free up the seat when cancelling - make it available again
+    if (reservation.tripid && (reservation.status === RESERVATION_STATUS.CONFIRMED || reservation.status === RESERVATION_STATUS.CHECKED_IN)) {
+      // Fetch latest trip data to ensure we have current seat count
+      const currentTrip = await Trip.findById(reservation.tripid);
+      if (currentTrip) {
+        // Get vehicle to know max seats
+        const Vehicle = (await import('../models/Vehicle.js')).default;
+        let maxSeats = null;
+        if (currentTrip.vehicleid) {
+          const vehicle = await Vehicle.findById(currentTrip.vehicleid);
+          if (vehicle) {
+            maxSeats = vehicle.seatnum - 1; // Exclude driver seat
+          }
+        }
+
+        // Update available seats (increase by 1), but don't exceed max
+        const newSeatCount = currentTrip.availableseats + 1;
+        const finalSeatCount = (maxSeats !== null && newSeatCount > maxSeats) ? maxSeats : newSeatCount;
+        await Trip.updateAvailableSeats(reservation.tripid, finalSeatCount);
+      }
     }
 
     res.json({

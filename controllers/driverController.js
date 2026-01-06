@@ -4,7 +4,10 @@ import DriverQueue from '../models/DriverQueue.js';
 import Vehicle from '../models/Vehicle.js';
 import Trip from '../models/Trip.js';
 import Reservation from '../models/Reservation.js';
-import { RESERVATION_STATUS } from '../utils/constants.js';
+import Payment from '../models/Payment.js';
+import Wallet from '../models/Wallet.js';
+import { v4 as uuidv4 } from 'uuid';
+import { RESERVATION_STATUS, PAYMENT_STATUS, PAYMENT_METHOD } from '../utils/constants.js';
 import { checkAndAssignWaitingTrips } from '../services/tripOpeningService.js';
 
 const buildQueueResponse = (queue = [], driverid) => {
@@ -296,14 +299,68 @@ export const updateDriverReservationStatus = async (req, res, next) => {
     }
 
     const updates = {};
+    let refundAmount = null;
+    
     if (action === 'approve') {
       updates.driver_status = 'approved';
-      if (reservation.status === RESERVATION_STATUS.PENDING || reservation.status === 'pending_driver') {
+      if (reservation.status === 'pending_driver') {
         updates.status = RESERVATION_STATUS.CONFIRMED;
       }
     } else if (action === 'reject') {
       updates.driver_status = 'rejected';
       updates.status = RESERVATION_STATUS.CANCELLED;
+
+      // Process full refund for passenger when driver rejects
+      refundAmount = reservation.bookingprice || 0;
+      if (refundAmount > 0 && reservation.paymentid) {
+        const payment = await Payment.findById(reservation.paymentid);
+        if (payment && payment.status === PAYMENT_STATUS.COMPLETED) {
+          // Get passenger's userid from reservation
+          const passenger = reservation.passenger;
+          const passengerUserid = passenger?.user?.userid;
+          
+          if (passengerUserid) {
+            const wallets = await Wallet.findByUserId(passengerUserid, 'main');
+            if (wallets && wallets.length > 0) {
+              // Refund full amount to passenger's wallet
+              await Wallet.updateBalance(wallets[0].walletid, refundAmount, 'add');
+
+              // Create refund payment record
+              await Payment.create({
+                paymentid: uuidv4(),
+                amount: refundAmount,
+                method: PAYMENT_METHOD.WALLET,
+                status: PAYMENT_STATUS.REFUNDED,
+                type: 'refund',
+                fromwalletid: wallets[0].walletid,
+                towalletid: wallets[0].walletid,
+              });
+            }
+          }
+        }
+      }
+
+      // Free up the seat - make it available again
+      if (reservation.tripid && (reservation.status === RESERVATION_STATUS.CONFIRMED || reservation.status === RESERVATION_STATUS.CHECKED_IN)) {
+        // Fetch latest trip data to ensure we have current seat count
+        const currentTrip = await Trip.findById(reservation.tripid);
+        if (currentTrip) {
+          // Get vehicle to know max seats
+          const Vehicle = (await import('../models/Vehicle.js')).default;
+          let maxSeats = null;
+          if (currentTrip.vehicleid) {
+            const vehicle = await Vehicle.findById(currentTrip.vehicleid);
+            if (vehicle) {
+              maxSeats = vehicle.seatnum - 1; // Exclude driver seat
+            }
+          }
+
+          // Update available seats (increase by 1), but don't exceed max
+          const newSeatCount = currentTrip.availableseats + 1;
+          const finalSeatCount = (maxSeats !== null && newSeatCount > maxSeats) ? maxSeats : newSeatCount;
+          await Trip.updateAvailableSeats(reservation.tripid, finalSeatCount);
+        }
+      }
     } else if (action === 'checkin') {
       updates.driver_status = 'approved';
       updates.status = RESERVATION_STATUS.CHECKED_IN;
@@ -311,14 +368,20 @@ export const updateDriverReservationStatus = async (req, res, next) => {
 
     const updatedReservation = await Reservation.update(bookingid, updates);
 
+    // Prepare response message
+    let message;
+    if (action === 'approve') {
+      message = req.t('reservation.driver_approved') || 'Reservation approved';
+    } else if (action === 'reject') {
+      message = req.t('reservation.driver_rejected') || `Reservation rejected. Full refund of ${refundAmount || 0} processed.`;
+    } else {
+      message = req.t('reservation.checked_in') || 'Passenger checked in';
+    }
+
     res.json({
-      message:
-        action === 'approve'
-          ? req.t('reservation.driver_approved') || 'Reservation approved'
-          : action === 'reject'
-            ? req.t('reservation.driver_rejected') || 'Reservation rejected'
-            : req.t('reservation.checked_in') || 'Passenger checked in',
+      message,
       reservation: updatedReservation,
+      ...(refundAmount !== null && { refundAmount }),
     });
   } catch (error) {
     if (error.statusCode === 403) {

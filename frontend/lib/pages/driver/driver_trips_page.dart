@@ -180,6 +180,10 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             list[index] = updated;
           }
         }
+        // Reload trips to get updated seat counts
+        _loadTrips();
+        // Reload reservations for this trip
+        _loadReservations(tripId);
       } else if (result['message'] != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result['message'].toString())),
@@ -199,6 +203,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               backgroundColor: Colors.green,
             ),
           );
+          // Reload trips to get updated seat counts
+          _loadTrips();
           // Reload reservations
           for (final tripId in _reservations.keys) {
             _loadReservations(tripId);
@@ -1151,28 +1157,6 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             spacing: isSmallScreen ? 8.0 : 12.0,
             runSpacing: isSmallScreen ? 6.0 : 8.0,
             children: [
-              if (driverStatus != 'approved' && driverStatus != 'rejected')
-                FilledButton(
-                  onPressed: isMutating
-                      ? null
-                      : () => _updateReservationStatus(tripId, bookingId, 'approve'),
-                  style: FilledButton.styleFrom(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isSmallScreen ? 12.0 : 16.0,
-                      vertical: isSmallScreen ? 8.0 : 10.0,
-                    ),
-                  ),
-                  child: isMutating
-                      ? SizedBox(
-                          height: isSmallScreen ? 14.0 : 16.0,
-                          width: isSmallScreen ? 14.0 : 16.0,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          t('accept'),
-                          style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
-                        ),
-                ),
               if (driverStatus != 'rejected' && status != 'cancelled')
                 FilledButton.tonal(
                   onPressed: isMutating

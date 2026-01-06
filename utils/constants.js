@@ -33,7 +33,6 @@ export const TRIP_STATUS = {
 };
 
 export const RESERVATION_STATUS = {
-  PENDING: 'pending',
   CONFIRMED: 'confirmed',
   CHECKED_IN: 'checked_in',
   CANCELLED: 'cancelled',

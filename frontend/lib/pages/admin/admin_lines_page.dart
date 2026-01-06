@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import 'line_route_editor_page.dart';
 
 class AdminLinesPage extends StatefulWidget {
   const AdminLinesPage({super.key});
@@ -61,6 +62,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'currency': 'شيكل',
       'min': 'دقيقة',
       'km': 'كم',
+      'editRoute': 'تعديل المسار',
     },
     'en': {
       'title': 'Lines Management',
@@ -92,6 +94,7 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'currency': 'NIS',
       'min': 'min',
       'km': 'km',
+      'editRoute': 'Edit Route',
     },
   };
 
@@ -440,6 +443,22 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openRouteEditor(Map<String, dynamic> line) {
+    final lineName = _isArabic
+        ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? '')
+        : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? '');
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LineRouteEditorPage(
+          lineid: line['lineid'].toString(),
+          lineName: lineName,
+        ),
       ),
     );
   }
@@ -820,6 +839,15 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                     Row(
                       children: [
                         _buildActionButton(
+                          icon: Icons.route_rounded,
+                          color: Colors.green,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                          onTap: () => _openRouteEditor(line),
+                          tooltip: t('editRoute'),
+                        ),
+                        SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                        _buildActionButton(
                           icon: Icons.edit_rounded,
                           color: Colors.blueAccent,
                           isSmallScreen: isSmallScreen,
@@ -909,8 +937,9 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     required VoidCallback onTap,
     bool isSmallScreen = false,
     bool isMediumScreen = false,
+    String? tooltip,
   }) {
-    return Material(
+    final button = Material(
       color: AppTheme.isDarkMode ? color.withOpacity(0.2) : color.withOpacity(0.1),
       borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
       child: InkWell(
@@ -926,6 +955,14 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
         ),
       ),
     );
+
+    if (tooltip != null) {
+      return Tooltip(
+        message: tooltip,
+        child: button,
+      );
+    }
+    return button;
   }
 
   Widget _buildEmptyState({bool isSmallScreen = false, bool isMediumScreen = false}) {

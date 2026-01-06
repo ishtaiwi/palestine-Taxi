@@ -4,6 +4,7 @@ import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/driver_bottom_nav_bar.dart';
 import 'driver_home.dart';
+import 'driver_navigation_page.dart';
 import 'qr_scanner_page.dart';
 
 class DriverTripsPage extends StatefulWidget {
@@ -51,6 +52,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       'distributedPassengers': 'الركاب الموزعين',
       'enterBookingId': 'أدخل رقم الحجز',
       'checked_in': 'تم الصعود',
+      'navigate': 'الملاحة',
     },
     'en': {
       'title': 'My Trips',
@@ -79,6 +81,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       'distributedPassengers': 'Distributed Passengers',
       'enterBookingId': 'Enter Booking ID',
       'checked_in': 'Checked In',
+      'navigate': 'Navigate',
     },
   };
 
@@ -314,7 +317,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     );
   }
 
-  Future<void> _startTrip(String tripId) async {
+  Future<void> _startTrip(String tripId, Map<String, dynamic> trip) async {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
@@ -384,7 +387,28 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               backgroundColor: Colors.green,
             ),
           );
-          _loadTrips();
+          
+          // Navigate to navigation page
+          final line = trip['line'] as Map<String, dynamic>? ?? {};
+          final lineId = line['lineid']?.toString() ?? '';
+          final lineName = _isArabic
+              ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '')
+              : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '');
+          
+          if (lineId.isNotEmpty) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DriverNavigationPage(
+                  tripId: tripId,
+                  lineId: lineId,
+                  lineName: lineName,
+                ),
+              ),
+            ).then((_) => _loadTrips());
+          } else {
+            _loadTrips();
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -865,7 +889,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               if (status == 'open' || status == 'scheduled' || status == 'delayed')
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: () => _startTrip(tripId),
+                    onPressed: () => _startTrip(tripId, trip),
                     icon: Icon(
                       Icons.play_arrow,
                       size: isSmallScreen ? 18.0 : 20.0,
@@ -884,7 +908,48 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                     ),
                   ),
                 ),
-              if (status == 'in_progress')
+              if (status == 'in_progress') ...[
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      final lineData = trip['line'] as Map<String, dynamic>? ?? {};
+                      final lineId = lineData['lineid']?.toString() ?? '';
+                      final lineName = _isArabic
+                          ? (lineData['name_ar']?.toString() ?? lineData['linename']?.toString() ?? lineData['name_en']?.toString() ?? '')
+                          : (lineData['name_en']?.toString() ?? lineData['linename']?.toString() ?? lineData['name_ar']?.toString() ?? '');
+                      
+                      if (lineId.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DriverNavigationPage(
+                              tripId: tripId,
+                              lineId: lineId,
+                              lineName: lineName,
+                            ),
+                          ),
+                        ).then((_) => _loadTrips());
+                      }
+                    },
+                    icon: Icon(
+                      Icons.navigation,
+                      size: isSmallScreen ? 18.0 : 20.0,
+                    ),
+                    label: Text(
+                      t('navigate'),
+                      style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 8.0 : 12.0,
+                        vertical: isSmallScreen ? 10.0 : 12.0,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: () => _endTrip(tripId),
@@ -906,6 +971,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                     ),
                   ),
                 ),
+              ],
             ],
           ),
           SizedBox(height: isSmallScreen ? 12.0 : 16.0),

@@ -23,6 +23,7 @@ import 'admin_base_station_page.dart';
 import 'admin_reports_page.dart';
 import 'admin_settings_page.dart';
 import 'admin_driver_approvals_page.dart';
+import 'admin_routes_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -83,6 +84,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'settings': 'الإعدادات',
       'analytics': 'التحليلات',
       'map': 'الخريطة',
+      'routes': 'المسارات',
     },
     'en': {
       'title': 'Admin Dashboard',
@@ -110,6 +112,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'settings': 'Settings',
       'analytics': 'Analytics',
       'map': 'Map',
+      'routes': 'Routes',
     },
   };
 
@@ -687,7 +690,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                     Expanded(
                       child: _buildActionCard(
-                        icon: Icons.route_rounded,
+                        icon: Icons.timeline_rounded,
                         title: t('lines'),
                         color: Colors.green,
                         isSmallScreen: isSmallScreen,
@@ -696,6 +699,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             context,
                             MaterialPageRoute(
                                 builder: (_) => const AdminLinesPage())),
+                      ),
+                    ),
+                    SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                    Expanded(
+                      child: _buildActionCard(
+                        icon: Icons.route_rounded,
+                        title: t('routes'),
+                        color: Colors.cyan,
+                        isSmallScreen: isSmallScreen,
+                        isMediumScreen: isMediumScreen,
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const AdminRoutesPage())),
                       ),
                     ),
                   ],
@@ -989,11 +1006,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 title: t('lines'),
                 titleStyle: TextStyle(
                     color: _isDarkMode ? Colors.white : Colors.black87),
-                icon: Icon(Icons.route_rounded,
+                icon: Icon(Icons.timeline_rounded,
                     color: _isDarkMode ? Colors.white70 : Colors.black54),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AdminLinesPage()),
+                ),
+              ),
+              SideMenuItemDataTile(
+                isSelected: false,
+                title: t('routes'),
+                titleStyle: TextStyle(
+                    color: _isDarkMode ? Colors.white : Colors.black87),
+                icon: Icon(Icons.route_rounded,
+                    color: _isDarkMode ? Colors.white70 : Colors.black54),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AdminRoutesPage()),
                 ),
               ),
               SideMenuItemDataTile(

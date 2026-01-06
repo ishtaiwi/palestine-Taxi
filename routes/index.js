@@ -8,6 +8,7 @@ import paymentRoutes from './paymentRoutes.js';
 import walletRoutes from './walletRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import driverRoutes from './driverRoutes.js';
+import routingRoutes from './routingRoutes.js';
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.use('/payments', paymentRoutes);
 router.use('/wallets', walletRoutes);
 router.use('/admin', adminRoutes);
 router.use('/drivers', driverRoutes);
+router.use('/routing', routingRoutes);
 
 export default router;
 

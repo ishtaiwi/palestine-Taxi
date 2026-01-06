@@ -1,22 +1,23 @@
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 class AppConfig {
   static const Duration requestTimeout = Duration(seconds: 30);
-  
+
   static String get _baseUrl {
     if (kIsWeb) {
       return 'http://localhost:3000';
     }
-    
+
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:3000';
+      return 'http://192.168.1.11:3000';
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       return 'http://localhost:3000';
     }
-    
+
     return 'http://10.0.2.2:3000';
   }
-  
+
   static String get apiBaseUrl => '$_baseUrl/api';
   static String get healthCheckUrl => '$_baseUrl/health';
 

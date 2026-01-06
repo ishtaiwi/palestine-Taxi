@@ -96,6 +96,48 @@ class ApiService {
     return prefs.getBool('language_arabic') ?? true;
   }
 
+  /// Check system health status (API, Database, etc.)
+  static Future<Map<String, dynamic>> getSystemHealth() async {
+    try {
+      // Remove /api from base URL since /health is at root
+      final baseUrl = AppConfig.apiBaseUrl.replaceAll('/api', '');
+      final response = await http.get(
+        Uri.parse('$baseUrl/health'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'success': true,
+          'apiHealthy': true,
+          'dbHealthy': data['database']?['connected'] ?? false,
+          'dbConfigured': data['database']?['configured'] ?? false,
+          'timestamp': data['timestamp'] ?? DateTime.now().toIso8601String(),
+          'message': data['message'] ?? 'OK',
+        };
+      } else {
+        return {
+          'success': false,
+          'apiHealthy': false,
+          'dbHealthy': false,
+          'dbConfigured': false,
+          'timestamp': DateTime.now().toIso8601String(),
+          'message': 'API returned status ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'apiHealthy': false,
+        'dbHealthy': false,
+        'dbConfigured': false,
+        'timestamp': DateTime.now().toIso8601String(),
+        'message': e.toString(),
+      };
+    }
+  }
+
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,

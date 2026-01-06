@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
@@ -35,14 +36,84 @@ class TaxiPalestineApp extends StatelessWidget {
         Locale('en', ''), // English
         Locale('ar', ''), // Arabic
       ],
-      initialRoute: '/',
+      // Start with a small router that decides whether to go to login
+      // or directly into the appropriate dashboard based on saved session.
+      home: const _StartupRouter(),
       routes: {
-        '/': (context) => const LoginScreen(),
+        '/login': (context) => const LoginScreen(),
         '/passenger': (context) => const PassengerHomePage(),
         '/driver': (context) => const DriverHomePage(),
         '/admin': (context) => const AdminDashboardPage(),
       },
     );
+  }
+}
+
+/// Small wrapper that checks for a saved session and routes accordingly.
+class _StartupRouter extends StatefulWidget {
+  const _StartupRouter({super.key});
+
+  @override
+  State<_StartupRouter> createState() => _StartupRouterState();
+}
+
+class _StartupRouterState extends State<_StartupRouter> {
+  bool _isLoading = true;
+  Widget? _targetPage;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    // Try to get cached user first
+    Map<String, dynamic>? user = await ApiService.getUserData();
+
+    // If there is a token but no cached user, try to refresh from backend
+    if (user == null) {
+      final profileResult = await ApiService.getProfile();
+      if (profileResult['success'] == true) {
+        user = profileResult['user'] as Map<String, dynamic>?;
+      }
+    }
+
+    if (!mounted) return;
+
+    Widget target;
+    if (user != null) {
+      final role = user['role']?.toString().toUpperCase();
+      if (role == 'PASSENGER') {
+        target = const PassengerHomePage();
+      } else if (role == 'DRIVER') {
+        target = const DriverHomePage();
+      } else if (role == 'ADMIN') {
+        target = const AdminDashboardPage();
+      } else {
+        target = const LoginScreen();
+      }
+    } else {
+      target = const LoginScreen();
+    }
+
+    setState(() {
+      _targetPage = target;
+      _isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return _targetPage!;
   }
 }
 
@@ -111,6 +182,15 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    // Responsive breakpoints for mobile
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final isLargeScreen = screenWidth >= 400 && screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth < 900;
+    final isDesktop = kIsWeb && screenWidth >= 900;
 
     return Directionality(
       textDirection: textDirection,
@@ -132,7 +212,15 @@ class _LoginScreenState extends State<LoginScreen> {
               top: -120,
               left: -60,
               child: _GlowCircle(
-                diameter: 260,
+                diameter: isDesktop 
+                    ? 400 
+                    : (isTablet 
+                        ? 320 
+                        : (isLargeScreen 
+                            ? 280 
+                            : (isMediumScreen 
+                                ? 260 
+                                : 240))),
                 colors: [
                   Colors.orange.withOpacity(0.35),
                   Colors.orange.withOpacity(0.05),
@@ -143,7 +231,15 @@ class _LoginScreenState extends State<LoginScreen> {
               bottom: 40,
               right: -120,
               child: _GlowCircle(
-                diameter: 280,
+                diameter: isDesktop 
+                    ? 450 
+                    : (isTablet 
+                        ? 340 
+                        : (isLargeScreen 
+                            ? 300 
+                            : (isMediumScreen 
+                                ? 280 
+                                : 260))),
                 colors: [
                   const Color(0xFF00B4D8).withOpacity(0.25),
                   Colors.transparent,
@@ -151,75 +247,134 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: Row(
-                        children: _isArabic
-                            ? [
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: _LanguageToggle(
-                                    isArabic: _isArabic,
-                                    onArabic: () => _switchLanguage(true),
-                                    onEnglish: () => _switchLanguage(false),
-                                  ),
-                                ),
-                                const Spacer(),
-                                const _PalestineFlag(),
-                              ]
-                            : [
-                                const _PalestineFlag(),
-                                const Spacer(),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: _LanguageToggle(
-                                    isArabic: _isArabic,
-                                    onArabic: () => _switchLanguage(true),
-                                    onEnglish: () => _switchLanguage(false),
-                                  ),
-                                ),
-                              ],
-                      ),
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isDesktop 
+                        ? 24 
+                        : (isTablet 
+                            ? 32 
+                            : (isLargeScreen 
+                                ? 24 
+                                : (isMediumScreen 
+                                    ? 20 
+                                    : 16))),
+                    vertical: isDesktop 
+                        ? 16 
+                        : (isTablet 
+                            ? 24 
+                            : (isLargeScreen 
+                                ? 20 
+                                : (isMediumScreen 
+                                    ? 16 
+                                    : 12))),
+                  ),
+                  child: Container(
+                    width: isDesktop ? 480 : double.infinity,
+                    constraints: BoxConstraints(
+                      maxWidth: isDesktop ? 480 : double.infinity,
+                      minHeight: screenHeight * 0.8,
                     ),
-                    const SizedBox(height: 32),
-                    Column(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Transform.translate(
-                          offset: const Offset(0, -8),
-                          child: Image.asset(
-                            'images/logo-PM-removebg-preview.png',
-                            width: 180,
-                            height: 180,
-                            fit: BoxFit.contain,
+                        Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Row(
+                            children: _isArabic
+                                ? [
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: _LanguageToggle(
+                                        isArabic: _isArabic,
+                                        onArabic: () => _switchLanguage(true),
+                                        onEnglish: () => _switchLanguage(false),
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    const _PalestineFlag(),
+                                  ]
+                                : [
+                                    const _PalestineFlag(),
+                                    const Spacer(),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: _LanguageToggle(
+                                        isArabic: _isArabic,
+                                        onArabic: () => _switchLanguage(true),
+                                        onEnglish: () => _switchLanguage(false),
+                                      ),
+                                    ),
+                                  ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(
+                          height: isDesktop 
+                              ? 16 
+                              : (isTablet 
+                                  ? 20 
+                                  : (isLargeScreen 
+                                      ? 18 
+                                      : (isMediumScreen 
+                                          ? 16 
+                                          : 12))),
+                        ),
+                        Image.asset(
+                          'images/logo-PM-removebg-preview.png',
+                          width: isDesktop 
+                              ? 160 
+                              : (isTablet 
+                                  ? 150 
+                                  : (isLargeScreen 
+                                      ? 140 
+                                      : (isMediumScreen 
+                                          ? 130 
+                                          : 120))),
+                          height: isDesktop 
+                              ? 160 
+                              : (isTablet 
+                                  ? 150 
+                                  : (isLargeScreen 
+                                      ? 140 
+                                      : (isMediumScreen 
+                                          ? 130 
+                                          : 120))),
+                          fit: BoxFit.contain,
+                        ),
+                        SizedBox(
+                          height: isDesktop 
+                              ? 12 
+                              : (isTablet 
+                                  ? 16 
+                                  : (isLargeScreen 
+                                      ? 14 
+                                      : (isMediumScreen 
+                                          ? 12 
+                                          : 10))),
+                        ),
+                        _FormCard(
+                          formKey: _formKey,
+                          isLoading: _isLoading,
+                          emailController: _emailController,
+                          passwordController: _passwordController,
+                          obscurePassword: _obscurePassword,
+                          togglePassword: () => setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          }),
+                          t: t,
+                          onSubmit: _handleLogin,
+                          onForgotPassword: _handleForgotPassword,
+                          onRegister: _openRegisterScreen,
+                          isDesktop: isDesktop,
+                          isTablet: isTablet,
+                          isLargeScreen: isLargeScreen,
+                          isMediumScreen: isMediumScreen,
+                          isSmallScreen: isSmallScreen,
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    Transform.translate(
-                      offset: const Offset(0, -20),
-                      child: _FormCard(
-                        formKey: _formKey,
-                        isLoading: _isLoading,
-                        emailController: _emailController,
-                        passwordController: _passwordController,
-                        obscurePassword: _obscurePassword,
-                        togglePassword: () => setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        }),
-                        t: t,
-                        onSubmit: _handleLogin,
-                        onForgotPassword: _handleForgotPassword,
-                        onRegister: _openRegisterScreen,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -369,6 +524,9 @@ class _LanguageToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    
     final currentLabel = isArabic ? 'AR' : 'EN';
     return PopupMenuButton<String>(
       onSelected: (value) {
@@ -378,9 +536,11 @@ class _LanguageToggle extends StatelessWidget {
           onEnglish();
         }
       },
-      offset: const Offset(0, 40),
+      offset: Offset(0, isSmallScreen ? 35.0 : 40.0),
       color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+      ),
       itemBuilder: (context) => [
         PopupMenuItem(
           value: 'en',
@@ -404,33 +564,45 @@ class _LanguageToggle extends StatelessWidget {
         ),
       ],
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 10.0 : 12.0,
+          vertical: isSmallScreen ? 5.0 : 6.0,
+        ),
         decoration: BoxDecoration(
           color: const Color(0xFFF4F4F6),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 20.0 : 24.0),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.15),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              blurRadius: isSmallScreen ? 8.0 : 10.0,
+              offset: Offset(0, isSmallScreen ? 3.0 : 4.0),
             ),
           ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.public, size: 18, color: Colors.grey.shade800),
-            const SizedBox(width: 6),
+            Icon(
+              Icons.public, 
+              size: isSmallScreen ? 16.0 : 18.0, 
+              color: Colors.grey.shade800,
+            ),
+            SizedBox(width: isSmallScreen ? 5.0 : 6.0),
             Text(
               currentLabel,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 color: Colors.grey.shade800,
                 letterSpacing: 0.4,
+                fontSize: isSmallScreen ? 13.0 : 14.0,
               ),
             ),
-            const SizedBox(width: 4),
-            Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
+            SizedBox(width: isSmallScreen ? 3.0 : 4.0),
+            Icon(
+              Icons.keyboard_arrow_down, 
+              size: isSmallScreen ? 16.0 : 18.0, 
+              color: Colors.grey.shade600,
+            ),
           ],
         ),
       ),
@@ -449,6 +621,11 @@ class _FormCard extends StatelessWidget {
   final VoidCallback onForgotPassword;
   final VoidCallback onRegister;
   final String Function(String key) t;
+  final bool isDesktop;
+  final bool isTablet;
+  final bool isLargeScreen;
+  final bool isMediumScreen;
+  final bool isSmallScreen;
 
   const _FormCard({
     required this.formKey,
@@ -461,52 +638,141 @@ class _FormCard extends StatelessWidget {
     required this.onForgotPassword,
     required this.onRegister,
     required this.t,
+    this.isDesktop = false,
+    this.isTablet = false,
+    this.isLargeScreen = false,
+    this.isMediumScreen = false,
+    this.isSmallScreen = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Calculate responsive padding
+    final cardPadding = isDesktop 
+        ? 28.0 
+        : (isTablet 
+            ? 26.0 
+            : (isLargeScreen 
+                ? 24.0 
+                : (isMediumScreen 
+                    ? 20.0 
+                    : 18.0)));
+    
+    // Calculate responsive font sizes
+    final welcomeFontSize = isDesktop 
+        ? 18.0 
+        : (isTablet 
+            ? 17.0 
+            : (isLargeScreen 
+                ? 16.0 
+                : (isMediumScreen 
+                    ? 15.0 
+                    : 14.0)));
+    
+    final titleFontSize = isDesktop 
+        ? 32.0 
+        : (isTablet 
+            ? 28.0 
+            : (isLargeScreen 
+                ? 26.0 
+                : (isMediumScreen 
+                    ? 24.0 
+                    : 22.0)));
+    
+    final bodyFontSize = isDesktop 
+        ? 16.0 
+        : (isTablet 
+            ? 15.0 
+            : (isLargeScreen 
+                ? 15.0 
+                : (isMediumScreen 
+                    ? 14.0 
+                    : 13.0)));
+    
+    final inputPadding = isDesktop 
+        ? 20.0 
+        : (isTablet 
+            ? 18.0 
+            : (isLargeScreen 
+                ? 16.0 
+                : (isMediumScreen 
+                    ? 16.0 
+                    : 14.0)));
+    
+    final verticalInputPadding = isDesktop 
+        ? 18.0 
+        : (isTablet 
+            ? 16.0 
+            : (isLargeScreen 
+                ? 16.0 
+                : (isMediumScreen 
+                    ? 15.0 
+                    : 14.0)));
+    
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(isDesktop ? 28 : (isTablet ? 26 : 24)),
         color: Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.08),
-            blurRadius: 30,
-            offset: const Offset(0, 18),
+            blurRadius: isDesktop ? 30 : (isTablet ? 25 : 20),
+            offset: Offset(0, isDesktop ? 18 : (isTablet ? 15 : 12)),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(cardPadding),
         child: Form(
           key: formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 t('welcome'),
                 style: TextStyle(
                   color: Colors.orange.shade800,
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: welcomeFontSize,
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: isSmallScreen ? 3.0 : 4.0),
               Text(
                 t('login'),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
+                      fontSize: titleFontSize,
                     ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(
+                height: isDesktop 
+                    ? 24 
+                    : (isTablet 
+                        ? 22 
+                        : (isLargeScreen 
+                            ? 20 
+                            : (isMediumScreen 
+                                ? 18 
+                                : 16))),
+              ),
               TextFormField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
+                style: TextStyle(fontSize: bodyFontSize),
                 decoration: InputDecoration(
                   labelText: t('email'),
                   hintText: t('enterEmail'),
-                  prefixIcon: const Icon(Icons.email_outlined),
+                  prefixIcon: Icon(
+                    Icons.email_outlined,
+                    size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: inputPadding,
+                    vertical: verticalInputPadding,
+                  ),
+                  labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
+                  hintStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -518,18 +784,41 @@ class _FormCard extends StatelessWidget {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              SizedBox(
+                height: isDesktop 
+                    ? 18 
+                    : (isTablet 
+                        ? 17 
+                        : (isLargeScreen 
+                            ? 16 
+                            : (isMediumScreen 
+                                ? 15 
+                                : 14))),
+              ),
               TextFormField(
                 controller: passwordController,
                 obscureText: obscurePassword,
+                style: TextStyle(fontSize: bodyFontSize),
                 decoration: InputDecoration(
                   labelText: t('password'),
                   hintText: t('enterPassword'),
-                  prefixIcon: const Icon(Icons.lock_outline),
+                  prefixIcon: Icon(
+                    Icons.lock_outline,
+                    size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0),
+                  ),
                   suffixIcon: IconButton(
-                    icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
+                    icon: Icon(
+                      obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0),
+                    ),
                     onPressed: togglePassword,
                   ),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: inputPadding,
+                    vertical: verticalInputPadding,
+                  ),
+                  labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
+                  hintStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -538,53 +827,190 @@ class _FormCard extends StatelessWidget {
                   return null;
                 },
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: isSmallScreen ? 6.0 : 8.0),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: onForgotPassword,
-                  child: Text(t('forgot')),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isDesktop 
+                          ? 12 
+                          : (isTablet 
+                              ? 10 
+                              : (isLargeScreen 
+                                  ? 8 
+                                  : (isMediumScreen 
+                                      ? 7 
+                                      : 6))),
+                      vertical: isDesktop 
+                          ? 8 
+                          : (isTablet 
+                              ? 6 
+                              : (isLargeScreen 
+                                  ? 4 
+                                  : (isMediumScreen 
+                                      ? 4 
+                                      : 3))),
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    t('forgot'),
+                    style: TextStyle(
+                      fontSize: isDesktop 
+                          ? 15 
+                          : (isTablet 
+                              ? 14 
+                              : (isLargeScreen 
+                                  ? 14 
+                                  : (isMediumScreen 
+                                      ? 13 
+                                      : 12))),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(
+                height: isDesktop 
+                    ? 20 
+                    : (isTablet 
+                        ? 18 
+                        : (isLargeScreen 
+                            ? 16 
+                            : (isMediumScreen 
+                                ? 14 
+                                : 12))),
+              ),
               FilledButton(
                 onPressed: isLoading ? null : onSubmit,
                 style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  textStyle: const TextStyle(
-                    fontSize: 16,
+                  padding: EdgeInsets.symmetric(
+                    vertical: isDesktop 
+                        ? 16 
+                        : (isTablet 
+                            ? 16 
+                            : (isLargeScreen 
+                                ? 15 
+                                : (isMediumScreen 
+                                    ? 14 
+                                    : 13))),
+                  ),
+                  textStyle: TextStyle(
+                    fontSize: isDesktop 
+                        ? 17 
+                        : (isTablet 
+                            ? 16 
+                            : (isLargeScreen 
+                                ? 16 
+                                : (isMediumScreen 
+                                    ? 15 
+                                    : 14))),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? SizedBox(
+                        height: isSmallScreen ? 18.0 : 20.0,
+                        width: isSmallScreen ? 18.0 : 20.0,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
                     : Text(t('ctaLogin')),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: isSmallScreen ? 8.0 : 10.0),
               OutlinedButton(
                 onPressed: onRegister,
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: EdgeInsets.symmetric(
+                    vertical: isDesktop 
+                        ? 16 
+                        : (isTablet 
+                            ? 16 
+                            : (isLargeScreen 
+                                ? 15 
+                                : (isMediumScreen 
+                                    ? 14 
+                                    : 13))),
+                  ),
                 ),
-                child: Text(t('ctaRegister')),
+                child: Text(
+                  t('ctaRegister'),
+                  style: TextStyle(
+                    fontSize: isDesktop 
+                        ? 16 
+                        : (isTablet 
+                            ? 15 
+                            : (isLargeScreen 
+                                ? 15 
+                                : (isMediumScreen 
+                                    ? 14 
+                                    : 13))),
+                  ),
+                ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: isSmallScreen ? 8.0 : 10.0),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop 
+                      ? 18 
+                      : (isTablet 
+                          ? 16 
+                          : (isLargeScreen 
+                              ? 16 
+                              : (isMediumScreen 
+                                  ? 14 
+                                  : 12))),
+                  vertical: isDesktop 
+                      ? 12 
+                      : (isTablet 
+                          ? 12 
+                          : (isLargeScreen 
+                              ? 11 
+                              : (isMediumScreen 
+                                  ? 10 
+                                  : 9))),
+                ),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(
+                    isDesktop ? 20 : (isTablet ? 18 : (isLargeScreen ? 16 : 14)),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.verified, color: Colors.orange.shade800),
-                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.verified, 
+                      color: Colors.orange.shade800, 
+                      size: isDesktop 
+                          ? 20 
+                          : (isTablet 
+                              ? 19 
+                              : (isLargeScreen 
+                                  ? 18 
+                                  : (isMediumScreen 
+                                      ? 17 
+                                      : 16))),
+                    ),
+                    SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                     Expanded(
                       child: Text(
                         t('trust'),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: Colors.orange.shade900,
+                              fontSize: isDesktop 
+                                  ? 14 
+                                  : (isTablet 
+                                      ? 13 
+                                      : (isLargeScreen 
+                                          ? 13 
+                                          : (isMediumScreen 
+                                              ? 12 
+                                              : 11))),
                             ),
                       ),
                     ),
@@ -750,4 +1176,5 @@ class _PalestineFlagPainter extends CustomPainter {
   bool shouldRepaint(covariant _PalestineFlagPainter oldDelegate) =>
       oldDelegate.glowIntensity != glowIntensity;
 }
+
 

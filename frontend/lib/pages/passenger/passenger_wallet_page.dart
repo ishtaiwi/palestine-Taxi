@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import '../../services/api_service.dart';
@@ -24,7 +25,6 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
   final TextEditingController _cardNumberController = TextEditingController();
   final TextEditingController _expiryController = TextEditingController();
   final TextEditingController _cvcController = TextEditingController();
-  // CardFieldInputDetails? _cardDetails;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -188,7 +188,6 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
       
       final month = int.tryParse(expiryParts[0]) ?? 0;
       final year = int.tryParse(expiryParts[1]) ?? 0;
-      // Convert 2-digit year to 4-digit
       final fullYear = year < 100 ? 2000 + year : year;
 
       await Stripe.instance.dangerouslyUpdateCardDetails(CardDetails(
@@ -241,7 +240,14 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
     _cardNumberController.clear();
     _expiryController.clear();
     _cvcController.clear();
-    // _cardDetails = null;
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
+    final basePadding = isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0);
+    final titleFontSize = isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0);
+    final inputFontSize = isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0);
 
     final isDarkMode = _isDarkMode;
     final backgroundColor = isDarkMode ? const Color(0xFF1C2541) : Colors.white;
@@ -257,7 +263,9 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
       builder: (context) => Container(
         decoration: BoxDecoration(
           color: backgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(isSmallScreen ? 20.0 : 24.0),
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
@@ -267,10 +275,10 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
           ],
         ),
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-          top: 24,
-          left: 24,
-          right: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + basePadding,
+          top: basePadding,
+          left: basePadding,
+          right: basePadding,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -305,29 +313,29 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                   t('addBalance'),
                   style: TextStyle(
                     color: textPrimary,
-                    fontSize: 20,
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: isSmallScreen ? 24.0 : 32.0),
             
             Text(
               t('enterAmount'),
               style: TextStyle(
                 color: textSecondary,
-                fontSize: 14,
+                fontSize: isSmallScreen ? 12.0 : 14.0,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: isSmallScreen ? 6.0 : 8.0),
             TextField(
               controller: _amountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               style: TextStyle(
                 color: textPrimary,
-                fontSize: 24,
+                fontSize: inputFontSize,
                 fontWeight: FontWeight.bold,
               ),
               decoration: InputDecoration(
@@ -339,45 +347,50 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                     '₪',
                     style: TextStyle(
                       color: textPrimary,
-                      fontSize: 24,
+                      fontSize: inputFontSize,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                   borderSide: BorderSide(color: border),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                   borderSide: BorderSide(color: border),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                   borderSide: const BorderSide(color: Color(0xFF2C5F8D), width: 2),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 16.0 : 20.0, 
+                  vertical: isSmallScreen ? 16.0 : 20.0
+                ),
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: isSmallScreen ? 20.0 : 24.0),
             
             Text(
               _isArabic ? 'بيانات البطاقة' : 'Card Details',
               style: TextStyle(
                 color: textSecondary,
-                fontSize: 14,
+                fontSize: isSmallScreen ? 12.0 : 14.0,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 8),
-            // Card Number
+            SizedBox(height: isSmallScreen ? 6.0 : 8.0),
             Container(
               decoration: BoxDecoration(
                 color: inputFill,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                 border: Border.all(color: border),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 12.0 : 16.0, 
+                vertical: isSmallScreen ? 3.0 : 4.0
+              ),
               child: TextField(
                 controller: _cardNumberController,
                 keyboardType: TextInputType.number,
@@ -385,29 +398,44 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                   FilteringTextInputFormatter.digitsOnly,
                   LengthLimitingTextInputFormatter(16),
                 ],
-                style: TextStyle(color: textPrimary, fontSize: 16),
+                style: TextStyle(
+                  color: textPrimary, 
+                  fontSize: isSmallScreen ? 14.0 : 16.0
+                ),
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   hintText: '0000 0000 0000 0000',
                   labelText: _isArabic ? 'رقم البطاقة' : 'Card Number',
-                  labelStyle: TextStyle(color: textSecondary),
-                  hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
-                  icon: Icon(Icons.credit_card, color: textSecondary),
+                  labelStyle: TextStyle(
+                    color: textSecondary,
+                    fontSize: isSmallScreen ? 12.0 : 14.0,
+                  ),
+                  hintStyle: TextStyle(
+                    color: textSecondary.withOpacity(0.5),
+                    fontSize: isSmallScreen ? 12.0 : 14.0,
+                  ),
+                  icon: Icon(
+                    Icons.credit_card, 
+                    color: textSecondary,
+                    size: isSmallScreen ? 18.0 : 20.0,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isSmallScreen ? 12.0 : 16.0),
             Row(
               children: [
-                // Expiry Date
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
                       color: inputFill,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                       border: Border.all(color: border),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 12.0 : 16.0, 
+                      vertical: isSmallScreen ? 3.0 : 4.0
+                    ),
                     child: TextField(
                       controller: _expiryController,
                       keyboardType: TextInputType.datetime,
@@ -421,27 +449,38 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                               TextPosition(offset: _expiryController.text.length));
                         }
                       },
-                      style: TextStyle(color: textPrimary, fontSize: 16),
+                      style: TextStyle(
+                        color: textPrimary, 
+                        fontSize: isSmallScreen ? 14.0 : 16.0
+                      ),
                       decoration: InputDecoration(
                         border: InputBorder.none,
                         hintText: 'MM/YY',
                         labelText: _isArabic ? 'التاريخ' : 'Expiry',
-                        labelStyle: TextStyle(color: textSecondary),
-                        hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+                        labelStyle: TextStyle(
+                          color: textSecondary,
+                          fontSize: isSmallScreen ? 12.0 : 14.0,
+                        ),
+                        hintStyle: TextStyle(
+                          color: textSecondary.withOpacity(0.5),
+                          fontSize: isSmallScreen ? 12.0 : 14.0,
+                        ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                // CVC
+                SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
                       color: inputFill,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                       border: Border.all(color: border),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 12.0 : 16.0, 
+                      vertical: isSmallScreen ? 3.0 : 4.0
+                    ),
                     child: TextField(
                       controller: _cvcController,
                       keyboardType: TextInputType.number,
@@ -450,30 +489,41 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(4),
                       ],
-                      style: TextStyle(color: textPrimary, fontSize: 16),
+                      style: TextStyle(
+                        color: textPrimary, 
+                        fontSize: isSmallScreen ? 14.0 : 16.0
+                      ),
                       decoration: InputDecoration(
                         border: InputBorder.none,
                         hintText: '123',
                         labelText: 'CVC',
-                        labelStyle: TextStyle(color: textSecondary),
-                        hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
-                        suffixIcon: Icon(Icons.lock_outline, size: 18, color: textSecondary),
+                        labelStyle: TextStyle(
+                          color: textSecondary,
+                          fontSize: isSmallScreen ? 12.0 : 14.0,
+                        ),
+                        hintStyle: TextStyle(
+                          color: textSecondary.withOpacity(0.5),
+                          fontSize: isSmallScreen ? 12.0 : 14.0,
+                        ),
+                        suffixIcon: Icon(
+                          Icons.lock_outline, 
+                          size: isSmallScreen ? 16.0 : 18.0, 
+                          color: textSecondary
+                        ),
                       ),
                     ),
                   ),
                 ),
               ],
             ),
-            // Hidden CardField to ensure Stripe SDK is happy if needed
             Offstage(
               offstage: true,
               child: CardField(
                 onCardChanged: (card) {
-                  // _cardDetails = card;
                 },
               ),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: isSmallScreen ? 24.0 : 32.0),
             
             Row(
               children: [
@@ -481,22 +531,24 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: EdgeInsets.symmetric(
+                        vertical: isSmallScreen ? 12.0 : 16.0
+                      ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                       ),
                     ),
                     child: Text(
                       t('cancel'),
                       style: TextStyle(
                         color: textSecondary,
-                        fontSize: 16,
+                        fontSize: isSmallScreen ? 14.0 : 16.0,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                 Expanded(
                   flex: 2,
                   child: ElevatedButton(
@@ -504,16 +556,18 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2C5F8D),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: EdgeInsets.symmetric(
+                        vertical: isSmallScreen ? 12.0 : 16.0
+                      ),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                       ),
                     ),
                     child: Text(
                       t('add'),
-                      style: const TextStyle(
-                        fontSize: 16,
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 14.0 : 16.0,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -531,7 +585,28 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
     final balance = _wallet?['balance'] ?? 0.0;
+    final screenWidth = MediaQuery.of(context).size.width;
     
+    // Web-specific responsive breakpoints
+    final isWeb = kIsWeb;
+    final isDesktop = isWeb && screenWidth >= 1200;
+    final isTablet = screenWidth >= 600 && screenWidth < 1200;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    
+    // Responsive sizing - enhanced for web
+    final double basePadding = isWeb 
+        ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
+        : (isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0));
+    final double titleFontSize = isWeb
+        ? (isDesktop ? 24.0 : 22.0)
+        : (isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0));
+    final double balanceFontSize = isWeb
+        ? (isDesktop ? 48.0 : (isTablet ? 44.0 : 42.0))
+        : (isSmallScreen ? 32.0 : (isMediumScreen ? 37.0 : 42.0));
+    
+    // Max width for web to prevent content from stretching too wide
+    final double maxContentWidth = isWeb ? 1400.0 : double.infinity;
     
     final backgroundColor = _isDarkMode ? const Color(0xFF0A0E21) : const Color(0xFFF5F7FA);
     final cardColor = _isDarkMode ? const Color(0xFF1C2541) : Colors.white;
@@ -595,10 +670,10 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
               ),
               title: Text(
                 t('title'),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 22,
+                  fontSize: titleFontSize,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -626,21 +701,26 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
           ),
         ),
         body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: _loadWallet,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxContentWidth),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: _loadWallet,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.symmetric(horizontal: basePadding),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const SizedBox(height: 20),
+                        SizedBox(height: isSmallScreen ? 16.0 : 20.0),
                         
                         Container(
-                          height: 220,
+                          constraints: BoxConstraints(
+                            minHeight: isSmallScreen ? 200.0 : (isMediumScreen ? 220.0 : 240.0),
+                          ),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: _isDarkMode
@@ -666,7 +746,7 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                 top: -30,
                                 child: Icon(
                                   Icons.account_balance_wallet,
-                                  size: 180,
+                                  size: isSmallScreen ? 150.0 : 180.0,
                                   color: Colors.white.withOpacity(0.05),
                                 ),
                               ),
@@ -674,8 +754,8 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                 left: -20,
                                 bottom: -20,
                                 child: Container(
-                                  width: 100,
-                                  height: 100,
+                                  width: isSmallScreen ? 80.0 : 100.0,
+                                  height: isSmallScreen ? 80.0 : 100.0,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: Colors.white.withOpacity(0.05),
@@ -683,10 +763,12 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                 ),
                               ),
                               Padding(
-                                padding: const EdgeInsets.all(24),
+                                padding: EdgeInsets.all(
+                                  isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0),
+                                ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -694,27 +776,35 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                         Row(
                                           children: [
                                             Container(
-                                              padding: const EdgeInsets.all(8),
+                                              padding: EdgeInsets.all(
+                                                isSmallScreen ? 6.0 : 8.0,
+                                              ),
                                               decoration: BoxDecoration(
                                                 color: Colors.white.withOpacity(0.2),
                                                 borderRadius: BorderRadius.circular(8),
                                               ),
-                                              child: const Icon(Icons.account_balance_wallet_outlined,
-                                                  color: Colors.white, size: 20),
+                                              child: Icon(
+                                                Icons.account_balance_wallet_outlined,
+                                                color: Colors.white, 
+                                                size: isSmallScreen ? 18.0 : 20.0,
+                                              ),
                                             ),
-                                            const SizedBox(width: 12),
+                                            SizedBox(width: isSmallScreen ? 10.0 : 12.0),
                                             Text(
                                               t('balance'),
                                               style: TextStyle(
                                                 color: Colors.white.withOpacity(0.9),
-                                                fontSize: 16,
+                                                fontSize: isSmallScreen ? 14.0 : 16.0,
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
                                           ],
                                         ),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: isSmallScreen ? 10.0 : 12.0,
+                                            vertical: isSmallScreen ? 5.0 : 6.0,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: Colors.white.withOpacity(0.15),
                                             borderRadius: BorderRadius.circular(20),
@@ -722,21 +812,22 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                                 color: Colors.white.withOpacity(0.2)),
                                           ),
                                           child: Row(
+                                            mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Container(
-                                                width: 8,
-                                                height: 8,
+                                                width: isSmallScreen ? 6.0 : 8.0,
+                                                height: isSmallScreen ? 6.0 : 8.0,
                                                 decoration: const BoxDecoration(
                                                   color: Colors.greenAccent,
                                                   shape: BoxShape.circle,
                                                 ),
                                               ),
-                                              const SizedBox(width: 8),
+                                              SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                                               Text(
                                                 t('available'),
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   color: Colors.white,
-                                                  fontSize: 12,
+                                                  fontSize: isSmallScreen ? 11.0 : 12.0,
                                                   fontWeight: FontWeight.w500,
                                                 ),
                                               ),
@@ -745,30 +836,41 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                         ),
                                       ],
                                     ),
-                                    const Spacer(),
+                                    SizedBox(
+                                      height: isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0),
+                                    ),
                                     Text(
                                       '${balance.toStringAsFixed(2)} ₪',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: Colors.white,
-                                        fontSize: 42,
+                                        fontSize: balanceFontSize,
                                         fontWeight: FontWeight.bold,
                                         letterSpacing: 1,
                                       ),
                                     ),
-                                    const SizedBox(height: 20),
+                                    SizedBox(
+                                      height: isSmallScreen ? 14.0 : (isMediumScreen ? 18.0 : 20.0),
+                                    ),
                                     SizedBox(
                                       width: double.infinity,
                                       child: ElevatedButton.icon(
                                         onPressed: _showAddBalanceSheet,
-                                        icon: const Icon(Icons.add_card, size: 20),
+                                        icon: Icon(
+                                          Icons.add_card, 
+                                          size: isSmallScreen ? 18.0 : 20.0,
+                                        ),
                                         label: Text(t('addBalance')),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.white,
                                           foregroundColor: const Color(0xFF1E3A5F),
-                                          padding: const EdgeInsets.symmetric(vertical: 14),
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: isSmallScreen ? 12.0 : 14.0,
+                                          ),
                                           elevation: 0,
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(16),
+                                            borderRadius: BorderRadius.circular(
+                                              isSmallScreen ? 14.0 : 16.0,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -836,27 +938,36 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                                     transaction['fromwalletid'] != null;
                                   final isOutgoing = transaction['fromwalletid'] == _wallet!['walletid'];
                                   
-                                  
                                   String typeLabel = t('transfer');
+                                  String typeDescription = '';
                                   IconData typeIcon = Icons.swap_horiz;
                                   Color iconColor = Colors.blue;
                                   Color iconBgColor = Colors.blue.withOpacity(0.1);
                                   
-                                  if (type == 'deposit' || (isIncoming && type == 'transfer')) {
-                                    typeLabel = t('deposit');
+                                  if (type == 'wallet_topup' || type == 'deposit' || (isIncoming && type == 'transfer')) {
+                                    typeLabel = _isArabic ? 'شحن رصيد' : 'Top Up';
+                                    typeDescription = _isArabic ? 'إضافة رصيد للمحفظة بالبطاقة' : 'Wallet top-up via card';
                                     typeIcon = Icons.arrow_downward_rounded;
                                     iconColor = Colors.green;
                                     iconBgColor = Colors.green.withOpacity(0.1);
-                                  } else if (type == 'payment' || isOutgoing) {
-                                    typeLabel = t('payment');
+                                  } else if (type == 'reservation' || (type == 'payment' && isOutgoing)) {
+                                    typeLabel = _isArabic ? 'حجز رحلة' : 'Trip Booking';
+                                    typeDescription = _isArabic ? 'دفع مقابل حجز رحلة' : 'Payment for trip reservation';
                                     typeIcon = Icons.arrow_upward_rounded;
                                     iconColor = Colors.red;
                                     iconBgColor = Colors.red.withOpacity(0.1);
                                   } else if (type == 'refund') {
                                     typeLabel = t('refund');
+                                    typeDescription = _isArabic ? 'استرداد مبلغ من حجز ملغي' : 'Refund from cancelled booking';
                                     typeIcon = Icons.refresh;
                                     iconColor = Colors.green;
                                     iconBgColor = Colors.green.withOpacity(0.1);
+                                  } else if (type == 'payment' && isOutgoing) {
+                                    typeLabel = t('payment');
+                                    typeDescription = _isArabic ? 'دفع' : 'Payment';
+                                    typeIcon = Icons.arrow_upward_rounded;
+                                    iconColor = Colors.red;
+                                    iconBgColor = Colors.red.withOpacity(0.1);
                                   }
 
                                   
@@ -910,6 +1021,16 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                                   fontSize: 16,
                                                 ),
                                               ),
+                                              if (typeDescription.isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  typeDescription,
+                                                  style: TextStyle(
+                                                    color: textSecondary,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
                                               const SizedBox(height: 4),
                                               Text(
                                                 dateStr,
@@ -979,6 +1100,8 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                 ],
               ),
             ),
+          ),
+        ),
         bottomNavigationBar: PassengerBottomNavBar(
           currentIndex: 3,
           isDarkMode: _isDarkMode,

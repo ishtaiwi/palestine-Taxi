@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../services/api_service.dart';
 import '../../pages/passenger/passenger_home.dart';
@@ -88,6 +89,9 @@ class _SelectRoleScreenState extends State<SelectRoleScreen> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = kIsWeb && screenWidth > 800;
+    
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
@@ -121,11 +125,34 @@ class _SelectRoleScreenState extends State<SelectRoleScreen> {
             ),
           ),
           child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            child: Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 24 : 24,
+                  vertical: isDesktop ? 16 : 24,
+                ),
+                child: Container(
+                  width: isDesktop ? 520 : double.infinity,
+                  constraints: BoxConstraints(
+                    maxWidth: isDesktop ? 520 : double.infinity,
+                  ),
+                  padding: EdgeInsets.all(isDesktop ? 28 : 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: Colors.white38),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 25,
+                        offset: const Offset(0, 15),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                   Text(
                     _isArabic
                         ? 'اختر الدور الأنسب لك لإكمال إنشاء الحساب'
@@ -139,14 +166,14 @@ class _SelectRoleScreenState extends State<SelectRoleScreen> {
                   const SizedBox(height: 24),
                   ..._roles.map(
                     (role) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildRoleCard(role),
+                      padding: EdgeInsets.only(bottom: isDesktop ? 14 : 16),
+                      child: _buildRoleCard(role, isDesktop: isDesktop),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: isDesktop ? 24 : 24),
                   SizedBox(
                     width: double.infinity,
-                    height: 56,
+                    height: isDesktop ? 52 : 56,
                     child: Container(
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
@@ -209,7 +236,9 @@ class _SelectRoleScreenState extends State<SelectRoleScreen> {
                       ),
                     ),
                   ),
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -218,13 +247,13 @@ class _SelectRoleScreenState extends State<SelectRoleScreen> {
     );
   }
 
-  Widget _buildRoleCard(_RoleOption option) {
+  Widget _buildRoleCard(_RoleOption option, {bool isDesktop = false}) {
     final isSelected = _selectedRole == option.role;
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: () => setState(() => _selectedRole = option.role),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(isDesktop ? 18 : 20),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           color: isSelected

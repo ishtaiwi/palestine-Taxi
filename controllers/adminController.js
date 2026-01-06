@@ -8,7 +8,11 @@ import Line from '../models/Line.js';
 import Vehicle from '../models/Vehicle.js';
 import Payment from '../models/Payment.js';
 import DriverQueue from '../models/DriverQueue.js';
+import Wallet from '../models/Wallet.js';
+import AppConfig from '../models/AppConfig.js';
+import logger from '../utils/logger.js';
 import { TRIP_STATUS, RESERVATION_STATUS, VEHICLE_STATUS, USER_ROLES, PAYMENT_STATUS } from '../utils/constants.js';
+import { sendDriverApprovalEmail, sendDriverRejectionEmail } from '../utils/email.js';
 import {
   trainModelBulk as trainRushHourModel,
   getRushHourPredictions as fetchRushHourPredictions,
@@ -30,7 +34,7 @@ export const getDashboardStats = async (req, res, next) => {
     const lines = await Line.findAll();
     const vehicles = await Vehicle.findAll();
     const users = await User.findAll();
-    
+
     const stats = {
       totalTrips: trips.length,
       completedTrips: trips.filter(t => t.status === TRIP_STATUS.COMPLETED).length,
@@ -43,7 +47,7 @@ export const getDashboardStats = async (req, res, next) => {
       totalDrivers: users.filter(u => u.role === USER_ROLES.DRIVER).length,
       totalPassengers: users.filter(u => u.role === USER_ROLES.PASSENGER).length,
     };
-    
+
     res.json(stats);
   } catch (error) {
     next(error);
@@ -55,7 +59,7 @@ export const getAllUsers = async (req, res, next) => {
   try {
     const { role } = req.query;
     const filters = role ? { role } : {};
-    
+
     const users = await User.findAll(filters);
     res.json(users);
   } catch (error) {
@@ -68,13 +72,13 @@ export const getUserById = async (req, res, next) => {
   try {
     const { userid } = req.params;
     const user = await User.findById(userid);
-    
+
     if (!user) {
-      return res.status(404).json({ 
-        message: req.t('user.not_found') || 'User not found' 
+      return res.status(404).json({
+        message: req.t('user.not_found') || 'User not found'
       });
     }
-    
+
     res.json(user);
   } catch (error) {
     next(error);
@@ -86,7 +90,7 @@ export const updateUser = async (req, res, next) => {
   try {
     const { userid } = req.params;
     const updates = req.body;
-    
+
     const user = await User.update(userid, updates);
     res.json({
       message: req.t('user.updated') || 'User updated successfully',
@@ -102,7 +106,7 @@ export const deleteUser = async (req, res, next) => {
   try {
     const { userid } = req.params;
 
-    
+
     const user = await User.findById(userid);
     if (!user) {
       return res.status(404).json({
@@ -110,29 +114,124 @@ export const deleteUser = async (req, res, next) => {
       });
     }
 
-    
+
     const driver = await Driver.findByUserId(userid);
     if (driver) {
-      
+
       await DriverQueue.deleteByDriverId(driver.driverid);
 
-      
-      
-      
+
+
+
       const vehicles = await Vehicle.findByDriverId(driver.driverid);
       if (vehicles && vehicles.length > 0) {
         for (const vehicle of vehicles) {
-           await Vehicle.delete(vehicle.vehicleid);
+          await Vehicle.delete(vehicle.vehicleid);
         }
       }
-      
-      
+
+
       await Driver.delete(driver.driverid);
     }
 
-    
+    const passenger = await Passenger.findByUserId(userid);
+    if (passenger) {
+      try {
+        await Reservation.deleteByPassengerId(passenger.passengerid);
+        logger.info('Deleted reservations for passenger before user deletion', {
+          userid,
+          passengerid: passenger.passengerid,
+        });
+      } catch (reservationError) {
+        logger.warn('Could not delete reservations for passenger', {
+          userid,
+          passengerid: passenger.passengerid,
+          error: reservationError.message,
+        });
+      }
+
+      await Passenger.delete(passenger.passengerid);
+    }
+
+    const admin = await Admin.findByUserId(userid);
+    if (admin) {
+      await Admin.delete(admin.id);
+      logger.info('Deleted admin record before user deletion', {
+        userid,
+        adminid: admin.id,
+      });
+    }
+
+    try {
+      const wallets = await Wallet.findByUserId(userid);
+      if (wallets && wallets.length > 0) {
+        const walletIds = wallets.map(w => w.walletid);
+        
+        try {
+          await Payment.deleteByWalletIds(walletIds);
+          logger.info('Deleted payments for user wallets before wallet deletion', {
+            userid,
+            wallets_count: wallets.length,
+          });
+        } catch (paymentError) {
+          logger.warn('Could not delete payments for user wallets', {
+            userid,
+            error: paymentError.message,
+          });
+        }
+      }
+      
+      await Wallet.deleteByUserId(userid);
+      logger.info('Deleted wallets for user before user deletion', { userid });
+    } catch (walletError) {
+      logger.warn('Could not delete wallets for user', {
+        userid,
+        error: walletError.message,
+      });
+    }
+
+    try {
+      const PasswordResetToken = (await import('../models/PasswordResetToken.js')).default;
+      await PasswordResetToken.deleteByUserId(userid);
+      logger.info('Deleted password reset tokens for user before user deletion', { userid });
+    } catch (tokenError) {
+      logger.warn('Could not delete password reset tokens for user', {
+        userid,
+        error: tokenError.message,
+      });
+    }
+
+    try {
+      const Rating = (await import('../models/Rating.js')).default;
+      await Rating.deleteByPassengerId(userid);
+      logger.info('Deleted trip ratings for user before user deletion', { userid });
+    } catch (ratingError) {
+      logger.warn('Could not delete trip ratings for user', {
+        userid,
+        error: ratingError.message,
+      });
+    }
+
+    try {
+      const driversApprovedByUser = await Driver.updateByFilter(
+        { approved_by: userid },
+        { approved_by: null }
+      );
+      if (driversApprovedByUser && driversApprovedByUser.length > 0) {
+        logger.info('Cleared approved_by references before user deletion', {
+          userid,
+          drivers_affected: driversApprovedByUser.length,
+        });
+      }
+    } catch (updateError) {
+      logger.warn('Could not clear approved_by references', {
+        userid,
+        error: updateError.message,
+      });
+    }
+
     await User.delete(userid);
-    
+
     res.json({
       message: req.t('user.deleted') || 'User deleted successfully',
     });
@@ -145,20 +244,20 @@ export const deleteUser = async (req, res, next) => {
 export const getRevenueAnalytics = async (req, res, next) => {
   try {
     const { startDate, endDate, lineid } = req.query;
-    
+
     const { PAYMENT_STATUS } = await import('../utils/constants.js');
     let payments = await Payment.findAll({ status: PAYMENT_STATUS.COMPLETED });
-    
+
     if (startDate) {
       payments = payments.filter(p => new Date(p.time) >= new Date(startDate));
     }
     if (endDate) {
       payments = payments.filter(p => new Date(p.time) <= new Date(endDate));
     }
-    
+
     const totalRevenue = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-    
-    
+
+
     const revenueByLine = {};
     if (lineid) {
       const reservations = await Reservation.findAll();
@@ -171,7 +270,7 @@ export const getRevenueAnalytics = async (req, res, next) => {
         }
       });
     }
-    
+
     res.json({
       totalRevenue,
       revenueByLine,
@@ -187,7 +286,7 @@ export const updateAdminPermissions = async (req, res, next) => {
   try {
     const { adminid } = req.params;
     const { permissions } = req.body;
-    
+
     const admin = await Admin.updatePermissions(adminid, permissions);
     res.json({
       message: req.t('admin.permissions_updated') || 'Permissions updated successfully',
@@ -321,7 +420,6 @@ export const getPredictionInsights = async (req, res, next) => {
   }
 };
 
-// Helper function to group data by time period
 function groupByTimePeriod(data, groupBy, dateField) {
   const groups = {};
   const periodFormats = {
@@ -462,6 +560,7 @@ export const getTripStatistics = async (req, res, next) => {
     const completed = trips.filter((t) => t.status === TRIP_STATUS.COMPLETED).length;
     const cancelled = trips.filter((t) => t.status === TRIP_STATUS.CANCELLED).length;
     const scheduled = trips.filter((t) => t.status === TRIP_STATUS.SCHEDULED).length;
+    const open = trips.filter((t) => t.status === TRIP_STATUS.OPEN).length;
     const inProgress = trips.filter((t) => t.status === TRIP_STATUS.IN_PROGRESS).length;
 
     let totalUtilization = 0;
@@ -475,6 +574,7 @@ export const getTripStatistics = async (req, res, next) => {
         completed: items.filter((t) => t.status === TRIP_STATUS.COMPLETED).length,
         cancelled: items.filter((t) => t.status === TRIP_STATUS.CANCELLED).length,
         scheduled: items.filter((t) => t.status === TRIP_STATUS.SCHEDULED).length,
+        open: items.filter((t) => t.status === TRIP_STATUS.OPEN).length,
         inProgress: items.filter((t) => t.status === TRIP_STATUS.IN_PROGRESS).length,
       };
     });
@@ -496,6 +596,7 @@ export const getTripStatistics = async (req, res, next) => {
       completed,
       cancelled,
       scheduled,
+      open,
       inProgress,
       averageUtilization,
       overTime,
@@ -694,6 +795,264 @@ export const getLinePerformance = async (req, res, next) => {
 
     res.json({
       linePerformance: Object.values(linePerformance),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getTimezoneConfig = async (req, res, next) => {
+  try {
+    const offset = await AppConfig.getTimezoneOffset();
+
+    const timezoneName = offset >= 0 ? `UTC+${offset}` : `UTC${offset}`;
+
+    const timezoneDescriptions = {
+      2: 'Palestine Standard Time',
+      3: 'Arabia Standard Time',
+      '-5': 'Eastern Standard Time',
+      0: 'Coordinated Universal Time',
+    };
+
+    res.json({
+      success: true,
+      timezone_offset: offset,
+      timezone_name: timezoneName,
+      description: timezoneDescriptions[offset] || `UTC${offset >= 0 ? '+' : ''}${offset}`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateTimezoneConfig = async (req, res, next) => {
+  try {
+    const { timezone_offset } = req.body;
+
+    if (timezone_offset === undefined || timezone_offset === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'timezone_offset is required',
+      });
+    }
+
+    const offset = parseInt(timezone_offset, 10);
+    if (isNaN(offset) || offset < -12 || offset > 14) {
+      return res.status(400).json({
+        success: false,
+        message: 'timezone_offset must be between -12 and 14',
+      });
+    }
+
+    await AppConfig.setTimezoneOffset(offset);
+
+    const timezoneName = offset >= 0 ? `UTC+${offset}` : `UTC${offset}`;
+
+    res.json({
+      success: true,
+      message: 'Timezone configuration updated successfully',
+      timezone_offset: offset,
+      timezone_name: timezoneName,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPendingDrivers = async (req, res, next) => {
+  try {
+    const pendingDrivers = await Driver.findPendingDrivers();
+    res.json({
+      success: true,
+      drivers: pendingDrivers,
+      count: pendingDrivers.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllDriversWithApprovalStatus = async (req, res, next) => {
+  try {
+    const { approval_status } = req.query;
+    const filters = {};
+    
+    if (approval_status) {
+      filters.approval_status = approval_status;
+    }
+    
+    const drivers = await Driver.findAll(filters);
+    res.json({
+      success: true,
+      drivers,
+      count: drivers.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const approveDriver = async (req, res, next) => {
+  try {
+    const { driverid } = req.params;
+    const { rejection_reason } = req.body;
+    
+    const driver = await Driver.findById(driverid);
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: req.t('driver.not_found') || 'Driver not found',
+      });
+    }
+    
+    if (!driver.user || driver.user.role?.toUpperCase() !== 'DRIVER') {
+      logger.warn('Attempt to approve non-driver user', {
+        driverid,
+        user_role: driver.user?.role,
+      });
+      return res.status(400).json({
+        success: false,
+        message: req.t('driver.invalid_role') || 'This user is not a driver',
+      });
+    }
+    
+    const updates = {
+      approval_status: 'approved',
+      approval_date: new Date().toISOString(),
+      approved_by: req.user.userid,
+    };
+    
+    if (rejection_reason === null || rejection_reason === '') {
+      updates.rejection_reason = null;
+    }
+    
+    const updatedDriver = await Driver.update(driverid, updates);
+    
+    logger.info('Driver approved by admin', {
+      driverid,
+      approved_by: req.user.userid,
+      driver_email: driver.user?.email,
+    });
+    
+    if (driver.user?.email && driver.user.role?.toUpperCase() === 'DRIVER') {
+      try {
+        const emailResult = await sendDriverApprovalEmail({
+          to: driver.user.email,
+          driverName: driver.user.fullname || 'Driver',
+        });
+        
+        if (emailResult.sent) {
+          logger.info('Driver approval email sent successfully', {
+            driverid,
+            email: driver.user.email,
+          });
+        } else {
+          logger.warn('Driver approval email not sent', {
+            driverid,
+            email: driver.user.email,
+            reason: emailResult.reason,
+          });
+        }
+      } catch (emailError) {
+        logger.error('Error sending driver approval email', {
+          driverid,
+          email: driver.user.email,
+          error: emailError.message,
+        });
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: req.t('driver.approved') || 'Driver approved successfully',
+      driver: updatedDriver,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const rejectDriver = async (req, res, next) => {
+  try {
+    const { driverid } = req.params;
+    const { rejection_reason } = req.body;
+    
+    if (!rejection_reason || !rejection_reason.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: req.t('driver.rejection_reason_required') || 'Rejection reason is required',
+      });
+    }
+    
+    const driver = await Driver.findById(driverid);
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: req.t('driver.not_found') || 'Driver not found',
+      });
+    }
+    
+    // Verify this is actually a driver (extra safety check)
+    if (!driver.user || driver.user.role?.toUpperCase() !== 'DRIVER') {
+      logger.warn('Attempt to reject non-driver user', {
+        driverid,
+        user_role: driver.user?.role,
+      });
+      return res.status(400).json({
+        success: false,
+        message: req.t('driver.invalid_role') || 'This user is not a driver',
+      });
+    }
+    
+    const updates = {
+      approval_status: 'rejected',
+      approval_date: new Date().toISOString(),
+      approved_by: req.user.userid,
+      rejection_reason: rejection_reason.trim(),
+    };
+    
+    const updatedDriver = await Driver.update(driverid, updates);
+    
+    logger.info('Driver rejected by admin', {
+      driverid,
+      rejected_by: req.user.userid,
+      driver_email: driver.user?.email,
+      rejection_reason: rejection_reason.trim(),
+    });
+    
+    if (driver.user?.email && driver.user.role?.toUpperCase() === 'DRIVER') {
+      try {
+        const emailResult = await sendDriverRejectionEmail({
+          to: driver.user.email,
+          driverName: driver.user.fullname || 'Driver',
+          rejectionReason: rejection_reason.trim(),
+        });
+        
+        if (emailResult.sent) {
+          logger.info('Driver rejection email sent successfully', {
+            driverid,
+            email: driver.user.email,
+          });
+        } else {
+          logger.warn('Driver rejection email not sent', {
+            driverid,
+            email: driver.user.email,
+            reason: emailResult.reason,
+          });
+        }
+      } catch (emailError) {
+        logger.error('Error sending driver rejection email', {
+          driverid,
+          email: driver.user.email,
+          error: emailError.message,
+        });
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: req.t('driver.rejected') || 'Driver rejected successfully',
+      driver: updatedDriver,
     });
   } catch (error) {
     next(error);

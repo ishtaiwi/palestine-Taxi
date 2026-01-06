@@ -6,26 +6,51 @@ import logger from '../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';
 import supabase from '../config/dbcon.js';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
+import { getServerTimezoneOffset, parseUtcDate } from '../utils/timeUtils.js';
 
 /**
  * Generate trip times based on schedule template
- * @param {number} startHour - Starting hour (0-23)
- * @param {number} endHour - Ending hour (0-23)
+ * Converts local schedule times to UTC using admin-configured timezone
+ * @param {number} startHour - Starting hour (0-23) in local timezone
+ * @param {number} endHour - Ending hour (0-23) in local timezone
  * @param {number} intervalMinutes - Interval between trips in minutes
  * @param {Date} targetDate - Date to generate trips for
- * @returns {Date[]} Array of trip departure times
+ * @returns {Promise<Date[]>} Array of trip departure times in UTC
  */
-function generateTripTimes(startHour, endHour, intervalMinutes, targetDate) {
+async function generateTripTimes(startHour, endHour, intervalMinutes, targetDate) {
+  // Get admin-configured timezone offset
+  const timezoneOffset = await getServerTimezoneOffset();
+
   const tripTimes = [];
-  const date = new Date(targetDate);
-  date.setHours(startHour, 0, 0, 0); // Start at startHour:00:00
 
-  const endTime = new Date(targetDate);
-  endTime.setHours(endHour, 0, 0, 0); // End at endHour:00:00
+  // Extract date components
+  const year = targetDate.getFullYear();
+  const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+  const day = String(targetDate.getDate()).padStart(2, '0');
 
-  while (date <= endTime) {
-    tripTimes.push(new Date(date));
-    date.setMinutes(date.getMinutes() + intervalMinutes);
+  // Format timezone offset (e.g., "+02:00" or "-05:00")
+  const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+  const offsetHours = String(Math.abs(timezoneOffset)).padStart(2, '0');
+
+  // Calculate start and end in minutes from midnight
+  let currentMinutes = startHour * 60;
+  const endMinutes = endHour * 60;
+
+  while (currentMinutes <= endMinutes) {
+    const hours = Math.floor(currentMinutes / 60);
+    const mins = currentMinutes % 60;
+
+    // Create ISO string with explicit admin timezone offset
+    // Example: "2025-12-23T18:00:00+02:00" (for 6 PM UTC+2)
+    const localTimeString = `${year}-${month}-${day}T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00${offsetSign}${offsetHours}:00`;
+
+    // Parse as UTC - this correctly converts "18:00+02:00" to "16:00Z" (UTC)
+    const utcTime = parseUtcDate(localTimeString);
+    if (utcTime) {
+      tripTimes.push(utcTime);
+    }
+
+    currentMinutes += intervalMinutes;
   }
 
   return tripTimes;
@@ -74,8 +99,8 @@ async function createTripsForDate(template, targetDate) {
   const { templateid, lineid, start_hour, end_hour, interval_minutes } = template;
 
   try {
-    // Generate trip times for the target date
-    const tripTimes = generateTripTimes(start_hour, end_hour, interval_minutes, targetDate);
+    // Generate trip times for the target date (converted to UTC)
+    const tripTimes = await generateTripTimes(start_hour, end_hour, interval_minutes, targetDate);
 
     if (tripTimes.length === 0) {
       logger.warn('No trip times generated', { templateid, targetDate });
@@ -135,6 +160,7 @@ async function createTripsForDate(template, targetDate) {
         const defaultAvailableSeats = calculateAvailablePassengerSeats(defaultSeats, 0, 0);
 
         // Create trip with vehicleid = null (will be assigned from driver queue at opening time)
+        // Use departure settings from template (default to false if not set)
         const tripData = {
           tripid: uuidv4(),
           lineid,
@@ -144,9 +170,9 @@ async function createTripsForDate(template, targetDate) {
           availableseats: defaultAvailableSeats,
           totalbookings: 0,
           trip_opening_time: openingTime.toISOString(),
-          auto_departure_enabled: true,
+          auto_departure_enabled: template.auto_departure_enabled ?? false,
           early_departure_allowed: true,
-          scheduled_departure_enforced: true,
+          scheduled_departure_enforced: template.scheduled_departure_enforced ?? false,
           templateid: templateid, // Link trip to schedule template
         };
 
@@ -214,7 +240,7 @@ export async function createDailyTrips() {
     // Target date: tomorrow
     const tomorrow = new Date();
     ///////////////////////////////////////////////////////////////////////////////////
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setDate(tomorrow.getDate());
     ///////////////////////////////////////////////////////////////////////////////////
     tomorrow.setHours(0, 0, 0, 0);
 

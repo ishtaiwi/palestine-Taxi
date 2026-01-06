@@ -25,10 +25,9 @@ export const testConnection = async () => {
   }
 
   try {
-    
     const { data, error } = await supabase
       .from('user')
-      .select('count')
+      .select('*')
       .limit(1);
 
     if (error) {

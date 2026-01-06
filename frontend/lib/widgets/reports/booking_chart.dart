@@ -26,7 +26,7 @@ class BookingTimeSeriesChart extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 250,
+      height: 180,
       child: LineChart(
         LineChartData(
           gridData: FlGridData(
@@ -58,7 +58,9 @@ class BookingTimeSeriesChart extends StatelessWidget {
                     return Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: Text(
-                        date.length > 10 ? date.substring(5, 10) : date.substring(5),
+                        date.length > 10
+                            ? date.substring(5, 10)
+                            : date.substring(5),
                         style: TextStyle(
                           color: AppTheme.textSecondary,
                           fontSize: 10,
@@ -273,7 +275,8 @@ class BookingByStatusChart extends StatelessWidget {
                   toY: (entry.value.value as num).toDouble(),
                   color: color,
                   width: 30,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(4)),
                 ),
               ],
             );
@@ -293,4 +296,3 @@ class BookingByStatusChart extends StatelessWidget {
     return max > 0 ? max : 100;
   }
 }
-

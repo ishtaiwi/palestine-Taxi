@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +8,7 @@ import '../../services/location_service.dart';
 import '../../screens/auth/login_page.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/driver_bottom_nav_bar.dart';
+import '../../config/app_config.dart';
 import 'driver_queue_page.dart';
 import 'driver_trips_page.dart';
 import 'driver_vehicle_page.dart';
@@ -22,6 +24,8 @@ class DriverHomePage extends StatefulWidget {
 
 class _DriverHomePageState extends State<DriverHomePage>
     with WidgetsBindingObserver {
+  final GlobalKey<DriverQueuePageState> _queueKey =
+      GlobalKey<DriverQueuePageState>();
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   bool _isArabic = true;
@@ -235,6 +239,36 @@ class _DriverHomePageState extends State<DriverHomePage>
     );
   }
 
+  Widget _buildNetworkImage() {
+    final avatarUrl = _userData?['avatar_url']?.toString() ?? 
+                     _userData?['avatarUrl']?.toString();
+    
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      final imageUrl = AppConfig.apiBaseUrl.replaceFirst('/api', '') + avatarUrl;
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _buildDefaultAvatar();
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Center(
+            child: CircularProgressIndicator(
+              value: loadingProgress.expectedTotalBytes != null
+                  ? loadingProgress.cumulativeBytesLoaded /
+                      loadingProgress.expectedTotalBytes!
+                  : null,
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+            ),
+          );
+        },
+      );
+    }
+    return _buildDefaultAvatar();
+  }
+
   Future<void> _handleLogout() async {
     // Stop location tracking on logout
     await _locationService.stopLocationTracking();
@@ -257,6 +291,30 @@ class _DriverHomePageState extends State<DriverHomePage>
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Web-specific responsive breakpoints
+    final isWeb = kIsWeb;
+    final isDesktop = isWeb && screenWidth >= 1200;
+    final isTablet = screenWidth >= 600 && screenWidth < 1200;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    
+    // Responsive sizing - enhanced for web
+    final double basePadding = isWeb 
+        ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
+        : (isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0));
+    final double cardPadding = isWeb
+        ? (isDesktop ? 40.0 : (isTablet ? 32.0 : 28.0))
+        : (isSmallScreen ? 20.0 : (isMediumScreen ? 24.0 : 32.0));
+    final double avatarSize = isWeb
+        ? (isDesktop ? 100.0 : (isTablet ? 90.0 : 80.0))
+        : (isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0));
+    
+    // Max width for web to prevent content from stretching too wide
+    final double maxContentWidth = isWeb ? 1400.0 : double.infinity;
 
     // Theme-aware colors
     final backgroundColor = _isDarkMode
@@ -304,10 +362,10 @@ class _DriverHomePageState extends State<DriverHomePage>
             child: AppBar(
               title: Text(
                 t('title'),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 22,
+                  fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
                   letterSpacing: 0.5,
                 ),
               ),
@@ -335,14 +393,14 @@ class _DriverHomePageState extends State<DriverHomePage>
                     }
                   },
                   child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.all(8),
+                    margin: EdgeInsets.only(right: isSmallScreen ? 4.0 : 8.0),
+                    padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                     child: Stack(
                       children: [
                         Icon(
                           Icons.location_on,
                           color: Colors.white,
-                          size: 24,
+                          size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                         ),
                         Positioned(
                           right: 0,
@@ -361,22 +419,14 @@ class _DriverHomePageState extends State<DriverHomePage>
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: Icon(
-                    _isArabic ? Icons.language : Icons.translate,
-                    color: Colors.white,
-                  ),
-                  onPressed: () => _switchLanguage(!_isArabic),
-                  tooltip: _isArabic ? 'English' : 'العربية',
-                ),
                 Container(
-                  margin: const EdgeInsets.only(right: 8),
+                  margin: EdgeInsets.only(right: isSmallScreen ? 4.0 : 8.0),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.logout_rounded, size: 22),
+                    icon: Icon(Icons.logout_rounded, size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0)),
                     onPressed: _handleLogout,
                     tooltip: t('logout'),
                   ),
@@ -388,14 +438,17 @@ class _DriverHomePageState extends State<DriverHomePage>
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(basePadding),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                       // Professional Welcome Card - Driver Version
                       Container(
-                        padding: const EdgeInsets.all(32),
+                        padding: EdgeInsets.all(cardPadding),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
@@ -435,13 +488,13 @@ class _DriverHomePageState extends State<DriverHomePage>
                                     children: [
                                       // Profile Image Container
                                       Container(
-                                        width: 80,
-                                        height: 80,
+                                        width: avatarSize,
+                                        height: avatarSize,
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           border: Border.all(
                                             color: Colors.white,
-                                            width: 3,
+                                            width: isSmallScreen ? 2.0 : 3.0,
                                           ),
                                           boxShadow: [
                                             BoxShadow(
@@ -458,10 +511,11 @@ class _DriverHomePageState extends State<DriverHomePage>
                                                   fit: BoxFit.cover,
                                                   errorBuilder: (context, error,
                                                       stackTrace) {
-                                                    return _buildDefaultAvatar();
+                                                    // Fallback to network image if local fails
+                                                    return _buildNetworkImage();
                                                   },
                                                 )
-                                              : _buildDefaultAvatar(),
+                                              : _buildNetworkImage(),
                                         ),
                                       ),
                                       // Camera Icon Overlay
@@ -469,7 +523,7 @@ class _DriverHomePageState extends State<DriverHomePage>
                                         bottom: 0,
                                         right: 0,
                                         child: Container(
-                                          padding: const EdgeInsets.all(6),
+                                          padding: EdgeInsets.all(isSmallScreen ? 4.0 : 6.0),
                                           decoration: BoxDecoration(
                                             gradient: LinearGradient(
                                               begin: Alignment.topLeft,
@@ -482,20 +536,20 @@ class _DriverHomePageState extends State<DriverHomePage>
                                             shape: BoxShape.circle,
                                             border: Border.all(
                                               color: Colors.white,
-                                              width: 2,
+                                              width: isSmallScreen ? 1.5 : 2.0,
                                             ),
                                           ),
-                                          child: const Icon(
+                                          child: Icon(
                                             Icons.camera_alt_rounded,
                                             color: Colors.white,
-                                            size: 16,
+                                            size: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 16),
+                                SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                                 // Greeting Text
                                 Expanded(
                                   child: Column(
@@ -504,14 +558,14 @@ class _DriverHomePageState extends State<DriverHomePage>
                                     children: [
                                       Text(
                                         _isArabic ? 'مرحباً بك!' : 'Hello!',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 18,
+                                          fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 18.0),
                                           fontWeight: FontWeight.w600,
                                           letterSpacing: 0.5,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
+                                      SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                                       // User name with waving hand icon
                                       Row(
                                         children: [
@@ -519,9 +573,9 @@ class _DriverHomePageState extends State<DriverHomePage>
                                             child: Text(
                                               _userData?['fullname'] ??
                                                   t('driver'),
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 color: Colors.white,
-                                                fontSize: 28,
+                                                fontSize: isSmallScreen ? 20.0 : (isMediumScreen ? 24.0 : 28.0),
                                                 fontWeight: FontWeight.bold,
                                                 letterSpacing: 0.3,
                                                 height: 1.2,
@@ -530,11 +584,11 @@ class _DriverHomePageState extends State<DriverHomePage>
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
-                                          const Icon(
+                                          SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                                          Icon(
                                             Icons.waving_hand_rounded,
                                             color: Colors.amber,
-                                            size: 28,
+                                            size: isSmallScreen ? 20.0 : (isMediumScreen ? 24.0 : 28.0),
                                           ),
                                         ],
                                       ),
@@ -543,7 +597,7 @@ class _DriverHomePageState extends State<DriverHomePage>
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 24),
+                            SizedBox(height: isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
                             // Divider
                             Container(
                               height: 1,
@@ -557,29 +611,29 @@ class _DriverHomePageState extends State<DriverHomePage>
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            SizedBox(height: isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
                             // Driver Message with Car Icon
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(10),
+                                  padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withAlpha(26),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.local_taxi_rounded,
                                     color: Colors.white,
-                                    size: 24,
+                                    size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                                   ),
                                 ),
-                                const SizedBox(width: 14),
+                                SizedBox(width: isSmallScreen ? 10.0 : 14.0),
                                 Expanded(
                                   child: Text(
                                     t('driverMessage'),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: 15,
+                                      fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0),
                                       fontWeight: FontWeight.w500,
                                       letterSpacing: 0.3,
                                       height: 1.4,
@@ -588,7 +642,7 @@ class _DriverHomePageState extends State<DriverHomePage>
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 20),
+                            SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
                             // Quick Stats Row
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -596,27 +650,32 @@ class _DriverHomePageState extends State<DriverHomePage>
                                 _buildQuickStat(
                                   icon: Icons.access_time_rounded,
                                   label: t('available247'),
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
                                 ),
                                 Container(
                                   width: 1,
-                                  height: 20,
+                                  height: isSmallScreen ? 16.0 : 20.0,
                                   color: Colors.white.withAlpha(77),
                                 ),
                                 _buildQuickStat(
                                   icon: Icons.verified_user_rounded,
                                   label: t('safeSecure'),
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
                                 ),
                               ],
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
 
                       // Section Header - Quick Actions
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 12.0 : 16.0, 
+                            vertical: isSmallScreen ? 10.0 : 12.0),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -624,7 +683,7 @@ class _DriverHomePageState extends State<DriverHomePage>
                               Colors.orange.shade700.withAlpha(13),
                             ],
                           ),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                           border: Border.all(
                             color: Colors.orange.shade600.withAlpha(77),
                             width: 1.5,
@@ -635,14 +694,14 @@ class _DriverHomePageState extends State<DriverHomePage>
                             Icon(
                               Icons.flash_on,
                               color: Colors.orange.shade600,
-                              size: 24,
+                              size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: isSmallScreen ? 10.0 : 12.0),
                             Text(
                               t('actions'),
                               style: TextStyle(
                                 color: textPrimaryColor,
-                                fontSize: 18,
+                                fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.5,
                               ),
@@ -650,98 +709,204 @@ class _DriverHomePageState extends State<DriverHomePage>
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
 
                       // Action Cards Grid
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.list_alt_rounded,
-                              title: t('myTrips'),
-                              color: Colors.blue,
-                              cardColor: cardColor,
-                              textColor: textPrimaryColor,
-                              isDarkMode: _isDarkMode,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const DriverTripsPage(),
-                                  ),
-                                );
-                              },
+                      isWeb && (isDesktop || isTablet)
+                          ? GridView.count(
+                              crossAxisCount: isDesktop ? 4 : 2,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              crossAxisSpacing: 16.0,
+                              mainAxisSpacing: 16.0,
+                              childAspectRatio: isDesktop ? 1.1 : 1.0,
+                              children: [
+                                _buildActionCard(
+                                  icon: Icons.list_alt_rounded,
+                                  title: t('myTrips'),
+                                  color: Colors.blue,
+                                  cardColor: cardColor,
+                                  textColor: textPrimaryColor,
+                                  isDarkMode: _isDarkMode,
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
+                                  isWeb: isWeb,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const DriverTripsPage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                _buildActionCard(
+                                  icon: Icons.check_circle_rounded,
+                                  title: t('checkin'),
+                                  color: Colors.green,
+                                  cardColor: cardColor,
+                                  textColor: textPrimaryColor,
+                                  isDarkMode: _isDarkMode,
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
+                                  isWeb: isWeb,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const DriverQueuePage(),
+                                      ),
+                                    ).then(
+                                        (_) => _queueKey.currentState?.refresh());
+                                  },
+                                ),
+                                _buildActionCard(
+                                  icon: Icons.directions_car_rounded,
+                                  title: t('myVehicle'),
+                                  color: Colors.orange,
+                                  cardColor: cardColor,
+                                  textColor: textPrimaryColor,
+                                  isDarkMode: _isDarkMode,
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
+                                  isWeb: isWeb,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const DriverVehiclePage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                _buildActionCard(
+                                  icon: Icons.person_rounded,
+                                  title: t('profile'),
+                                  color: Colors.purple,
+                                  cardColor: cardColor,
+                                  textColor: textPrimaryColor,
+                                  isDarkMode: _isDarkMode,
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
+                                  isWeb: isWeb,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const DriverProfilePage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            )
+                          : Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildActionCard(
+                                        icon: Icons.list_alt_rounded,
+                                        title: t('myTrips'),
+                                        color: Colors.blue,
+                                        cardColor: cardColor,
+                                        textColor: textPrimaryColor,
+                                        isDarkMode: _isDarkMode,
+                                        isSmallScreen: isSmallScreen,
+                                        isMediumScreen: isMediumScreen,
+                                        isWeb: isWeb,
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => const DriverTripsPage(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    SizedBox(width: isSmallScreen ? 12.0 : 16.0),
+                                    Expanded(
+                                      child: _buildActionCard(
+                                        icon: Icons.check_circle_rounded,
+                                        title: t('checkin'),
+                                        color: Colors.green,
+                                        cardColor: cardColor,
+                                        textColor: textPrimaryColor,
+                                        isDarkMode: _isDarkMode,
+                                        isSmallScreen: isSmallScreen,
+                                        isMediumScreen: isMediumScreen,
+                                        isWeb: isWeb,
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => const DriverQueuePage(),
+                                            ),
+                                          ).then(
+                                              (_) => _queueKey.currentState?.refresh());
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildActionCard(
+                                        icon: Icons.directions_car_rounded,
+                                        title: t('myVehicle'),
+                                        color: Colors.orange,
+                                        cardColor: cardColor,
+                                        textColor: textPrimaryColor,
+                                        isDarkMode: _isDarkMode,
+                                        isSmallScreen: isSmallScreen,
+                                        isMediumScreen: isMediumScreen,
+                                        isWeb: isWeb,
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => const DriverVehiclePage(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    SizedBox(width: isSmallScreen ? 12.0 : 16.0),
+                                    Expanded(
+                                      child: _buildActionCard(
+                                        icon: Icons.person_rounded,
+                                        title: t('profile'),
+                                        color: Colors.purple,
+                                        cardColor: cardColor,
+                                        textColor: textPrimaryColor,
+                                        isDarkMode: _isDarkMode,
+                                        isSmallScreen: isSmallScreen,
+                                        isMediumScreen: isMediumScreen,
+                                        isWeb: isWeb,
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => const DriverProfilePage(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.check_circle_rounded,
-                              title: t('checkin'),
-                              color: Colors.green,
-                              cardColor: cardColor,
-                              textColor: textPrimaryColor,
-                              isDarkMode: _isDarkMode,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const DriverQueuePage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.directions_car_rounded,
-                              title: t('myVehicle'),
-                              color: Colors.orange,
-                              cardColor: cardColor,
-                              textColor: textPrimaryColor,
-                              isDarkMode: _isDarkMode,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const DriverVehiclePage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildActionCard(
-                              icon: Icons.person_rounded,
-                              title: t('profile'),
-                              color: Colors.purple,
-                              cardColor: cardColor,
-                              textColor: textPrimaryColor,
-                              isDarkMode: _isDarkMode,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const DriverProfilePage(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
+                      SizedBox(height: isSmallScreen ? 20.0 : (isMediumScreen ? 26.0 : 32.0)),
 
                       // Section Header - Driver Queue
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 12.0 : 16.0, 
+                            vertical: isSmallScreen ? 10.0 : 12.0),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -749,7 +914,7 @@ class _DriverHomePageState extends State<DriverHomePage>
                               Colors.blue.shade700.withAlpha(13),
                             ],
                           ),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                           border: Border.all(
                             color: Colors.blue.shade600.withAlpha(77),
                             width: 1.5,
@@ -763,28 +928,28 @@ class _DriverHomePageState extends State<DriverHomePage>
                                 Icon(
                                   Icons.queue_rounded,
                                   color: Colors.blue.shade600,
-                                  size: 24,
+                                  size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: isSmallScreen ? 10.0 : 12.0),
                                 Text(
                                   t('queueTitle'),
                                   style: TextStyle(
                                     color: textPrimaryColor,
-                                    fontSize: 18,
+                                    fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 0.5,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
+                            SizedBox(height: isSmallScreen ? 4.0 : 6.0),
                             Padding(
-                              padding: const EdgeInsets.only(left: 36),
+                              padding: EdgeInsets.only(left: isSmallScreen ? 30.0 : 36.0),
                               child: Text(
                                 t('queueSubtitle'),
                                 style: TextStyle(
                                   color: textPrimaryColor.withAlpha(179),
-                                  fontSize: 13,
+                                  fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
                                   letterSpacing: 0.2,
                                 ),
                               ),
@@ -792,15 +957,15 @@ class _DriverHomePageState extends State<DriverHomePage>
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: isSmallScreen ? 12.0 : 16.0),
 
                       // Driver Queue Card
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(20),
+                        padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
                         decoration: BoxDecoration(
                           color: cardColor,
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
                           border: Border.all(
                             color: _isDarkMode
                                 ? const Color(0xFF2C3E50)
@@ -821,12 +986,13 @@ class _DriverHomePageState extends State<DriverHomePage>
                           ],
                         ),
                         child: DriverQueuePage(
+                          key: _queueKey,
                           embedded: true,
                           isArabicOverride: _isArabic,
                           isDarkModeOverride: _isDarkMode,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
 
                       // Section Header - Statistics
                       Container(
@@ -990,8 +1156,10 @@ class _DriverHomePageState extends State<DriverHomePage>
                               textSecondaryColor,
                               cardColor,
                               _isDarkMode,
+                              isSmallScreen: isSmallScreen,
+                              isMediumScreen: isMediumScreen,
                             ),
-                            const SizedBox(height: 14),
+                            SizedBox(height: isSmallScreen ? 10.0 : 14.0),
                             if (_userData?['phone'] != null)
                               _buildInfoRow(
                                 Icons.phone_outlined,
@@ -1002,9 +1170,11 @@ class _DriverHomePageState extends State<DriverHomePage>
                                 textSecondaryColor,
                                 cardColor,
                                 _isDarkMode,
+                                isSmallScreen: isSmallScreen,
+                                isMediumScreen: isMediumScreen,
                               ),
                             if (_userData?['phone'] != null)
-                              const SizedBox(height: 14),
+                              SizedBox(height: isSmallScreen ? 10.0 : 14.0),
                             _buildInfoRow(
                               Icons.badge_outlined,
                               t('role'),
@@ -1014,6 +1184,8 @@ class _DriverHomePageState extends State<DriverHomePage>
                               textSecondaryColor,
                               cardColor,
                               _isDarkMode,
+                              isSmallScreen: isSmallScreen,
+                              isMediumScreen: isMediumScreen,
                             ),
                           ],
                         ),
@@ -1022,6 +1194,8 @@ class _DriverHomePageState extends State<DriverHomePage>
                   ),
                 ),
               ),
+            ),
+        ),
         bottomNavigationBar: DriverBottomNavBar(
           currentIndex: 2, // Home is index 2
           isDarkMode: _isDarkMode,
@@ -1037,6 +1211,8 @@ class _DriverHomePageState extends State<DriverHomePage>
   Widget _buildQuickStat({
     required IconData icon,
     required String label,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1044,14 +1220,14 @@ class _DriverHomePageState extends State<DriverHomePage>
         Icon(
           icon,
           color: Colors.white.withAlpha(230),
-          size: 18,
+          size: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 18.0),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: isSmallScreen ? 6.0 : 8.0),
         Text(
           label,
           style: TextStyle(
             color: Colors.white.withAlpha(230),
-            fontSize: 13,
+            fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
             fontWeight: FontWeight.w500,
             letterSpacing: 0.2,
           ),
@@ -1068,16 +1244,23 @@ class _DriverHomePageState extends State<DriverHomePage>
     required Color textColor,
     required bool isDarkMode,
     required VoidCallback onTap,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+    bool isWeb = false,
   }) {
     // Create a lighter and darker shade for gradient
     final Color lightShade = Color.lerp(color, Colors.white, 0.15)!;
     final Color darkShade = Color.lerp(color, Colors.black, 0.2)!;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 22),
+    Widget cardContent = Container(
+        padding: EdgeInsets.symmetric(
+          vertical: isWeb 
+              ? (isSmallScreen ? 24.0 : 32.0)
+              : (isSmallScreen ? 20.0 : (isMediumScreen ? 26.0 : 32.0)), 
+          horizontal: isWeb 
+              ? (isSmallScreen ? 18.0 : 24.0)
+              : (isSmallScreen ? 16.0 : (isMediumScreen ? 19.0 : 22.0))
+        ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -1089,7 +1272,7 @@ class _DriverHomePageState extends State<DriverHomePage>
             end: Alignment.bottomRight,
             stops: const [0.0, 0.5, 1.0],
           ),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 20.0 : 24.0),
           boxShadow: [
             // Main colored shadow
             BoxShadow(
@@ -1118,13 +1301,13 @@ class _DriverHomePageState extends State<DriverHomePage>
           children: [
             // Icon container with glow effect
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isSmallScreen ? 14.0 : (isMediumScreen ? 17.0 : 20.0)),
               decoration: BoxDecoration(
                 color: Colors.white.withAlpha(64),
                 shape: BoxShape.circle,
                 border: Border.all(
                   color: Colors.white.withAlpha(102),
-                  width: 2.5,
+                  width: isSmallScreen ? 2.0 : 2.5,
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -1134,15 +1317,21 @@ class _DriverHomePageState extends State<DriverHomePage>
                   ),
                 ],
               ),
-              child: Icon(icon, color: Colors.white, size: 38),
+              child: Icon(icon, color: Colors.white, size: isWeb 
+                  ? (isSmallScreen ? 38.0 : 44.0)
+                  : (isSmallScreen ? 28.0 : (isMediumScreen ? 33.0 : 38.0))),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: isWeb 
+                ? (isSmallScreen ? 15.0 : 20.0)
+                : (isSmallScreen ? 12.0 : (isMediumScreen ? 15.0 : 18.0))),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
-                fontSize: 15.5,
+                fontSize: isWeb 
+                    ? (isSmallScreen ? 15.5 : 17.0)
+                    : (isSmallScreen ? 12.0 : (isMediumScreen ? 13.5 : 15.5)),
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
                 height: 1.3,
@@ -1162,8 +1351,27 @@ class _DriverHomePageState extends State<DriverHomePage>
             ),
           ],
         ),
-      ),
+      );
+
+    // Wrap with hover effects for web
+    Widget interactiveCard = InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(isSmallScreen ? 20.0 : 24.0),
+      child: cardContent,
     );
+
+    if (isWeb) {
+      return MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: interactiveCard,
+        ),
+      );
+    }
+
+    return interactiveCard;
   }
 
   Widget _buildStatItem(
@@ -1234,14 +1442,16 @@ class _DriverHomePageState extends State<DriverHomePage>
     Color textPrimaryColor,
     Color textSecondaryColor,
     Color cardColor,
-    bool isDarkMode,
-  ) {
+    bool isDarkMode, {
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       decoration: BoxDecoration(
         color:
             isDarkMode ? Colors.white.withAlpha(13) : const Color(0xFFF8F9FA),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 14.0),
         border: Border.all(
           color: isDarkMode ? Colors.white.withAlpha(25) : Colors.grey.shade200,
           width: 1,
@@ -1250,14 +1460,14 @@ class _DriverHomePageState extends State<DriverHomePage>
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
             decoration: BoxDecoration(
               color: accentColor.withAlpha(38),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
             ),
-            child: Icon(icon, color: accentColor, size: 22),
+            child: Icon(icon, color: accentColor, size: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0)),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: isSmallScreen ? 12.0 : 14.0),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1266,17 +1476,17 @@ class _DriverHomePageState extends State<DriverHomePage>
                   label,
                   style: TextStyle(
                     color: textSecondaryColor,
-                    fontSize: 13,
+                    fontSize: isSmallScreen ? 11.0 : 12.0,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.2,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: isSmallScreen ? 4.0 : 6.0),
                 Text(
                   value,
                   style: TextStyle(
                     color: textPrimaryColor,
-                    fontSize: 16,
+                    fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.3,
                   ),

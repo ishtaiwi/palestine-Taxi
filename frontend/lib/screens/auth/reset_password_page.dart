@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../services/api_service.dart';
 import 'login_page.dart';
 
@@ -146,6 +147,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = kIsWeb && screenWidth > 800;
+    
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
@@ -179,22 +183,30 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ),
           ),
           child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.03),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: Colors.white24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 25,
-                      offset: const Offset(0, 15),
-                    ),
-                  ],
+            child: Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 24 : 24,
+                  vertical: isDesktop ? 16 : 24,
                 ),
+                child: Container(
+                  width: isDesktop ? 480 : double.infinity,
+                  constraints: BoxConstraints(
+                    maxWidth: isDesktop ? 480 : double.infinity,
+                  ),
+                  padding: EdgeInsets.all(isDesktop ? 28 : 24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: Colors.white24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 25,
+                        offset: const Offset(0, 15),
+                      ),
+                    ],
+                  ),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -207,12 +219,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                             .titleMedium
                             ?.copyWith(color: Colors.white70),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: isDesktop ? 20 : 24),
                       _buildPasswordField(
                         controller: _passwordController,
                         label: t('password'),
                         hint: t('enterPassword'),
                         obscure: _obscurePassword,
+                        isDesktop: isDesktop,
                         toggle: () => setState(() {
                           _obscurePassword = !_obscurePassword;
                         }),
@@ -233,12 +246,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: isDesktop ? 14 : 16),
                       _buildPasswordField(
                         controller: _confirmPasswordController,
                         label: t('confirmPassword'),
                         hint: t('confirmPasswordHint'),
                         obscure: _obscureConfirmPassword,
+                        isDesktop: isDesktop,
                         toggle: () => setState(() {
                           _obscureConfirmPassword = !_obscureConfirmPassword;
                         }),
@@ -255,7 +269,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 32),
+                      SizedBox(height: isDesktop ? 24 : 28),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
@@ -274,7 +288,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               : Text(t('resetPassword')),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: isDesktop ? 16 : 20),
                       Align(
                         alignment: Alignment.center,
                         child: TextButton(
@@ -296,6 +310,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -307,11 +322,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     required VoidCallback toggle,
     String? Function(String?)? validator,
     VoidCallback? onChanged,
+    bool isDesktop = false,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: obscure,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: isDesktop ? 16 : null,
+      ),
       decoration: _inputDecoration(
         label,
         hint,

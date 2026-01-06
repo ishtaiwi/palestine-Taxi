@@ -162,21 +162,58 @@ export const getDriverTrips = async (req, res, next) => {
     const vehicles = await Vehicle.findByDriverId(driverRecord.driverid);
     const vehicleIds = vehicles.map((vehicle) => vehicle.vehicleid).filter(Boolean);
 
-    if (vehicleIds.length === 0) {
-      return res.json([]);
-    }
-
     const filters = {};
     if (req.query.status) {
       filters.status = req.query.status;
     }
+    // Note: We don't filter by fromNow when upcoming=true because we want to include delayed trips
+    // that have passed departure time but haven't departed yet (passengers are waiting)
+
+    // Get trips by vehicle IDs
+    const tripsByVehicle = vehicleIds.length > 0
+      ? await Trip.findByVehicleIds(vehicleIds, filters)
+      : [];
+
+    // Also get trips assigned to this driver (by assigned_driverid)
+    const tripsByDriver = await Trip.findAssignedTrips(driverRecord.driverid, filters);
+
+    // Combine and deduplicate trips
+    const allTrips = [...tripsByVehicle, ...tripsByDriver];
+    const uniqueTrips = Array.from(
+      new Map(allTrips.map(trip => [trip.tripid, trip])).values()
+    );
+
+    // Filter out trips with no bookings (only show trips with at least 1 booking)
+    const tripsWithBookings = uniqueTrips.filter(trip => {
+      const totalBookings = trip.totalbookings || 0;
+      return totalBookings > 0;
+    });
+
+    // If upcoming=true, filter to include:
+    // - Future trips (deptime >= now)
+    // - Delayed trips (status = delayed, even if deptime passed, because passengers are waiting)
+    // - In-progress trips
+    // - Open/scheduled trips that have passed departure time (should be marked as delayed but include them anyway)
     if (req.query.upcoming === 'true') {
-      filters.fromNow = true;
+      const now = new Date().toISOString();
+      const filteredTrips = tripsWithBookings.filter(trip => {
+        // Include delayed trips (passengers are waiting)
+        if (trip.status === 'delayed') return true;
+        // Include in-progress trips
+        if (trip.status === 'in_progress') return true;
+        // Include future trips
+        if (trip.deptime && trip.deptime >= now) return true;
+        // Include open/scheduled trips that have passed departure time
+        // These have passengers waiting even if not yet marked as delayed
+        if ((trip.status === 'open' || trip.status === 'scheduled') && trip.deptime && trip.deptime < now) {
+          return true;
+        }
+        return false;
+      });
+      return res.json(filteredTrips);
     }
 
-    const trips = await Trip.findByVehicleIds(vehicleIds, filters);
-
-    res.json(trips);
+    res.json(tripsWithBookings);
   } catch (error) {
     next(error);
   }
@@ -279,8 +316,8 @@ export const updateDriverReservationStatus = async (req, res, next) => {
         action === 'approve'
           ? req.t('reservation.driver_approved') || 'Reservation approved'
           : action === 'reject'
-              ? req.t('reservation.driver_rejected') || 'Reservation rejected'
-              : req.t('reservation.checked_in') || 'Passenger checked in',
+            ? req.t('reservation.driver_rejected') || 'Reservation rejected'
+            : req.t('reservation.checked_in') || 'Passenger checked in',
       reservation: updatedReservation,
     });
   } catch (error) {

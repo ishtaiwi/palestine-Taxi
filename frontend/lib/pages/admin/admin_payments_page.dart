@@ -17,10 +17,9 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
   bool _isLoading = true;
   bool _isArabic = true;
 
-  
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  String? _statusFilter; 
+  String? _statusFilter;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -107,7 +106,8 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
             content: Text('${t('error')}: ${e.toString()}'),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -119,23 +119,40 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
       final method = (payment['method'] ?? '').toString().toLowerCase();
       final status = (payment['status'] ?? '').toString().toLowerCase();
       final amount = (payment['amount'] ?? '').toString();
-      
+
       final matchesSearch = _searchQuery.isEmpty ||
           method.contains(_searchQuery) ||
           amount.contains(_searchQuery);
 
-      final matchesStatus = _statusFilter == null || status == _statusFilter?.toLowerCase();
+      final matchesStatus =
+          _statusFilter == null || status == _statusFilter?.toLowerCase();
 
       return matchesSearch && matchesStatus;
     }).toList();
   }
 
   String _formatDate(String? dateString) {
-    if (dateString == null) return '';
+    if (dateString == null || dateString.isEmpty) return '';
     try {
-      final date = DateTime.parse(dateString);
+      // Normalize Supabase timestamp format to ISO 8601 and convert to local time
+      // Supabase returns: "2025-12-23 21:00:00+00" -> convert to: "2025-12-23T21:00:00Z"
+      String normalized = dateString.toString();
+      // Replace space with T
+      normalized = normalized.replaceFirst(' ', 'T');
+      // Replace +00 or +00:00 with Z (UTC indicator)
+      normalized = normalized.replaceFirst(RegExp(r'\+00:?00?$'), 'Z');
+      // If no timezone indicator, assume UTC
+      if (!normalized.contains('Z') &&
+          !normalized.contains('+') &&
+          !normalized.contains('-')) {
+        normalized += 'Z';
+      }
+      // Parse as UTC and convert to local timezone for display
+      final date = DateTime.parse(normalized).toLocal();
       return DateFormat('dd/MM/yyyy HH:mm').format(date);
     } catch (e) {
+      debugPrint(
+          'Error parsing date in admin payments: $dateString, error: $e');
       return dateString;
     }
   }
@@ -168,27 +185,41 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final textDirection = _isArabic ? material.TextDirection.rtl : material.TextDirection.ltr;
+    final textDirection =
+        _isArabic ? material.TextDirection.rtl : material.TextDirection.ltr;
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
 
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        appBar: _buildAppBar(),
+        appBar: _buildAppBar(context),
         body: _isLoading
-            ? Center(child: CircularProgressIndicator(color: AppTheme.appBarColor))
+            ? Center(
+                child: CircularProgressIndicator(color: AppTheme.appBarColor))
             : Column(
                 children: [
-                  _buildSearchBar(),
-                  _buildFilterSection(),
+                  _buildSearchBar(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                  _buildFilterSection(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                   Expanded(
                     child: _filteredPayments.isEmpty
-                        ? _buildEmptyState()
+                        ? _buildEmptyState(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen)
                         : ListView.separated(
-                            padding: const EdgeInsets.all(16),
+                            padding: EdgeInsets.all(basePadding),
                             itemCount: _filteredPayments.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 12),
-                            itemBuilder: (context, index) => _buildPaymentCard(_filteredPayments[index]),
+                            separatorBuilder: (context, index) =>
+                                SizedBox(height: isSmallScreen ? 10.0 : 12.0),
+                            itemBuilder: (context, index) =>
+                                _buildPaymentCard(
+                                  _filteredPayments[index],
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
+                                ),
                           ),
                   ),
                 ],
@@ -197,7 +228,11 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     return AppBar(
       backgroundColor: AppTheme.isDarkMode
           ? const Color(0xFF1C2541) // Dark card color for better integration
@@ -205,15 +240,19 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        icon: Icon(
+          Icons.arrow_back_ios_new_rounded, 
+          color: Colors.white,
+          size: isSmallScreen ? 18.0 : 20.0,
+        ),
         onPressed: () => Navigator.pop(context),
       ),
       title: Text(
         t('title'),
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
-          fontSize: 20,
+          fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
         ),
       ),
       actions: [
@@ -221,6 +260,7 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
           icon: Icon(
             _isArabic ? Icons.language : Icons.translate,
             color: Colors.white,
+            size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 24.0),
           ),
           onPressed: () {
             setState(() {
@@ -229,20 +269,27 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
             });
           },
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: isSmallScreen ? 4.0 : 8.0),
       ],
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(isSmallScreen ? 16.0 : 20.0),
+        ),
       ),
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      margin: EdgeInsets.fromLTRB(
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        isSmallScreen ? 16.0 : 20.0, 
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        0
+      ),
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 15.0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -253,16 +300,33 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
       ),
       child: TextField(
         controller: _searchController,
-        style: TextStyle(color: AppTheme.textPrimary),
+        style: TextStyle(
+          color: AppTheme.textPrimary,
+          fontSize: isSmallScreen ? 14.0 : 16.0,
+        ),
         decoration: InputDecoration(
           hintText: t('search'),
-          hintStyle: TextStyle(color: AppTheme.textSecondary),
-          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.textSecondary),
+          hintStyle: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: isSmallScreen ? 14.0 : 16.0,
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded, 
+            color: AppTheme.textSecondary,
+            size: isSmallScreen ? 20.0 : 24.0,
+          ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 16.0 : 20.0, 
+            vertical: isSmallScreen ? 12.0 : 15.0
+          ),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                  icon: Icon(
+                    Icons.close_rounded, 
+                    color: AppTheme.textSecondary,
+                    size: isSmallScreen ? 20.0 : 24.0,
+                  ),
                   onPressed: () {
                     _searchController.clear();
                     FocusScope.of(context).unfocus();
@@ -274,27 +338,30 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
     );
   }
 
-  Widget _buildFilterSection() {
+  Widget _buildFilterSection({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      padding: EdgeInsets.symmetric(
+        vertical: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0), 
+        horizontal: isSmallScreen ? 12.0 : 16.0
+      ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildFilterChip(null, t('filterAll')),
-            const SizedBox(width: 8),
-            _buildFilterChip('completed', t('completed'), color: Colors.green),
-            const SizedBox(width: 8),
-            _buildFilterChip('pending', t('pending'), color: Colors.orange),
-            const SizedBox(width: 8),
-            _buildFilterChip('failed', t('failed'), color: Colors.red),
+            _buildFilterChip(null, t('filterAll'), isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+            _buildFilterChip('completed', t('completed'), color: Colors.green, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+            _buildFilterChip('pending', t('pending'), color: Colors.orange, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+            SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+            _buildFilterChip('failed', t('failed'), color: Colors.red, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFilterChip(String? status, String label, {Color? color}) {
+  Widget _buildFilterChip(String? status, String label, {Color? color, bool isSmallScreen = false, bool isMediumScreen = false}) {
     final isSelected = _statusFilter == status;
     final activeColor = color ?? AppTheme.appBarColor;
 
@@ -307,12 +374,17 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+          vertical: isSmallScreen ? 6.0 : 8.0
+        ),
         decoration: BoxDecoration(
           color: isSelected ? activeColor : AppTheme.cardBackground,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
           border: Border.all(
-            color: isSelected ? activeColor : AppTheme.textSecondary.withOpacity(0.3),
+            color: isSelected
+                ? activeColor
+                : AppTheme.textSecondary.withOpacity(0.3),
             width: 1.5,
           ),
           boxShadow: isSelected
@@ -330,21 +402,21 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
           style: TextStyle(
             color: isSelected ? Colors.white : AppTheme.textSecondary,
             fontWeight: FontWeight.bold,
-            fontSize: 14,
+            fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildPaymentCard(Map<String, dynamic> payment) {
+  Widget _buildPaymentCard(Map<String, dynamic> payment, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final status = payment['status']?.toString();
     final statusColor = _getStatusColor(status);
 
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -353,23 +425,27 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
           ),
         ],
         border: Border(
-          right: _isArabic ? BorderSide(color: statusColor, width: 4) : BorderSide.none,
-          left: !_isArabic ? BorderSide(color: statusColor, width: 4) : BorderSide.none,
+          right: _isArabic
+              ? BorderSide(color: statusColor, width: isSmallScreen ? 3.0 : 4.0)
+              : BorderSide.none,
+          left: !_isArabic
+              ? BorderSide(color: statusColor, width: isSmallScreen ? 3.0 : 4.0)
+              : BorderSide.none,
         ),
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
           child: Column(
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: isSmallScreen ? 40.0 : (isMediumScreen ? 44.0 : 48.0),
+                    height: isSmallScreen ? 40.0 : (isMediumScreen ? 44.0 : 48.0),
                     decoration: BoxDecoration(
                       color: AppTheme.isDarkMode
                           ? Colors.blueAccent.withOpacity(0.2)
@@ -381,10 +457,10 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
                       color: AppTheme.isDarkMode
                           ? Colors.blueAccent
                           : AppTheme.appBarColor,
-                      size: 24,
+                      size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,51 +469,63 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '${payment['amount'] ?? 0} ILS', 
+                              '${payment['amount'] ?? 0} ILS',
                               style: TextStyle(
                                 color: AppTheme.textPrimary,
-                                fontSize: 18,
+                                fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isSmallScreen ? 8.0 : 10.0, 
+                                vertical: isSmallScreen ? 3.0 : 4.0
+                              ),
                               decoration: BoxDecoration(
                                 color: statusColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
                               ),
                               child: Text(
                                 _getStatusText(status),
                                 style: TextStyle(
                                   color: statusColor,
-                                  fontSize: 12,
+                                  fontSize: isSmallScreen ? 10.0 : (isMediumScreen ? 11.0 : 12.0),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: isSmallScreen ? 6.0 : 8.0),
                         Row(
                           children: [
-                            Icon(Icons.credit_card_rounded, size: 14, color: AppTheme.textSecondary),
-                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.credit_card_rounded,
+                              size: isSmallScreen ? 12.0 : 14.0, 
+                              color: AppTheme.textSecondary
+                            ),
+                            SizedBox(width: isSmallScreen ? 3.0 : 4.0),
                             Text(
-                              payment['method']?.toString().toUpperCase() ?? 'CASH',
+                              payment['method']?.toString().toUpperCase() ??
+                                  'CASH',
                               style: TextStyle(
                                 color: AppTheme.textSecondary,
-                                fontSize: 13,
+                                fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            Icon(Icons.access_time_rounded, size: 14, color: AppTheme.textSecondary),
-                            const SizedBox(width: 4),
+                            SizedBox(width: isSmallScreen ? 12.0 : 16.0),
+                            Icon(
+                              Icons.access_time_rounded,
+                              size: isSmallScreen ? 12.0 : 14.0, 
+                              color: AppTheme.textSecondary
+                            ),
+                            SizedBox(width: isSmallScreen ? 3.0 : 4.0),
                             Text(
                               _formatDate(payment['time']?.toString()),
                               style: TextStyle(
                                 color: AppTheme.textSecondary,
-                                fontSize: 13,
+                                fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
                               ),
                             ),
                           ],
@@ -454,13 +542,13 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(30),
+            padding: EdgeInsets.all(isSmallScreen ? 24.0 : (isMediumScreen ? 27.0 : 30.0)),
             decoration: BoxDecoration(
               color: AppTheme.cardBackground,
               shape: BoxShape.circle,
@@ -474,16 +562,18 @@ class _AdminPaymentsPageState extends State<AdminPaymentsPage> {
             ),
             child: Icon(
               Icons.payments_outlined,
-              size: 80,
-              color: AppTheme.textSecondary.withOpacity(0.5),
+              size: isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0),
+              color: AppTheme.isDarkMode
+                  ? Colors.white24
+                  : AppTheme.textSecondary.withOpacity(0.5),
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isSmallScreen ? 16.0 : 20.0),
           Text(
             t('noPayments'),
             style: TextStyle(
-              color: AppTheme.textPrimary,
-              fontSize: 18,
+              color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+              fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
               fontWeight: FontWeight.w600,
             ),
           ),

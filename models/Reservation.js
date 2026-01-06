@@ -15,7 +15,7 @@ class Reservation {
   static async findById(bookingid) {
     const { data, error } = await supabase
       .from('reservation')
-      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user(*)))), payment(*)')
+      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))), payment(*)')
       .eq('bookingid', bookingid)
       .single();
 
@@ -26,7 +26,7 @@ class Reservation {
   static async findByPassengerId(passengerid, filters = {}) {
     let query = supabase
       .from('reservation')
-      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user(*)))), payment(*)')
+      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))), payment(*)')
       .eq('passengerid', passengerid);
 
     if (filters.status) {
@@ -64,7 +64,7 @@ class Reservation {
   static async findAll(filters = {}) {
     let query = supabase
       .from('reservation')
-      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user(*)))), payment(*)');
+      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))), payment(*)');
 
     if (filters.status) {
       query = query.eq('status', filters.status);
@@ -86,7 +86,7 @@ class Reservation {
   static async findByBookingType(bookingType, filters = {}) {
     let query = supabase
       .from('reservation')
-      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user(*)))), payment(*)')
+      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))), payment(*)')
       .eq('booking_type', bookingType);
 
     if (filters.status) {
@@ -105,7 +105,7 @@ class Reservation {
   static async findFutureBookingsForTrip(scheduledTripTime, filters = {}) {
     let query = supabase
       .from('reservation')
-      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user(*)))), payment(*)')
+      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))), payment(*)')
       .eq('booking_type', 'future')
       .eq('scheduled_trip_time', scheduledTripTime)
       .in('status', ['confirmed', 'pending']);
@@ -256,6 +256,26 @@ class Reservation {
       tripid: reservation.trip?.tripid ?? null,
       eventTime: resolveEventDate(reservation)?.toISOString() ?? null,
     }));
+  }
+
+  static async deleteByPassengerId(passengerid) {
+    const { error } = await supabase
+      .from('reservation')
+      .delete()
+      .eq('passengerid', passengerid);
+    
+    if (error) throw error;
+    return true;
+  }
+
+  static async delete(bookingid) {
+    const { error } = await supabase
+      .from('reservation')
+      .delete()
+      .eq('bookingid', bookingid);
+    
+    if (error) throw error;
+    return true;
   }
 }
 

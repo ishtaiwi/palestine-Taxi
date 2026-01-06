@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../services/api_service.dart';
 import '../../pages/driver/driver_home.dart';
 import 'select_role_page.dart';
+import 'driver_pending_approval_page.dart';
 
 class DriverAdditionalInfoScreen extends StatefulWidget {
   final RegisterFormData formData;
@@ -48,11 +50,12 @@ class _DriverAdditionalInfoScreenState
       'lineRetry': 'إعادة تحميل الخطوط',
       'lineError': 'فشل تحميل الخطوط',
       'lineEmpty': 'لا توجد خطوط متاحة حالياً',
-      'vehicleInfo': 'معلومات المركبة (اختياري)',
-      'vehicleInfoNote': 'سيتم إنشاء المركبة تلقائياً. يمكنك إضافة رقم اللوحة وتخطيط المقاعد لاحقاً.',
+      'vehicleInfo': 'معلومات المركبة',
       'plateNumber': 'رقم اللوحة',
-      'plateNumberHint': 'مثال: 3-1234-A (اختياري)',
+      'plateNumberHint': 'مثال: 3-1234-A',
+      'plateNumberRequired': 'رقم اللوحة مطلوب',
       'seatLayout': 'تخطيط المقاعد',
+      'seatLayoutRequired': 'تخطيط المقاعد مطلوب',
     },
     'en': {
       'title': 'Driver Information',
@@ -69,11 +72,12 @@ class _DriverAdditionalInfoScreenState
       'lineRetry': 'Reload lines',
       'lineError': 'Failed to load lines',
       'lineEmpty': 'No lines available right now',
-      'vehicleInfo': 'Vehicle Information (Optional)',
-      'vehicleInfoNote': 'Vehicle will be created automatically. You can add plate number and seat layout later.',
+      'vehicleInfo': 'Vehicle Information',
       'plateNumber': 'Plate Number',
-      'plateNumberHint': 'Example: 3-1234-A (optional)',
+      'plateNumberHint': 'Example: 3-1234-A',
+      'plateNumberRequired': 'Plate number is required',
       'seatLayout': 'Seat Layout',
+      'seatLayoutRequired': 'Seat layout is required',
     },
   };
 
@@ -184,8 +188,6 @@ class _DriverAdditionalInfoScreenState
       debugPrint(
         '[DriverSignup] Submitting driver registration with lineId: $resolvedLineId',
       );
-      // Vehicle will be created automatically even if plate number is empty
-      // Default: seatlayout = '4+1', plateno = null (can be added later)
       final result = await ApiService.register(
         fullname: widget.formData.fullName,
         email: widget.formData.email,
@@ -194,16 +196,15 @@ class _DriverAdditionalInfoScreenState
         role: 'DRIVER',
         licenseId: _licenseIdController.text.trim(),
         lineId: resolvedLineId,
-        vehiclePlate: _plateNumberController.text.trim().isEmpty 
-            ? null 
-            : _plateNumberController.text.trim(), // Send null if empty
-        vehicleSeatLayout: _selectedSeatLayout, // Always send (default: '4+1')
+        vehiclePlate: _plateNumberController.text.trim(),
+        vehicleSeatLayout: _selectedSeatLayout,
       );
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
       final success = result['success'] == true || result['success'] == 'true';
+      final approvalStatus = result['approvalStatus'] as String?;
 
       if (success) {
         final message = result['message'] ?? (_isArabic ? 'تم إنشاء الحساب بنجاح' : 'Registration successful');
@@ -213,17 +214,27 @@ class _DriverAdditionalInfoScreenState
             SnackBar(
               content: Text(message),
               backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
+              duration: const Duration(seconds: 3),
             ),
           );
           
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted) {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const DriverHomePage()),
-                (route) => false,
-              );
+              // If driver is pending approval, show pending screen
+              if (approvalStatus == 'pending') {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DriverPendingApprovalPage()),
+                  (route) => false,
+                );
+              } else {
+                // If approved, go to home
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DriverHomePage()),
+                  (route) => false,
+                );
+              }
             }
           });
         }
@@ -260,6 +271,9 @@ class _DriverAdditionalInfoScreenState
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = kIsWeb && screenWidth > 800;
+    
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
@@ -293,43 +307,57 @@ class _DriverAdditionalInfoScreenState
             ),
           ),
           child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: Colors.white38),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 25,
-                      offset: const Offset(0, 15),
-                    ),
-                  ],
+            child: Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 24 : 24,
+                  vertical: isDesktop ? 16 : 24,
                 ),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isDesktop ? 600 : double.infinity,
+                  ),
+                  child: Container(
+                    width: isDesktop ? 600 : double.infinity,
+                    padding: EdgeInsets.all(isDesktop ? 32 : 24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: Colors.white38,
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 30,
+                          offset: const Offset(0, 15),
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                       Text(
                         t('subtitle'),
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                          fontSize: isDesktop ? 18 : 16,
+                        ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: isDesktop ? 20 : 24),
                       _buildTextField(
                         controller: _licenseIdController,
                         label: t('licenseId'),
                         hint: t('enterLicenseId'),
                         keyboardType: TextInputType.text,
+                        isDesktop: isDesktop,
+                        required: true,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return t('enterLicenseId');
@@ -342,55 +370,42 @@ class _DriverAdditionalInfoScreenState
                           return null;
                         },
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: isDesktop ? 20 : 24),
                       Text(
                         t('lineSection'),
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: isDesktop ? 18 : 16,
+                        ),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: isDesktop ? 14 : 16),
                       _buildLineSelector(),
-                      const SizedBox(height: 24),
-                      // Vehicle Information Section (Optional)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.info_outline, color: Colors.blue, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                t('vehicleInfoNote'),
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
+                      SizedBox(height: isDesktop ? 24 : 28),
+                      Text(
+                        t('vehicleInfo'),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: isDesktop ? 18 : 16,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: isDesktop ? 14 : 16),
                       _buildTextField(
                         controller: _plateNumberController,
                         label: t('plateNumber'),
                         hint: t('plateNumberHint'),
                         keyboardType: TextInputType.text,
+                        isDesktop: isDesktop,
                         validator: _validatePlateNumber,
+                        required: true,
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: isDesktop ? 20 : 24),
                       _buildSeatLayoutSelector(),
-                      const SizedBox(height: 32),
+                      SizedBox(height: isDesktop ? 28 : 32),
                       SizedBox(
                         width: double.infinity,
-                        height: 56,
+                        height: isDesktop ? 52 : 56,
                         child: Container(
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
@@ -457,6 +472,8 @@ class _DriverAdditionalInfoScreenState
                       ),
                     ],
                   ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -468,7 +485,7 @@ class _DriverAdditionalInfoScreenState
 
   String? _validatePlateNumber(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return _isArabic ? 'رقم المركبة مطلوب' : 'Vehicle plate is required';
+      return t('plateNumberRequired');
     }
     final pattern = RegExp(r'^\d-\d{4}-[A-Za-z]$');
     if (!pattern.hasMatch(value.trim())) {
@@ -480,43 +497,107 @@ class _DriverAdditionalInfoScreenState
   }
 
   Widget _buildSeatLayoutSelector() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = kIsWeb && screenWidth > 800;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          _isArabic ? 'نوع المقاعد' : 'Seat configuration',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ToggleButtons(
-          isSelected: [
-            _selectedSeatLayout == '4+1',
-            _selectedSeatLayout == '7+1',
-          ],
-          borderRadius: BorderRadius.circular(12),
-          fillColor: const Color(0xFFF57C00),
-          selectedColor: Colors.white,
-          color: Colors.white70,
-          onPressed: (index) {
-            setState(() {
-              _selectedSeatLayout = index == 0 ? '4+1' : '7+1';
-            });
-          },
+        Row(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(_isArabic ? '4+1 (خمس ركاب)' : '4+1 (5 seats)'),
+            Text(
+              t('seatLayout'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(_isArabic ? '7+1 (ثمانية ركاب)' : '7+1 (8 seats)'),
+            const SizedBox(width: 4),
+            const Text(
+              '*',
+              style: TextStyle(
+                color: Color(0xFFF57C00),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSeatOption(
+                layout: '4+1',
+                label: _isArabic ? '4+1 (خمس ركاب)' : '4+1 (5 seats)',
+                isSelected: _selectedSeatLayout == '4+1',
+                isDesktop: isDesktop,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSeatOption(
+                layout: '7+1',
+                label: _isArabic ? '7+1 (ثمانية ركاب)' : '7+1 (8 seats)',
+                isSelected: _selectedSeatLayout == '7+1',
+                isDesktop: isDesktop,
+              ),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildSeatOption({
+    required String layout,
+    required String label,
+    required bool isSelected,
+    required bool isDesktop,
+  }) {
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedSeatLayout = layout;
+        });
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          vertical: isDesktop ? 14 : 16,
+          horizontal: isDesktop ? 12 : 16,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFF57C00).withOpacity(0.2)
+              : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFFF57C00)
+                : Colors.white38,
+            width: isSelected ? 2.5 : 1.5,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFF57C00).withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.white70,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: isDesktop ? 15 : 14,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -526,16 +607,18 @@ class _DriverAdditionalInfoScreenState
     required String hint,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    bool isDesktop = false,
+    bool required = false,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
-      style: const TextStyle(
+      style: TextStyle(
         color: Colors.white,
-        fontSize: 16,
+        fontSize: isDesktop ? 16 : 16,
         fontWeight: FontWeight.w500,
       ),
-      decoration: _inputDecoration(label, hint),
+      decoration: _inputDecoration(label, hint, required: required),
       validator: validator,
       enableInteractiveSelection: true,
       autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -544,15 +627,16 @@ class _DriverAdditionalInfoScreenState
 
   InputDecoration _inputDecoration(
     String label,
-    String hint,
-  ) {
+    String hint, {
+    bool required = false,
+  }) {
     final baseBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
       borderSide: const BorderSide(color: Colors.white38),
     );
 
     return InputDecoration(
-      labelText: label,
+      labelText: required ? '$label *' : label,
       hintText: hint,
       labelStyle: const TextStyle(
         color: Colors.white,
@@ -564,6 +648,12 @@ class _DriverAdditionalInfoScreenState
       enabledBorder: baseBorder,
       focusedBorder: baseBorder.copyWith(
         borderSide: const BorderSide(color: Color(0xFFF57C00), width: 2),
+      ),
+      errorBorder: baseBorder.copyWith(
+        borderSide: const BorderSide(color: Colors.red, width: 2),
+      ),
+      focusedErrorBorder: baseBorder.copyWith(
+        borderSide: const BorderSide(color: Colors.red, width: 2),
       ),
     );
   }
@@ -684,25 +774,96 @@ class _DriverAdditionalInfoScreenState
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = kIsWeb && screenWidth > 800;
+    
     return DropdownButtonFormField<String>(
       value: _selectedLineId,
-      decoration: _inputDecoration(t('lineLabel'), t('lineHint')),
+      decoration: _inputDecoration(t('lineLabel'), t('lineHint'), required: true),
       dropdownColor: const Color(0xFF142238),
       iconEnabledColor: Colors.white,
-      style: const TextStyle(
+      iconSize: isDesktop ? 28 : 24,
+      icon: const Icon(Icons.keyboard_arrow_down_rounded),
+      style: TextStyle(
         color: Colors.white,
         fontWeight: FontWeight.w600,
+        fontSize: isDesktop ? 16 : 15,
       ),
+      menuMaxHeight: 400,
+      borderRadius: BorderRadius.circular(18),
       autovalidateMode: AutovalidateMode.onUserInteraction,
+      selectedItemBuilder: (BuildContext context) {
+        return _lines.map<Widget>((line) {
+          final lineName = _isArabic
+              ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '')
+              : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '');
+          return Align(
+            alignment: _isArabic ? Alignment.centerRight : Alignment.centerLeft,
+            child: Text(
+              lineName,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: isDesktop ? 16 : 15,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          );
+        }).toList();
+      },
       items: _lines
           .map(
             (line) => DropdownMenuItem<String>(
               value: line['lineid']?.toString(),
-              child: Text(
-                _isArabic
-                    ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '')
-                    : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? ''),
-                style: const TextStyle(color: Colors.white),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 0.5,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF57C00).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.route,
+                        color: Color(0xFFF57C00),
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _isArabic
+                            ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '')
+                            : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? ''),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (_selectedLineId == line['lineid']?.toString())
+                      const Padding(
+                        padding: EdgeInsets.only(left: 8),
+                        child: Icon(
+                          Icons.check_circle,
+                          color: Color(0xFFF57C00),
+                          size: 20,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           )

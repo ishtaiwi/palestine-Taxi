@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
@@ -18,10 +19,10 @@ class DriverQueuePage extends StatefulWidget {
   });
 
   @override
-  State<DriverQueuePage> createState() => _DriverQueuePageState();
+  State<DriverQueuePage> createState() => DriverQueuePageState();
 }
 
-class _DriverQueuePageState extends State<DriverQueuePage> {
+class DriverQueuePageState extends State<DriverQueuePage> {
   late bool _isArabic;
   late bool _isDarkMode;
   bool _isLoading = true;
@@ -32,31 +33,39 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
   final Map<String, Map<String, String>> _texts = {
     'ar': {
       'title': 'دور السائقين',
-      'line': 'الخط',
-      'yourTurn': 'دورك الحالي',
+      'line': 'الخط الحالي',
+      'yourTurn': 'دورك',
       'ahead': 'قبلك',
       'behind': 'بعدك',
       'joinQueue': 'حجز دور',
-      'leaveQueue': 'إلغاء الدور',
-      'noDrivers': 'لا يوجد سائقون في الدور حالياً',
-      'notInQueue': 'أنت خارج الدور حالياً',
+      'leaveQueue': 'مغادرة الدور',
+      'noDrivers': 'القائمة فارغة حالياً',
+      'notInQueue': 'أنت لست في قائمة الانتظار',
       'refresh': 'تحديث',
-      'statusWaiting': 'ينتظر',
+      'statusWaiting': 'في الانتظار',
       'retry': 'إعادة المحاولة',
+      'position': 'الترتيب',
+      'driverName': 'اسم السائق',
+      'phoneNumber': 'رقم الهاتف',
+      'you': 'أنت',
     },
     'en': {
       'title': 'Driver Queue',
-      'line': 'Line',
-      'yourTurn': 'Your turn',
+      'line': 'Current Line',
+      'yourTurn': 'Your Turn',
       'ahead': 'Ahead',
       'behind': 'Behind',
       'joinQueue': 'Join Queue',
       'leaveQueue': 'Leave Queue',
-      'noDrivers': 'No drivers in the queue yet',
-      'notInQueue': 'You are currently out of the queue',
+      'noDrivers': 'Queue is currently empty',
+      'notInQueue': 'You are not in the queue',
       'refresh': 'Refresh',
       'statusWaiting': 'Waiting',
       'retry': 'Retry',
+      'position': 'Pos',
+      'driverName': 'Driver Name',
+      'phoneNumber': 'Phone Number',
+      'you': 'You',
     },
   };
 
@@ -113,6 +122,10 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
     }
   }
 
+  void refresh() {
+    _loadQueue();
+  }
+
   Future<void> _loadQueue() async {
     setState(() {
       _isLoading = true;
@@ -133,6 +146,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
   }
 
   Future<void> _joinQueue() async {
+    final currentLine = _queueData?['line'];
     setState(() {
       _isMutating = true;
       _error = null;
@@ -144,6 +158,9 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
     setState(() {
       _isMutating = false;
       if (result['success'] == true) {
+        if (result['line'] == null && currentLine != null) {
+          result['line'] = currentLine;
+        }
         _queueData = result;
       } else {
         _error = result['message']?.toString();
@@ -152,6 +169,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
   }
 
   Future<void> _leaveQueue() async {
+    final currentLine = _queueData?['line'];
     setState(() {
       _isMutating = true;
       _error = null;
@@ -163,6 +181,9 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
     setState(() {
       _isMutating = false;
       if (result['success'] == true) {
+        if (result['line'] == null && currentLine != null) {
+          result['line'] = currentLine;
+        }
         _queueData = result;
       } else {
         _error = result['message']?.toString();
@@ -175,19 +196,29 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
-    final body = _buildBody();
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Web-specific responsive breakpoints
+    final isWeb = kIsWeb;
+    final isDesktop = isWeb && screenWidth >= 1200;
+    final isTablet = screenWidth >= 600 && screenWidth < 1200;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    
+    final body = _buildBody(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen, isWeb: isWeb);
 
     if (widget.embedded) {
-      return body;
+      return Directionality(
+        textDirection: textDirection,
+        child: body,
+      );
     }
 
-    // Theme-aware colors for full page view
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
         : const Color.fromARGB(255, 224, 228, 231);
-    final appBarColor = _isDarkMode
-        ? const Color(0xFF1E3A5F)
-        : const Color(0xFF2C5F8D);
 
     return Directionality(
       textDirection: textDirection,
@@ -222,13 +253,13 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
             ),
             child: AppBar(
               leading: Container(
-                margin: const EdgeInsets.all(8),
+                margin: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                  icon: Icon(Icons.arrow_back_ios_new, size: isSmallScreen ? 18.0 : 20.0),
                   onPressed: () {
                     if (Navigator.canPop(context)) {
                       Navigator.pop(context);
@@ -245,10 +276,10 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
               ),
               title: Text(
                 t('title'),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 22,
+                  fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
                   letterSpacing: 0.5,
                 ),
               ),
@@ -256,32 +287,44 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
               foregroundColor: Colors.white,
               elevation: 0,
               centerTitle: true,
-              iconTheme: const IconThemeData(color: Colors.white),
-              actionsIconTheme: const IconThemeData(color: Colors.white),
-              actions: [],
+              actions: [
+                Container(
+                  margin: EdgeInsets.only(right: isSmallScreen ? 4.0 : 8.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: Icon(Icons.refresh_rounded, size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0)),
+                    onPressed: _loadQueue,
+                    tooltip: t('refresh'),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
         body: body,
-        bottomNavigationBar: widget.embedded
-            ? null
-            : DriverBottomNavBar(
-                currentIndex: 1, // Check-in is index 1
-                isDarkMode: _isDarkMode,
-                isArabic: _isArabic,
-                onTap: (index) {
-                  DriverBottomNavBar.navigateToPage(context, index);
-                },
-              ),
+        bottomNavigationBar: DriverBottomNavBar(
+          currentIndex: 1, // Check-in is index 1
+          isDarkMode: _isDarkMode,
+          isArabic: _isArabic,
+          onTap: (index) {
+            DriverBottomNavBar.navigateToPage(context, index);
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildBody() {
-    // Theme-aware colors
-    final textPrimaryColor = _isDarkMode
-        ? Colors.white
-        : const Color(0xFF1E3A5F);
+  Widget _buildBody({bool isSmallScreen = false, bool isMediumScreen = false, bool isWeb = false}) {
+    final textPrimaryColor = _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
+    final double basePadding = isWeb 
+        ? (isSmallScreen ? 24.0 : 32.0)
+        : (isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0));
+    
+    // Max width for web to prevent content from stretching too wide
+    final double maxContentWidth = isWeb ? 1400.0 : double.infinity;
     
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -290,16 +333,25 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
     if (_error != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Icon(
+                Icons.error_outline, 
+                size: isSmallScreen ? 40.0 : (isMediumScreen ? 44.0 : 48.0), 
+                color: Colors.redAccent
+              ),
+              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: textPrimaryColor, fontSize: 16),
+                style: TextStyle(
+                  color: textPrimaryColor, 
+                  fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0)
+                ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
               FilledButton.tonal(
                 onPressed: _loadQueue,
                 child: Text(t('retry')),
@@ -310,7 +362,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
       );
     }
 
-    final content = _buildQueueContent();
+    final content = _buildQueueContent(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen);
 
     if (widget.embedded) {
       return content;
@@ -319,177 +371,113 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
     return RefreshIndicator(
       color: Colors.orange,
       onRefresh: _loadQueue,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
-        child: content,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.all(basePadding),
+            child: content,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildQueueContent() {
+  Widget _buildQueueContent({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final queue = (_queueData?['queue'] as List?) ?? [];
-    final current = _queueData?['currentEntry'] as Map<String, dynamic>?;
-
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (!widget.embedded) const SizedBox(height: 8),
-        _buildLineCard(),
-        const SizedBox(height: 16),
-        _buildStatsRow(),
-        const SizedBox(height: 16),
-        _buildActionButton(),
-        const SizedBox(height: 16),
+        if (!widget.embedded) ...[
+          _buildLineCard(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+          SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
+        ],
+        _buildStatsRow(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+        SizedBox(height: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 24.0)),
+        _buildActionButton(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+        SizedBox(height: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 24.0)),
         if (!_isInQueue)
-          Text(
-            t('notInQueue'),
-            style: TextStyle(
-              color: _isDarkMode
-                  ? Colors.white.withOpacity(0.7)
-                  : AppTheme.lightTextSecondary,
-            ),
-          ),
-        const SizedBox(height: 12),
-        if (queue.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: _isDarkMode
-                  ? Colors.white.withOpacity(0.05)
-                  : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(16),
-              border: _isDarkMode
-                  ? null
-                  : Border.all(color: Colors.grey.shade300, width: 1),
-            ),
+          Padding(
+            padding: EdgeInsets.only(bottom: isSmallScreen ? 8.0 : 12.0),
             child: Center(
               child: Text(
-                t('noDrivers'),
+                t('notInQueue'),
                 style: TextStyle(
-                  color: _isDarkMode ? Colors.white : AppTheme.lightTextPrimary,
-                  fontSize: 16,
+                  color: _isDarkMode
+                      ? Colors.white.withOpacity(0.7)
+                      : const Color(0xFF546E7A),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
-          )
-        else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: queue.length,
-            itemBuilder: (context, index) {
-              final entry = queue[index] as Map<String, dynamic>;
-              final driver = entry['driver'] as Map<String, dynamic>? ?? {};
-              final user = driver['user'] as Map<String, dynamic>? ?? {};
-              final isCurrent = current != null && current['queueid'] == entry['queueid'];
-              final textColor = _isDarkMode ? Colors.white : AppTheme.lightTextPrimary;
-              final secondaryTextColor = _isDarkMode
-                  ? Colors.white.withOpacity(0.8)
-                  : AppTheme.lightTextSecondary;
-              
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isCurrent
-                      ? (_isDarkMode
-                          ? const Color(0xFF1B5E20).withOpacity(0.15)
-                          : Colors.green.shade50)
-                      : (_isDarkMode
-                          ? Colors.white.withOpacity(0.05)
-                          : Colors.grey.shade50),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isCurrent
-                        ? (_isDarkMode
-                            ? const Color(0xFF1B5E20)
-                            : Colors.green.shade300)
-                        : (_isDarkMode
-                            ? Colors.white24
-                            : Colors.grey.shade300),
-                    width: isCurrent ? 2 : 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.orange.withOpacity(0.2),
-                      child: Text(
-                        '${entry['position']}',
-                        style: const TextStyle(color: Colors.orange),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user['fullname']?.toString() ?? '---',
-                            style: TextStyle(
-                              color: textColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            user['phone']?.toString() ?? '',
-                            style: TextStyle(
-                              color: secondaryTextColor,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      t('statusWaiting'),
-                      style: TextStyle(color: secondaryTextColor),
-                    ),
-                  ],
-                ),
-              );
-            },
           ),
+        
+        _buildQueueList(queue, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
       ],
     );
   }
 
-  Widget _buildLineCard() {
+  Widget _buildLineCard({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final line = _queueData?['line'] as Map<String, dynamic>? ?? {};
+    final lineName = _isArabic
+        ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '---')
+        : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '---');
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+        gradient: LinearGradient(
+          colors: _isDarkMode 
+              ? [const Color(0xFF1565C0), const Color(0xFF0D47A1)]
+              : [const Color(0xFF1E88E5), const Color(0xFF1565C0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1565C0).withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            t('line'),
-            style: const TextStyle(
-              color: Colors.white, // نص أبيض على خلفية غامقة
-              fontSize: 14,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
+                ),
+                child: Icon(Icons.alt_route_rounded, color: Colors.white, size: isSmallScreen ? 18.0 : 20.0),
+              ),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+              Text(
+                t('line'),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isSmallScreen ? 8.0 : 12.0),
           Text(
-            _isArabic
-                ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '---')
-                : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '---'),
-            style: const TextStyle(
+            lineName,
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 21.0 : 24.0),
               fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
             ),
           ),
         ],
@@ -497,7 +485,7 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
     );
   }
 
-  Widget _buildStatsRow() {
+  Widget _buildStatsRow({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final ahead = (_queueData?['aheadCount'] as num?)?.toInt() ?? 0;
     final behind = (_queueData?['behindCount'] as num?)?.toInt() ?? 0;
 
@@ -507,88 +495,76 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
           child: _buildStatBox(
             label: t('ahead'),
             value: '$ahead',
+            icon: Icons.keyboard_arrow_up_rounded,
             color: Colors.orange,
+            isSmallScreen: isSmallScreen,
+            isMediumScreen: isMediumScreen,
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: isSmallScreen ? 12.0 : 16.0),
         Expanded(
           child: _buildStatBox(
             label: t('behind'),
             value: '$behind',
+            icon: Icons.keyboard_arrow_down_rounded,
             color: Colors.green,
+            isSmallScreen: isSmallScreen,
+            isMediumScreen: isMediumScreen,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildActionButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: FilledButton(
-        onPressed: _isMutating
-            ? null
-            : _isInQueue
-                ? _leaveQueue
-                : _joinQueue,
-        style: FilledButton.styleFrom(
-          backgroundColor: _isInQueue ? Colors.redAccent : const Color(0xFFF57C00),
-          textStyle: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        child: _isMutating
-            ? const SizedBox(
-                height: 24,
-                width: 24,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2.5,
-                ),
-              )
-            : Text(_isInQueue ? t('leaveQueue') : t('joinQueue')),
-      ),
-    );
-  }
-
   Widget _buildStatBox({
     required String label,
     required String value,
+    required IconData icon,
     required Color color,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
+    final cardColor = _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white;
+    final borderColor = _isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200;
+    final textColor = _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       decoration: BoxDecoration(
-        color: _isDarkMode
-            ? Colors.white.withOpacity(0.05)
-            : Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _isDarkMode
-              ? Colors.white24
-              : Colors.grey.shade300,
-        ),
+        color: cardColor,
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(_isDarkMode ? 0.2 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: _isDarkMode
-                  ? Colors.white
-                  : AppTheme.lightTextSecondary,
-              fontSize: 12,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: _isDarkMode ? Colors.white70 : const Color(0xFF546E7A),
+                  fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Icon(icon, color: color, size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0)),
+            ],
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: isSmallScreen ? 8.0 : 12.0),
           Text(
             value,
             style: TextStyle(
-              color: color,
-              fontSize: 24,
+              color: textColor,
+              fontSize: isSmallScreen ? 22.0 : (isMediumScreen ? 25.0 : 28.0),
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -596,5 +572,169 @@ class _DriverQueuePageState extends State<DriverQueuePage> {
       ),
     );
   }
-}
 
+  Widget _buildActionButton({bool isSmallScreen = false, bool isMediumScreen = false}) {
+    return SizedBox(
+      width: double.infinity,
+      height: isSmallScreen ? 48.0 : (isMediumScreen ? 52.0 : 56.0),
+      child: FilledButton.icon(
+        onPressed: _isMutating
+            ? null
+            : _isInQueue
+                ? _leaveQueue
+                : _joinQueue,
+        icon: _isMutating 
+            ? SizedBox(
+                width: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0), 
+                height: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0), 
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+              )
+            : Icon(
+                _isInQueue ? Icons.exit_to_app_rounded : Icons.add_circle_outline_rounded,
+                size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
+              ),
+        label: Text(
+          _isMutating 
+              ? '' 
+              : (_isInQueue ? t('leaveQueue') : t('joinQueue')),
+          style: TextStyle(
+            fontSize: isSmallScreen ? 15.0 : (isMediumScreen ? 16.0 : 18.0), 
+            fontWeight: FontWeight.bold
+          ),
+        ),
+        style: FilledButton.styleFrom(
+          backgroundColor: _isInQueue ? Colors.redAccent : const Color(0xFFF57C00),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+          ),
+          elevation: 4,
+          shadowColor: (_isInQueue ? Colors.redAccent : const Color(0xFFF57C00)).withOpacity(0.4),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQueueList(List<dynamic> queue, {bool isSmallScreen = false, bool isMediumScreen = false}) {
+    if (queue.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(isSmallScreen ? 20.0 : (isMediumScreen ? 26.0 : 32.0)),
+        decoration: BoxDecoration(
+          color: _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
+          border: Border.all(
+            color: _isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.people_outline_rounded,
+              size: isSmallScreen ? 40.0 : (isMediumScreen ? 44.0 : 48.0),
+              color: _isDarkMode ? Colors.white38 : Colors.grey.shade400,
+            ),
+            SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+            Text(
+              t('noDrivers'),
+              style: TextStyle(
+                color: _isDarkMode ? Colors.white70 : const Color(0xFF546E7A),
+                fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final currentEntry = _queueData?['currentEntry'] as Map<String, dynamic>?;
+    final textPrimaryColor = _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
+    final cardBgColor = _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white;
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: queue.length,
+      itemBuilder: (context, index) {
+        final entry = queue[index] as Map<String, dynamic>;
+        final driver = entry['driver'] as Map<String, dynamic>? ?? {};
+        final user = driver['user'] as Map<String, dynamic>? ?? {};
+        final isCurrent = currentEntry != null && currentEntry['queueid'] == entry['queueid'];
+        
+        return Container(
+          margin: EdgeInsets.only(bottom: isSmallScreen ? 10.0 : 12.0),
+          decoration: BoxDecoration(
+            color: isCurrent 
+                ? (_isDarkMode ? const Color(0xFF1B5E20).withOpacity(0.3) : Colors.green.shade50)
+                : cardBgColor,
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+            border: Border.all(
+              color: isCurrent
+                  ? Colors.green
+                  : (_isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200),
+              width: isCurrent ? 2 : 1,
+            ),
+            boxShadow: [
+              if (!isCurrent)
+                BoxShadow(
+                  color: Colors.black.withOpacity(_isDarkMode ? 0.2 : 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+            ],
+          ),
+          child: ListTile(
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 12.0 : 16.0, 
+              vertical: isSmallScreen ? 6.0 : 8.0
+            ),
+            leading: CircleAvatar(
+              radius: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
+              backgroundColor: isCurrent ? Colors.green : Colors.orange.withOpacity(0.2),
+              child: Text(
+                '${entry['position']}',
+                style: TextStyle(
+                  color: isCurrent ? Colors.white : Colors.orange,
+                  fontWeight: FontWeight.bold,
+                  fontSize: isSmallScreen ? 14.0 : 16.0,
+                ),
+              ),
+            ),
+            title: Text(
+              isCurrent ? '${user['fullname']} (${t('you')})' : (user['fullname']?.toString() ?? '---'),
+              style: TextStyle(
+                color: textPrimaryColor,
+                fontWeight: FontWeight.bold,
+                fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
+              ),
+            ),
+            subtitle: Text(
+              user['phone']?.toString() ?? '',
+              style: TextStyle(
+                color: _isDarkMode ? Colors.white70 : const Color(0xFF546E7A),
+                fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+              ),
+            ),
+            trailing: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 8.0 : 10.0, 
+                vertical: isSmallScreen ? 4.0 : 6.0
+              ),
+              decoration: BoxDecoration(
+                color: (isCurrent ? Colors.green : const Color(0xFF546E7A)).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+              ),
+              child: Text(
+                t('statusWaiting'),
+                style: TextStyle(
+                  color: isCurrent ? Colors.green : const Color(0xFF546E7A),
+                  fontSize: isSmallScreen ? 10.0 : (isMediumScreen ? 11.0 : 12.0),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

@@ -1,9 +1,11 @@
 import Trip from '../models/Trip.js';
 import Vehicle from '../models/Vehicle.js';
 import DriverQueue from '../models/DriverQueue.js';
+import Reservation from '../models/Reservation.js';
 import { distributeAllBookings } from './matchingService.js';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
 import logger from '../utils/logger.js';
+import { getUtcNow, parseUtcDate } from '../utils/timeUtils.js';
 
 /**
  * Assign a vehicle to a trip from the driver queue
@@ -14,18 +16,18 @@ import logger from '../utils/logger.js';
 export const assignVehicleFromQueue = async (tripid, lineid) => {
   try {
     logger.info(`[TripOpeningService] 🔍 Attempting to assign vehicle from queue for trip ${tripid}`);
-    
+
     // Get next driver from queue
     const queue = await DriverQueue.getActiveByLine(lineid);
     if (!queue || queue.length === 0) {
       logger.info(`[TripOpeningService] ⚠️ No drivers available in queue for line ${lineid}`);
       return null;
     }
-    
+
     // Get the first driver in queue (FIFO)
     const driverQueueEntry = queue[0];
     const driverid = driverQueueEntry.driverid;
-    
+
     // Get driver's vehicle (one-to-one relationship)
     const vehicles = await Vehicle.findByDriverId(driverid);
     if (!vehicles || vehicles.length === 0) {
@@ -34,20 +36,20 @@ export const assignVehicleFromQueue = async (tripid, lineid) => {
       await DriverQueue.removeDriverFromQueue(driverid);
       return null;
     }
-    
+
     const vehicle = vehicles[0];
-    
+
     // Update trip with vehicle and driver assignment
     const updatedTrip = await Trip.update(tripid, {
       vehicleid: vehicle.vehicleid,
       availableseats: calculateAvailablePassengerSeats(vehicle.seatnum, 0, 0),
     });
-    
+
     // Assign driver to trip
     await Trip.assignDriver(tripid, driverid);
-    
+
     logger.info(`[TripOpeningService] ✅ Vehicle ${vehicle.vehicleid} and driver ${driverid} assigned to trip ${tripid}`);
-    
+
     return {
       success: true,
       vehicle,
@@ -68,13 +70,13 @@ export const assignVehicleFromQueue = async (tripid, lineid) => {
 export const openScheduledTrip = async (tripid) => {
   try {
     logger.info(`[TripOpeningService] 🚀 Opening trip ${tripid}`);
-    
+
     // Get trip details
     const trip = await Trip.findById(tripid);
     if (!trip) {
       throw new Error(`Trip ${tripid} not found`);
     }
-    
+
     // Allow opening trips in 'scheduled' or 'delayed' status
     if (trip.status !== 'scheduled' && trip.status !== 'delayed') {
       logger.warn(`[TripOpeningService] ⚠️ Trip ${tripid} is not in scheduled/delayed status: ${trip.status}`);
@@ -83,28 +85,33 @@ export const openScheduledTrip = async (tripid) => {
         message: 'Trip is not in scheduled/delayed status',
       };
     }
-    
-    // Update trip_opening_time if not already set
+
+    // Update trip_opening_time and status to 'open' if not already set
     if (!trip.trip_opening_time) {
-      const openingTime = new Date().toISOString();
+      const openingTime = getUtcNow().toISOString();
       await Trip.update(tripid, {
         trip_opening_time: openingTime,
+        status: 'open',
       });
-      logger.info(`[TripOpeningService] ✅ Set trip_opening_time for trip ${tripid}`);
+      logger.info(`[TripOpeningService] ✅ Set trip_opening_time and status='open' for trip ${tripid}`);
+    } else if (trip.status === 'scheduled') {
+      // Trip already has opening time but status not updated yet
+      await Trip.update(tripid, { status: 'open' });
+      logger.info(`[TripOpeningService] ✅ Updated status to 'open' for trip ${tripid}`);
     }
-    
+
     // Check if trip has vehicle assigned
     let vehicleAssigned = false;
     if (!trip.vehicleid) {
       logger.info(`[TripOpeningService] 🔍 Trip ${tripid} has no vehicle, attempting assignment from queue`);
       const assignmentResult = await assignVehicleFromQueue(tripid, trip.lineid);
-      
+
       if (assignmentResult) {
         vehicleAssigned = true;
-        // Update trip status back to scheduled if it was delayed
+        // Update trip status to open if it was delayed
         if (trip.status === 'delayed') {
-          await Trip.update(tripid, { status: 'scheduled' });
-          logger.info(`[TripOpeningService] ✅ Trip ${tripid} status changed from delayed to scheduled`);
+          await Trip.update(tripid, { status: 'open' });
+          logger.info(`[TripOpeningService] ✅ Trip ${tripid} status changed from delayed to open`);
         }
         // Refresh trip data after assignment
         const updatedTrip = await Trip.findById(tripid);
@@ -123,14 +130,14 @@ export const openScheduledTrip = async (tripid) => {
     } else {
       vehicleAssigned = true;
     }
-    
+
     // Only distribute bookings if vehicle is assigned
     let distributionResult = null;
     if (vehicleAssigned) {
       logger.info(`[TripOpeningService] 📋 Distributing bookings for trip ${tripid}`);
       distributionResult = await distributeAllBookings(tripid);
     }
-    
+
     return {
       success: true,
       trip,
@@ -150,33 +157,92 @@ export const openScheduledTrip = async (tripid) => {
  */
 export const findWaitingTrips = async (lineid = null) => {
   try {
-    const now = new Date().toISOString();
-    
-    // Get all scheduled and delayed trips (filtered by lineid if provided)
-    // We need to check both statuses since delayed trips also need vehicles
+    const now = getUtcNow();
+    logger.info(`[TripOpeningService] 🔍 Finding waiting trips${lineid ? ` for line ${lineid}` : ' (all lines)'}`);
+
+    // Get all scheduled, open, and delayed trips (filtered by lineid if provided)
+    // We need to check all these statuses since they may need vehicles
     let allTrips = [];
     if (lineid) {
       const scheduledTrips = await Trip.findAll({ status: 'scheduled', lineid });
+      const openTrips = await Trip.findAll({ status: 'open', lineid });
       const delayedTrips = await Trip.findAll({ status: 'delayed', lineid });
-      allTrips = [...scheduledTrips, ...delayedTrips];
+      allTrips = [...scheduledTrips, ...openTrips, ...delayedTrips];
+      logger.info(`[TripOpeningService] Found ${allTrips.length} trips (scheduled: ${scheduledTrips.length}, open: ${openTrips.length}, delayed: ${delayedTrips.length}) for line ${lineid}`);
     } else {
       const scheduledTrips = await Trip.findAll({ status: 'scheduled' });
+      const openTrips = await Trip.findAll({ status: 'open' });
       const delayedTrips = await Trip.findAll({ status: 'delayed' });
-      allTrips = [...scheduledTrips, ...delayedTrips];
+      allTrips = [...scheduledTrips, ...openTrips, ...delayedTrips];
+      logger.info(`[TripOpeningService] Found ${allTrips.length} trips (scheduled: ${scheduledTrips.length}, open: ${openTrips.length}, delayed: ${delayedTrips.length}) for all lines`);
     }
-    
-    // Filter trips that have trip_opening_time set but no vehicleid
-    // and the opening time has passed (trip is opened)
-    const waitingTrips = allTrips.filter(trip => 
-      trip.trip_opening_time && 
-      !trip.vehicleid &&
-      new Date(trip.trip_opening_time) <= new Date(now) &&
-      new Date(trip.deptime) >= new Date(now) // Only future trips
-    );
-    
+
+    // Filter trips that need vehicle assignment:
+    // 1. No vehicle assigned (!trip.vehicleid)
+    // 2. Trip opening time has passed (if set) OR departure time has passed
+    // 3. If departure time has passed, trip must have reservations
+    // 4. Trip is in a status that allows assignment (scheduled, open, delayed)
+    const waitingTrips = [];
+    let skippedCount = { hasVehicle: 0, noDeptime: 0, timeNotPassed: 0, noReservations: 0 };
+
+    for (const trip of allTrips) {
+      if (trip.vehicleid) {
+        skippedCount.hasVehicle++;
+        continue; // Already has vehicle
+      }
+
+      const openingTime = trip.trip_opening_time ? parseUtcDate(trip.trip_opening_time) : null;
+      const deptime = trip.deptime ? parseUtcDate(trip.deptime) : null;
+
+      if (!deptime) {
+        skippedCount.noDeptime++;
+        logger.debug(`[TripOpeningService] Trip ${trip.tripid} has no deptime, skipping`);
+        continue; // Must have departure time
+      }
+
+      const openingTimePassed = openingTime ? openingTime.getTime() <= now.getTime() : false;
+      const departureTimePassed = deptime.getTime() <= now.getTime();
+
+      // If departure time has passed, only include if trip has reservations
+      if (departureTimePassed) {
+        try {
+          const reservations = await Reservation.findByTripId(trip.tripid);
+          logger.debug(`[TripOpeningService] Trip ${trip.tripid} reservations check: found ${reservations?.length || 0} reservations, totalbookings: ${trip.totalbookings || 0}`);
+          const hasReservations = reservations && reservations.length > 0;
+          if (!hasReservations) {
+            skippedCount.noReservations++;
+            logger.info(`[TripOpeningService] ⚠️ Trip ${trip.tripid} (line: ${trip.lineid}) passed departure time but has no reservations (found ${reservations?.length || 0}, totalbookings: ${trip.totalbookings || 0}), skipping assignment`);
+            continue; // Skip trips without reservations that have passed departure
+          }
+          logger.debug(`[TripOpeningService] Trip ${trip.tripid} has ${reservations.length} reservation(s), proceeding with assignment`);
+        } catch (error) {
+          logger.error(`[TripOpeningService] Error checking reservations for trip ${trip.tripid}:`, error);
+          continue; // Skip on error
+        }
+      }
+
+      // Check if time conditions are met
+      if (!openingTimePassed && !departureTimePassed) {
+        skippedCount.timeNotPassed++;
+        logger.debug(`[TripOpeningService] Trip ${trip.tripid} (line: ${trip.lineid}) time not passed yet - opening: ${openingTime ? openingTime.toISOString() : 'N/A'}, deptime: ${deptime.toISOString()}, now: ${now.toISOString()}`);
+        continue;
+      }
+
+      // Include if opening time passed (normal case, before departure) OR departure time passed with reservations
+      waitingTrips.push(trip);
+      logger.debug(`[TripOpeningService] ✅ Trip ${trip.tripid} (line: ${trip.lineid}) added to waiting list - openingTimePassed: ${openingTimePassed}, departureTimePassed: ${departureTimePassed}`);
+    }
+
+    logger.info(`[TripOpeningService] Filtered ${allTrips.length} trips: ${waitingTrips.length} waiting, ${skippedCount.hasVehicle} have vehicles, ${skippedCount.noDeptime} no deptime, ${skippedCount.timeNotPassed} time not passed, ${skippedCount.noReservations} no reservations`);
+
     // Sort by deptime (earliest first)
-    waitingTrips.sort((a, b) => new Date(a.deptime) - new Date(b.deptime));
-    
+    waitingTrips.sort((a, b) => {
+      const aDeptime = parseUtcDate(a.deptime);
+      const bDeptime = parseUtcDate(b.deptime);
+      if (!aDeptime || !bDeptime) return 0;
+      return aDeptime.getTime() - bDeptime.getTime();
+    });
+
     return waitingTrips;
   } catch (error) {
     logger.error('[TripOpeningService] Error finding waiting trips:', error);
@@ -192,10 +258,10 @@ export const findWaitingTrips = async (lineid = null) => {
 export const checkAndAssignWaitingTrips = async (lineid) => {
   try {
     logger.info(`[TripOpeningService] 🔍 Checking for waiting trips on line ${lineid}`);
-    
+
     // Find waiting trips for this line
     const waitingTrips = await findWaitingTrips(lineid);
-    
+
     if (waitingTrips.length === 0) {
       logger.info(`[TripOpeningService] ✅ No waiting trips found for line ${lineid}`);
       return {
@@ -204,37 +270,37 @@ export const checkAndAssignWaitingTrips = async (lineid) => {
         trips: [],
       };
     }
-    
+
     logger.info(`[TripOpeningService] 📅 Found ${waitingTrips.length} waiting trips for line ${lineid}`);
-    
+
     const results = [];
     let assignedCount = 0;
-    
+
     // Try to assign vehicles to waiting trips (in order of departure time)
     for (const trip of waitingTrips) {
       try {
         const assignmentResult = await assignVehicleFromQueue(trip.tripid, lineid);
-        
+
         if (assignmentResult) {
           assignedCount++;
-          // Update trip status back to scheduled if it was delayed
+          // Update trip status to open if it was delayed
           if (trip.status === 'delayed') {
-            await Trip.update(trip.tripid, { status: 'scheduled' });
+            await Trip.update(trip.tripid, { status: 'open' });
           }
-          
+
           // Distribute bookings for this trip now that vehicle is assigned
           try {
             await distributeAllBookings(trip.tripid);
           } catch (distError) {
             logger.warn(`[TripOpeningService] ⚠️ Error distributing bookings for trip ${trip.tripid}:`, distError);
           }
-          
+
           results.push({
             tripid: trip.tripid,
             success: true,
             vehicleAssigned: true,
           });
-          
+
           logger.info(`[TripOpeningService] ✅ Waiting trip ${trip.tripid} assigned vehicle`);
         } else {
           // No driver available for this trip
@@ -254,7 +320,7 @@ export const checkAndAssignWaitingTrips = async (lineid) => {
         });
       }
     }
-    
+
     return {
       success: true,
       assigned: assignedCount,
@@ -268,26 +334,67 @@ export const checkAndAssignWaitingTrips = async (lineid) => {
 };
 
 /**
- * Mark trips as delayed if they have no vehicle 1 minute before scheduled departure
+ * Mark trips as delayed if:
+ * 1. They have no vehicle 1 minute before scheduled departure, OR
+ * 2. They have reservations, departure time has passed, and haven't departed yet
  * @returns {Promise<object>} - Results of delayed marking
  */
 export const markTripsAsDelayed = async () => {
   try {
-    const now = new Date();
+    const now = getUtcNow();
     const oneMinuteBefore = new Date(now.getTime() + 60 * 1000); // 1 minute from now
-    
+
     // Find trips that need to be marked as delayed
-    // Status is scheduled, vehicleid is NULL, and deptime is 1 minute away
-    const allTrips = await Trip.findAll({ status: 'scheduled' });
-    
-    const tripsToDelay = allTrips.filter(trip => {
-      if (trip.vehicleid) return false; // Has vehicle, skip
-      
-      const deptime = new Date(trip.deptime);
-      // Check if deptime is within 1 minute from now (but not in the past)
-      return deptime >= now && deptime <= oneMinuteBefore;
-    });
-    
+    // Status is scheduled, open, or delayed (to re-check), and haven't departed
+    const scheduledTrips = await Trip.findAll({ status: 'scheduled' });
+    const openTrips = await Trip.findAll({ status: 'open' });
+    const delayedTrips = await Trip.findAll({ status: 'delayed' });
+    const allTrips = [...scheduledTrips, ...openTrips, ...delayedTrips];
+
+    const tripsToDelay = [];
+
+    for (const trip of allTrips) {
+      // Skip trips that are already in_progress or completed
+      if (trip.status === 'in_progress' || trip.status === 'completed' || trip.status === 'cancelled') {
+        continue;
+      }
+
+      const deptime = parseUtcDate(trip.deptime);
+      if (!deptime) continue;
+
+      const departureTimePassed = deptime.getTime() <= now.getTime();
+      const oneMinuteBeforeDeparture = deptime.getTime() >= now.getTime() && deptime.getTime() <= oneMinuteBefore.getTime();
+
+      // Case 1: No vehicle and 1 minute before departure
+      if (!trip.vehicleid && oneMinuteBeforeDeparture) {
+        tripsToDelay.push(trip);
+        continue;
+      }
+
+      // Case 2: Has reservations, departure time passed, and hasn't departed
+      if (departureTimePassed) {
+        try {
+          // Check both totalbookings (quick check) and actual reservations (more accurate)
+          const hasBookings = (trip.totalbookings && trip.totalbookings > 0) || false;
+
+          let hasReservations = false;
+          if (hasBookings) {
+            // If totalbookings > 0, verify with actual reservation query
+            const reservations = await Reservation.findByTripId(trip.tripid);
+            hasReservations = reservations && reservations.length > 0;
+          }
+
+          // Mark as delayed if has reservations (checked via query) OR has bookings count
+          if ((hasReservations || hasBookings) && trip.status !== 'delayed') {
+            tripsToDelay.push(trip);
+            logger.info(`[TripOpeningService] ⚠️ Trip ${trip.tripid} (status: ${trip.status}, totalbookings: ${trip.totalbookings || 0}) has reservations and departure time passed, marking as delayed`);
+          }
+        } catch (error) {
+          logger.error(`[TripOpeningService] Error checking reservations for trip ${trip.tripid}:`, error);
+        }
+      }
+    }
+
     if (tripsToDelay.length === 0) {
       return {
         success: true,
@@ -295,9 +402,9 @@ export const markTripsAsDelayed = async () => {
         trips: [],
       };
     }
-    
+
     logger.info(`[TripOpeningService] ⚠️ Marking ${tripsToDelay.length} trips as delayed`);
-    
+
     const results = [];
     for (const trip of tripsToDelay) {
       try {
@@ -316,7 +423,7 @@ export const markTripsAsDelayed = async () => {
         });
       }
     }
-    
+
     return {
       success: true,
       marked: results.filter(r => r.success).length,
@@ -337,10 +444,10 @@ export const markTripsAsDelayed = async () => {
 export const openScheduledTrips = async (openingWindowMinutes = 45) => {
   try {
     logger.info(`[TripOpeningService] 🔍 Finding trips that need to be opened (${openingWindowMinutes} minutes before departure)`);
-    
+
     // Find trips that need opening
     const tripsToOpen = await Trip.findTripsNeedingOpening(openingWindowMinutes);
-    
+
     if (tripsToOpen.length === 0) {
       logger.info(`[TripOpeningService] ✅ No trips need to be opened at this time`);
       return {
@@ -349,11 +456,11 @@ export const openScheduledTrips = async (openingWindowMinutes = 45) => {
         trips: [],
       };
     }
-    
+
     logger.info(`[TripOpeningService] 📅 Found ${tripsToOpen.length} trips to open`);
-    
+
     const results = [];
-    
+
     // Open each trip
     for (const trip of tripsToOpen) {
       try {
@@ -373,7 +480,7 @@ export const openScheduledTrips = async (openingWindowMinutes = 45) => {
         });
       }
     }
-    
+
     // Also check for trips that need to be marked as delayed
     try {
       const delayResult = await markTripsAsDelayed();
@@ -383,9 +490,9 @@ export const openScheduledTrips = async (openingWindowMinutes = 45) => {
     } catch (error) {
       logger.error('[TripOpeningService] ⚠️ Error checking delayed trips:', error);
     }
-    
+
     const successCount = results.filter(r => r.success).length;
-    
+
     return {
       success: true,
       opened: successCount,

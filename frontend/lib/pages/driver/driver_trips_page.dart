@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/driver_bottom_nav_bar.dart';
@@ -225,34 +226,53 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
 
   Future<void> _showCheckInDialog(String tripId) async {
     final controller = TextEditingController();
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E3A5F),
+        titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
         title: Text(
           t('checkin'),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+          ),
         ),
         content: TextField(
           controller: controller,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: isSmallScreen ? 14.0 : 16.0,
+          ),
           decoration: InputDecoration(
             labelText: t('enterBookingId'),
-            labelStyle: const TextStyle(color: Colors.white70),
+            labelStyle: TextStyle(
+              color: Colors.white70,
+              fontSize: isSmallScreen ? 13.0 : 14.0,
+            ),
             hintText: 'Booking ID',
-            hintStyle: const TextStyle(color: Colors.white54),
+            hintStyle: TextStyle(
+              color: Colors.white54,
+              fontSize: isSmallScreen ? 13.0 : 14.0,
+            ),
             filled: true,
             fillColor: Colors.white.withOpacity(0.1),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
               borderSide: const BorderSide(color: Colors.white54),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
               borderSide: const BorderSide(color: Colors.white54),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
               borderSide: const BorderSide(color: Colors.white),
             ),
           ),
@@ -262,7 +282,10 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               _isArabic ? 'إلغاء' : 'Cancel',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: isSmallScreen ? 13.0 : 14.0,
+              ),
             ),
           ),
           FilledButton(
@@ -274,10 +297,17 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               }
             },
             style: FilledButton.styleFrom(
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 16.0 : 20.0,
+                vertical: isSmallScreen ? 10.0 : 12.0,
+              ),
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
             ),
-            child: Text(t('checkin')),
+            child: Text(
+              t('checkin'),
+              style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+            ),
           ),
         ],
       ),
@@ -285,26 +315,42 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
   }
 
   Future<void> _startTrip(String tripId) async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E3A5F),
+        titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
         title: Text(
           t('startTrip'),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+          ),
         ),
         content: Text(
           _isArabic
               ? 'هل أنت متأكد من بدء هذه الرحلة؟'
               : 'Are you sure you want to start this trip?',
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: isSmallScreen ? 14.0 : 16.0,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               _isArabic ? 'إلغاء' : 'Cancel',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: isSmallScreen ? 13.0 : 14.0,
+              ),
             ),
           ),
           FilledButton(
@@ -312,8 +358,15 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             style: FilledButton.styleFrom(
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 16.0 : 20.0,
+                vertical: isSmallScreen ? 10.0 : 12.0,
+              ),
             ),
-            child: Text(t('startTrip')),
+            child: Text(
+              t('startTrip'),
+              style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+            ),
           ),
         ],
       ),
@@ -354,26 +407,42 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
   }
 
   Future<void> _endTrip(String tripId) async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E3A5F),
+        titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
         title: Text(
           t('endTrip'),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+          ),
         ),
         content: Text(
           _isArabic
               ? 'هل أنت متأكد من إنهاء هذه الرحلة؟'
               : 'Are you sure you want to end this trip?',
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: isSmallScreen ? 14.0 : 16.0,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               _isArabic ? 'إلغاء' : 'Cancel',
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: isSmallScreen ? 13.0 : 14.0,
+              ),
             ),
           ),
           FilledButton(
@@ -381,8 +450,15 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 16.0 : 20.0,
+                vertical: isSmallScreen ? 10.0 : 12.0,
+              ),
             ),
-            child: Text(t('endTrip')),
+            child: Text(
+              t('endTrip'),
+              style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+            ),
           ),
         ],
       ),
@@ -426,13 +502,15 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
     
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     // Theme-aware colors
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
         : const Color.fromARGB(255, 224, 228, 231);
-    final appBarColor = _isDarkMode
-        ? const Color(0xFF1E3A5F)
-        : const Color(0xFF2C5F8D);
 
     return Directionality(
       textDirection: textDirection,
@@ -490,10 +568,10 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               ),
               title: Text(
                 t('title'),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 22,
+                  fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
                   letterSpacing: 0.5,
                 ),
               ),
@@ -505,13 +583,13 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               actionsIconTheme: const IconThemeData(color: Colors.white),
               actions: [
                 Container(
-                  margin: const EdgeInsets.only(right: 8),
+                  margin: EdgeInsets.only(right: isSmallScreen ? 4.0 : 8.0),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.refresh_rounded, size: 22),
+                    icon: Icon(Icons.refresh_rounded, size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0)),
                     onPressed: _loadTrips,
                     tooltip: t('refresh'),
                   ),
@@ -534,6 +612,22 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
   }
 
   Widget _buildBody() {
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Web-specific responsive breakpoints
+    final isWeb = kIsWeb;
+    final isDesktop = isWeb && screenWidth >= 1200;
+    final isTablet = screenWidth >= 600 && screenWidth < 1200;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    final double basePadding = isWeb 
+        ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
+        : (isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0));
+    
+    // Max width for web to prevent content from stretching too wide
+    final double maxContentWidth = isWeb ? 1400.0 : double.infinity;
+    
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -549,16 +643,19 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     if (_error != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: textPrimaryColor),
+                style: TextStyle(
+                  color: textPrimaryColor,
+                  fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0),
+                ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
               FilledButton.tonal(
                 onPressed: _loadTrips,
                 child: Text(t('refresh')),
@@ -573,7 +670,10 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       return Center(
         child: Text(
           t('noTrips'),
-          style: TextStyle(color: textPrimaryColor),
+          style: TextStyle(
+            color: textPrimaryColor,
+            fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
+          ),
         ),
       );
     }
@@ -581,24 +681,56 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     return RefreshIndicator(
       color: Colors.orange,
       onRefresh: _loadTrips,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            t('subtitle'),
-            style: TextStyle(
-              color: textSecondaryColor,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ..._trips.map(_buildTripTile),
-        ],
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxContentWidth),
+          child: isWeb && (isDesktop || isTablet) && _trips.isNotEmpty
+              ? Padding(
+                  padding: EdgeInsets.all(basePadding),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        t('subtitle'),
+                        style: TextStyle(
+                          color: textSecondaryColor,
+                          fontSize: isWeb ? (isDesktop ? 16.0 : 15.0) : (isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0)),
+                        ),
+                      ),
+                      SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                      Wrap(
+                        spacing: 16.0,
+                        runSpacing: 16.0,
+                        children: _trips.map((trip) => 
+                          SizedBox(
+                            width: isDesktop ? (maxContentWidth - 64) / 2 : double.infinity,
+                            child: _buildTripTile(trip, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen, isWeb: isWeb),
+                          )
+                        ).toList(),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView(
+                  padding: EdgeInsets.all(basePadding),
+                  children: [
+                    Text(
+                      t('subtitle'),
+                      style: TextStyle(
+                        color: textSecondaryColor,
+                        fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
+                      ),
+                    ),
+                    SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                    ..._trips.map((trip) => _buildTripTile(trip, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen, isWeb: isWeb)),
+                  ],
+                ),
+        ),
       ),
     );
   }
 
-  Widget _buildTripTile(Map<String, dynamic> trip) {
+  Widget _buildTripTile(Map<String, dynamic> trip, {bool isSmallScreen = false, bool isMediumScreen = false, bool isWeb = false}) {
     final tripId = trip['tripid']?.toString() ?? '';
     final line = trip['line'] as Map<String, dynamic>? ?? {};
     final departureTime = _formatDateTime(trip['deptime']);
@@ -618,12 +750,12 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
         : Colors.grey.shade300;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? 10.0 : 12.0),
       decoration: BoxDecoration(
         color: _isDarkMode
             ? Colors.white.withOpacity(0.04)
             : cardColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         border: Border.all(color: borderColor),
       ),
       child: ExpansionTile(
@@ -643,51 +775,61 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                   : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '---'),
               style: TextStyle(
                 color: textPrimaryColor,
-                fontSize: 16,
+                fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: isSmallScreen ? 2.0 : 4.0),
             Text(
               '${t('departure')}: $departureTime',
-              style: TextStyle(color: textSecondaryColor, fontSize: 12),
+              style: TextStyle(
+                color: textSecondaryColor, 
+                fontSize: isSmallScreen ? 11.0 : 12.0
+              ),
             ),
-            const SizedBox(height: 2),
+            SizedBox(height: isSmallScreen ? 1.0 : 2.0),
             Text(
               '${t('status')}: $status',
-              style: TextStyle(color: textSecondaryColor, fontSize: 12),
+              style: TextStyle(
+                color: textSecondaryColor, 
+                fontSize: isSmallScreen ? 11.0 : 12.0
+              ),
             ),
           ],
         ),
-        childrenPadding: const EdgeInsets.all(16),
+        childrenPadding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
         children: [
-          _buildTripStatsRow(trip),
+          _buildTripStatsRow(trip, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
           // Assigned Driver Info
           if (trip['assigned_driverid'] != null) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: isSmallScreen ? 10.0 : 12.0),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
               decoration: BoxDecoration(
                 color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
                 border: Border.all(color: Colors.blue.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.person, color: Colors.blue, size: 20),
-                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.person, 
+                    color: Colors.blue, 
+                    size: isSmallScreen ? 18.0 : 20.0
+                  ),
+                  SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                   Text(
                     t('assignedDriver'),
                     style: TextStyle(
                       color: _isDarkMode ? Colors.white : const Color(0xFF1E3A5F),
-                      fontSize: 14,
+                      fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
                     ),
                   ),
                 ],
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          SizedBox(height: isSmallScreen ? 12.0 : 16.0),
           // Trip Actions
           Row(
             children: [
@@ -701,24 +843,44 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                       ),
                     ).then((_) => _loadReservations(tripId));
                   },
-                  icon: const Icon(Icons.qr_code_scanner),
-                  label: Text(t('checkinQR')),
+                  icon: Icon(
+                    Icons.qr_code_scanner,
+                    size: isSmallScreen ? 18.0 : 20.0,
+                  ),
+                  label: Text(
+                    t('checkinQR'),
+                    style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _isDarkMode ? Colors.white : Colors.green,
                     side: const BorderSide(color: Colors.green),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 8.0 : 12.0,
+                      vertical: isSmallScreen ? 10.0 : 12.0,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              if (status == 'open' || status == 'scheduled')
+              SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+              if (status == 'open' || status == 'scheduled' || status == 'delayed')
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: () => _startTrip(tripId),
-                    icon: const Icon(Icons.play_arrow),
-                    label: Text(t('startTrip')),
+                    icon: Icon(
+                      Icons.play_arrow,
+                      size: isSmallScreen ? 18.0 : 20.0,
+                    ),
+                    label: Text(
+                      t('startTrip'),
+                      style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                    ),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 8.0 : 12.0,
+                        vertical: isSmallScreen ? 10.0 : 12.0,
+                      ),
                     ),
                   ),
                 ),
@@ -726,24 +888,34 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: () => _endTrip(tripId),
-                    icon: const Icon(Icons.stop),
-                    label: Text(t('endTrip')),
+                    icon: Icon(
+                      Icons.stop,
+                      size: isSmallScreen ? 18.0 : 20.0,
+                    ),
+                    label: Text(
+                      t('endTrip'),
+                      style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                    ),
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 8.0 : 12.0,
+                        vertical: isSmallScreen ? 10.0 : 12.0,
+                      ),
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildReservationsSection(tripId),
+          SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+          _buildReservationsSection(tripId, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
         ],
       ),
     );
   }
 
-  Widget _buildTripStatsRow(Map<String, dynamic> trip) {
+  Widget _buildTripStatsRow(Map<String, dynamic> trip, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final availSeats = trip['availableseats']?.toString() ?? '--';
     final totalBookings = trip['totalbookings']?.toString() ?? '0';
     
@@ -760,10 +932,10 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     Widget buildStat(String label, String value) {
       return Expanded(
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
           decoration: BoxDecoration(
             color: cardBgColor,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
             border: Border.all(color: borderColor),
           ),
           child: Column(
@@ -773,15 +945,15 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                 label,
                 style: TextStyle(
                   color: textSecondaryColor,
-                  fontSize: 12,
+                  fontSize: isSmallScreen ? 11.0 : 12.0,
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: isSmallScreen ? 3.0 : 4.0),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.orange,
-                  fontSize: 18,
+                  fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -794,21 +966,21 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     return Row(
       children: [
         buildStat(t('seats'), availSeats),
-        const SizedBox(width: 12),
+        SizedBox(width: isSmallScreen ? 10.0 : 12.0),
         buildStat(t('bookings'), totalBookings),
       ],
     );
   }
 
-  Widget _buildReservationsSection(String tripId) {
+  Widget _buildReservationsSection(String tripId, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final loading = _loadingReservations.contains(tripId);
     final reservations = _reservations[tripId];
 
     if (loading) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(16),
-          child: CircularProgressIndicator(),
+          padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+          child: const CircularProgressIndicator(),
         ),
       );
     }
@@ -820,16 +992,17 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
           t('reservations'),
           style: TextStyle(
             color: _isDarkMode ? Colors.white : const Color(0xFF1E3A5F),
-            fontSize: 16,
+            fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: isSmallScreen ? 10.0 : 12.0),
         if (reservations == null)
           Text(
             t('none'),
             style: TextStyle(
               color: _isDarkMode ? Colors.white : const Color(0xFF546E7A),
+              fontSize: isSmallScreen ? 13.0 : 14.0,
             ),
           )
         else if (reservations.isEmpty)
@@ -837,12 +1010,13 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             t('none'),
             style: TextStyle(
               color: _isDarkMode ? Colors.white : const Color(0xFF546E7A),
+              fontSize: isSmallScreen ? 13.0 : 14.0,
             ),
           )
         else
           Column(
             children: reservations.map((reservation) {
-              return _buildReservationCard(tripId, reservation);
+              return _buildReservationCard(tripId, reservation, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen);
             }).toList(),
           ),
       ],
@@ -851,8 +1025,10 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
 
   Widget _buildReservationCard(
     String tripId,
-    Map<String, dynamic> reservation,
-  ) {
+    Map<String, dynamic> reservation, {
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+  }) {
     final passenger = reservation['passenger'] as Map<String, dynamic>? ?? {};
     final user = passenger['user'] as Map<String, dynamic>? ?? {};
     final status = reservation['status']?.toString() ?? '';
@@ -893,11 +1069,11 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
         : Colors.grey.shade300;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? 10.0 : 12.0),
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       decoration: BoxDecoration(
         color: cardBgColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
         border: Border.all(color: borderColor),
       ),
       child: Column(
@@ -906,15 +1082,19 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
           Row(
             children: [
               CircleAvatar(
+                radius: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
                 backgroundColor: Colors.orange.withOpacity(0.2),
                 child: Text(
                   (user['fullname']?.toString().isNotEmpty ?? false)
                       ? user['fullname'].toString()[0].toUpperCase()
                       : '?',
-                  style: const TextStyle(color: Colors.orange),
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 18.0),
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -923,13 +1103,17 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                       user['fullname']?.toString() ?? t('passenger'),
                       style: TextStyle(
                         color: textPrimaryColor,
-                        fontSize: 16,
+                        fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                     Text(
                       '${t('seat')}: $seat',
-                      style: TextStyle(color: textSecondaryColor, fontSize: 12),
+                      style: TextStyle(
+                        color: textSecondaryColor, 
+                        fontSize: isSmallScreen ? 11.0 : 12.0
+                      ),
                     ),
                   ],
                 ),
@@ -938,43 +1122,56 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                 status,
                 style: TextStyle(
                   color: textSecondaryColor,
-                  fontSize: 12,
+                  fontSize: isSmallScreen ? 11.0 : 12.0,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 10.0 : 12.0),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 10.0 : 12.0, 
+              vertical: isSmallScreen ? 4.0 : 6.0
+            ),
             decoration: BoxDecoration(
               color: driverStatusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
             ),
             child: Text(
               driverStatusText,
               style: TextStyle(
                 color: driverStatusColor,
                 fontWeight: FontWeight.bold,
+                fontSize: isSmallScreen ? 11.0 : 12.0,
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 10.0 : 12.0),
           Wrap(
-            spacing: 12,
-            runSpacing: 8,
+            spacing: isSmallScreen ? 8.0 : 12.0,
+            runSpacing: isSmallScreen ? 6.0 : 8.0,
             children: [
               if (driverStatus != 'approved' && driverStatus != 'rejected')
                 FilledButton(
                   onPressed: isMutating
                       ? null
                       : () => _updateReservationStatus(tripId, bookingId, 'approve'),
+                  style: FilledButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 12.0 : 16.0,
+                      vertical: isSmallScreen ? 8.0 : 10.0,
+                    ),
+                  ),
                   child: isMutating
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
+                      ? SizedBox(
+                          height: isSmallScreen ? 14.0 : 16.0,
+                          width: isSmallScreen ? 14.0 : 16.0,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(t('accept')),
+                      : Text(
+                          t('accept'),
+                          style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                        ),
                 ),
               if (driverStatus != 'rejected' && status != 'cancelled')
                 FilledButton.tonal(
@@ -983,14 +1180,21 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                       : () => _updateReservationStatus(tripId, bookingId, 'reject'),
                   style: FilledButton.styleFrom(
                     foregroundColor: Colors.redAccent,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 12.0 : 16.0,
+                      vertical: isSmallScreen ? 8.0 : 10.0,
+                    ),
                   ),
                   child: isMutating
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
+                      ? SizedBox(
+                          height: isSmallScreen ? 14.0 : 16.0,
+                          width: isSmallScreen ? 14.0 : 16.0,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(t('reject')),
+                      : Text(
+                          t('reject'),
+                          style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                        ),
                 ),
               if (driverStatus == 'approved' && status != 'checked_in')
                 FilledButton.tonal(
@@ -1009,29 +1213,49 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                             }
                           });
                         },
+                  style: FilledButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 12.0 : 16.0,
+                      vertical: isSmallScreen ? 8.0 : 10.0,
+                    ),
+                  ),
                   child: isMutating
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
+                      ? SizedBox(
+                          height: isSmallScreen ? 14.0 : 16.0,
+                          width: isSmallScreen ? 14.0 : 16.0,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(t('checkin')),
+                      : Text(
+                          t('checkin'),
+                          style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                        ),
                 ),
               if (isCheckedIn)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSmallScreen ? 10.0 : 12.0, 
+                    vertical: isSmallScreen ? 6.0 : 8.0
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.check_circle, 
+                        color: Colors.green, 
+                        size: isSmallScreen ? 14.0 : 16.0
+                      ),
+                      SizedBox(width: isSmallScreen ? 3.0 : 4.0),
                       Text(
                         t('checked_in'),
-                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.green, 
+                          fontWeight: FontWeight.bold,
+                          fontSize: isSmallScreen ? 11.0 : 12.0,
+                        ),
                       ),
                     ],
                   ),

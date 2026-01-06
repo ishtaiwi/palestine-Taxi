@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../services/api_service.dart';
 import 'verify_code_page.dart';
 
@@ -131,6 +132,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = kIsWeb && screenWidth > 800;
+    
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
@@ -164,31 +168,41 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
           child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  Icon(
-                    Icons.lock_outline,
-                    size: 100,
-                    color: Colors.orange.shade400,
+            child: Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isDesktop ? 24 : 24,
+                  vertical: isDesktop ? 16 : 24,
+                ),
+                child: Container(
+                  width: isDesktop ? 480 : double.infinity,
+                  constraints: BoxConstraints(
+                    maxWidth: isDesktop ? 480 : double.infinity,
                   ),
-                  const SizedBox(height: 32),
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.03),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: Colors.white24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.25),
-                          blurRadius: 25,
-                          offset: const Offset(0, 15),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(height: isDesktop ? 20 : 40),
+                      Icon(
+                        Icons.lock_outline,
+                        size: isDesktop ? 80 : 100,
+                        color: Colors.orange.shade400,
+                      ),
+                      SizedBox(height: isDesktop ? 24 : 32),
+                      Container(
+                        padding: EdgeInsets.all(isDesktop ? 28 : 24),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.03),
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(color: Colors.white24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              blurRadius: 25,
+                              offset: const Offset(0, 15),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
                     child: Form(
                       key: _formKey,
                       child: Column(
@@ -212,11 +226,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                 .bodyMedium
                                 ?.copyWith(color: Colors.white70),
                           ),
-                          const SizedBox(height: 24),
+                          SizedBox(height: isDesktop ? 20 : 24),
                           TextFormField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isDesktop ? 16 : null,
+                            ),
                             decoration: _inputDecoration(
                               t('email'),
                               t('enterEmail'),
@@ -238,7 +255,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             },
                             autovalidateMode: AutovalidateMode.onUserInteraction,
                           ),
-                          const SizedBox(height: 32),
+                          SizedBox(height: isDesktop ? 24 : 28),
                           SizedBox(
                             width: double.infinity,
                             child: Container(
@@ -286,7 +303,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 24),
+                          SizedBox(height: isDesktop ? 16 : 20),
                           Align(
                             alignment: Alignment.center,
                             child: TextButton(
@@ -303,8 +320,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ],
                       ),
                     ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),

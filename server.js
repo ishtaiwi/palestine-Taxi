@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import cors from 'cors';
 import appConfig from './config/app.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
@@ -28,12 +30,16 @@ import locationRoutes from './routes/locationRoutes.js';
 
 import { startTripOpeningJob } from './jobs/tripOpeningJob.js';
 import { startDepartureCheckJob } from './jobs/departureCheckJob.js';
+import { startDelayedTripCheckJob } from './jobs/delayedTripCheckJob.js';
 import { startNoShowCheckJob } from './jobs/noShowCheckJob.js';
 import { startDailyTripCreationJob } from './jobs/dailyTripCreationJob.js';
 import { startPredictionUpdateJob } from './jobs/predictionUpdateJob.js';
 import { initializeModel } from './services/rushHourPredictionService.js';
 
 const app = express();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 
 app.use(cors(appConfig.cors));
@@ -55,6 +61,8 @@ app.use((req, res, next) => {
 
 
 app.use('/api/', generalLimiter);
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 app.get('/health', (req, res) => {
@@ -156,16 +164,17 @@ app.listen(PORT, async () => {
   if (dbTest.connected) {
     logger.info('✅ Database connection verified');
 
-    
+
     logger.info('Starting background jobs...');
     startTripOpeningJob();
+    startDelayedTripCheckJob();
     startDepartureCheckJob();
     startNoShowCheckJob();
     startDailyTripCreationJob();
     startPredictionUpdateJob();
     logger.info('✅ All background jobs started');
 
-    
+
     setImmediate(async () => {
       try {
         await initializeModel();

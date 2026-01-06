@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
@@ -9,7 +10,8 @@ class PassengerReservationsPage extends StatefulWidget {
   const PassengerReservationsPage({super.key});
 
   @override
-  State<PassengerReservationsPage> createState() => _PassengerReservationsPageState();
+  State<PassengerReservationsPage> createState() =>
+      _PassengerReservationsPageState();
 }
 
 class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
@@ -135,14 +137,14 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
       final reservations = await ApiService.fetchPassengerReservations(
         status: _selectedStatus,
       );
-      
+
       // Load ratings for completed trips
       final ratings = <String, Map<String, dynamic>?>{};
       for (final reservation in reservations) {
         final bookingid = reservation['bookingid']?.toString();
         final trip = reservation['trip'] as Map<String, dynamic>?;
         final tripStatus = trip?['status']?.toString();
-        
+
         // Only load rating if trip is completed
         if (bookingid != null && tripStatus == 'completed') {
           try {
@@ -155,7 +157,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
           }
         }
       }
-      
+
       if (mounted) {
         setState(() {
           _reservations = reservations;
@@ -172,11 +174,18 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
       }
     }
   }
-  
-  Future<void> _showRatingDialog(Map<String, dynamic> reservation, Map<String, dynamic>? existingRating) async {
+
+  Future<void> _showRatingDialog(Map<String, dynamic> reservation,
+      Map<String, dynamic>? existingRating) async {
     final bookingid = reservation['bookingid']?.toString() ?? '';
     int selectedRating = existingRating?['rating'] ?? 5;
-    final commentController = TextEditingController(text: existingRating?['comment'] ?? '');
+    final commentController =
+        TextEditingController(text: existingRating?['comment'] ?? '');
+    
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final starSize = isSmallScreen ? 32.0 : 40.0;
+    final dialogPadding = isSmallScreen ? 16.0 : 20.0;
 
     final result = await showDialog<bool>(
       context: context,
@@ -184,11 +193,14 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
           ),
           title: Text(
             existingRating != null ? t('rateAgain') : t('rateTrip'),
-            style: const TextStyle(color: Color(0xFF1E3A5F), fontWeight: FontWeight.bold),
+            style: TextStyle(
+                color: const Color(0xFF1E3A5F), 
+                fontWeight: FontWeight.bold,
+                fontSize: isSmallScreen ? 18.0 : 20.0),
           ),
           content: SingleChildScrollView(
             child: Column(
@@ -203,7 +215,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                       icon: Icon(
                         index < selectedRating ? Icons.star : Icons.star_border,
                         color: Colors.orange,
-                        size: 40,
+                        size: starSize,
                       ),
                       onPressed: () {
                         setDialogState(() {
@@ -213,25 +225,33 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                     );
                   }),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                 // Comment field
                 TextField(
                   controller: commentController,
-                  style: const TextStyle(color: Color(0xFF1E3A5F)),
+                  style: TextStyle(
+                    color: const Color(0xFF1E3A5F),
+                    fontSize: isSmallScreen ? 14.0 : 16.0,
+                  ),
                   maxLines: 3,
                   decoration: InputDecoration(
                     labelText: t('comment'),
-                    labelStyle: TextStyle(color: Colors.grey.shade700),
+                    labelStyle: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                    ),
                     filled: true,
                     fillColor: Colors.grey.shade50,
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                       borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.orange, width: 2),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                      borderSide:
+                          const BorderSide(color: Colors.orange, width: 2),
                     ),
+                    contentPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
                   ),
                 ),
               ],
@@ -242,7 +262,10 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
               onPressed: () => Navigator.pop(context, false),
               child: Text(
                 t('cancel'),
-                style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                    color: Colors.grey.shade700, 
+                    fontWeight: FontWeight.w500,
+                    fontSize: isSmallScreen ? 13.0 : 14.0),
               ),
             ),
             FilledButton(
@@ -250,11 +273,19 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 16.0 : 20.0,
+                  vertical: isSmallScreen ? 10.0 : 12.0,
+                ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                 ),
               ),
-              child: Text(t('submit'), style: const TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(t('submit'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isSmallScreen ? 13.0 : 14.0,
+                  )),
             ),
           ],
         ),
@@ -278,14 +309,18 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
       ratingResult = await ApiService.updateRating(
         ratingid: existingRating['ratingid'],
         rating: selectedRating,
-        comment: commentController.text.trim().isEmpty ? null : commentController.text.trim(),
+        comment: commentController.text.trim().isEmpty
+            ? null
+            : commentController.text.trim(),
       );
     } else {
       // Submit new rating
       ratingResult = await ApiService.submitRating(
         bookingid: bookingid,
         rating: selectedRating,
-        comment: commentController.text.trim().isEmpty ? null : commentController.text.trim(),
+        comment: commentController.text.trim().isEmpty
+            ? null
+            : commentController.text.trim(),
       );
     }
 
@@ -322,14 +357,15 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
 
     try {
       final result = await ApiService.getReservationQRCode(bookingId);
-      
+
       if (!mounted) return;
       Navigator.pop(context); // Close loading
 
       if (result['success'] != true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result['message']?.toString() ?? 'Failed to load QR code'),
+            content:
+                Text(result['message']?.toString() ?? 'Failed to load QR code'),
             backgroundColor: Colors.red,
           ),
         );
@@ -338,39 +374,45 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
 
       final qrData = result['qrData'] as String?;
       final qrCode = result['qrCode'] as String?;
+      
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isSmallScreen = screenWidth < 360;
+      final qrSize = isSmallScreen ? 200.0 : 250.0;
 
       if (!mounted) return;
       showDialog(
         context: context,
         builder: (context) => Dialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0)),
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.qr_code, color: const Color(0xFF1E3A5F), size: 28),
+                    Icon(Icons.qr_code,
+                        color: const Color(0xFF1E3A5F), size: 28),
                     const SizedBox(width: 12),
                     Text(
                       t('qrCode'),
-                      style: const TextStyle(
-                        color: Color(0xFF1E3A5F),
-                        fontSize: 22,
+                      style: TextStyle(
+                        color: const Color(0xFF1E3A5F),
+                        fontSize: isSmallScreen ? 18.0 : 22.0,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: isSmallScreen ? 16.0 : 24.0),
                 if (qrData != null)
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.all(isSmallScreen ? 12.0 : 20.0),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                       border: Border.all(color: Colors.grey.shade300, width: 2),
                       boxShadow: [
                         BoxShadow(
@@ -383,27 +425,28 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                     child: QrImageView(
                       data: qrData,
                       version: QrVersions.auto,
-                      size: 250,
+                      size: qrSize,
                       backgroundColor: Colors.white,
                     ),
                   )
                 else if (qrCode != null)
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.all(isSmallScreen ? 12.0 : 20.0),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                       border: Border.all(color: Colors.grey.shade300, width: 2),
                     ),
                     child: Image.network(
                       qrCode,
-                      width: 250,
-                      height: 250,
+                      width: qrSize,
+                      height: qrSize,
                     ),
                   ),
-                const SizedBox(height: 20),
+                SizedBox(height: isSmallScreen ? 14.0 : 20.0),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(10),
@@ -411,7 +454,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade700, size: 18),
+                      Icon(Icons.info_outline,
+                          color: Colors.blue.shade700, size: 18),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
@@ -435,14 +479,19 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF1E3A5F),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: EdgeInsets.symmetric(
+                        vertical: isSmallScreen ? 12.0 : 14.0,
+                      ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                       ),
                     ),
                     child: Text(
                       t('close'),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: isSmallScreen ? 13.0 : 14.0,
+                      ),
                     ),
                   ),
                 ),
@@ -464,21 +513,28 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
   }
 
   Future<void> _cancelReservation(String bookingId) async {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         ),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
-            const SizedBox(width: 12),
+            Icon(Icons.warning_amber_rounded,
+                color: Colors.red.shade700, size: isSmallScreen ? 24.0 : 28.0),
+            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
             Expanded(
               child: Text(
                 _isArabic ? 'تأكيد الإلغاء' : 'Confirm Cancellation',
-                style: const TextStyle(color: Color(0xFF1E3A5F), fontWeight: FontWeight.bold, fontSize: 20),
+                style: TextStyle(
+                    color: const Color(0xFF1E3A5F),
+                    fontWeight: FontWeight.bold,
+                    fontSize: isSmallScreen ? 18.0 : 20.0),
               ),
             ),
           ],
@@ -487,14 +543,20 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
           _isArabic
               ? 'هل أنت متأكد من إلغاء هذه الحجز؟'
               : 'Are you sure you want to cancel this reservation?',
-          style: TextStyle(color: Colors.grey.shade700, fontSize: 15),
+          style: TextStyle(
+            color: Colors.grey.shade700, 
+            fontSize: isSmallScreen ? 13.0 : 15.0,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               _isArabic ? 'لا' : 'No',
-              style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  color: Colors.grey.shade700, 
+                  fontWeight: FontWeight.w500,
+                  fontSize: isSmallScreen ? 13.0 : 14.0),
             ),
           ),
           FilledButton(
@@ -502,13 +564,20 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red.shade700,
               foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 16.0 : 20.0,
+                vertical: isSmallScreen ? 10.0 : 12.0,
+              ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
               ),
             ),
             child: Text(
               _isArabic ? 'نعم، إلغاء' : 'Yes, Cancel',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: isSmallScreen ? 13.0 : 14.0,
+              ),
             ),
           ),
         ],
@@ -605,6 +674,31 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Web-specific responsive breakpoints
+    final isWeb = kIsWeb;
+    final isDesktop = isWeb && screenWidth >= 1200;
+    final isTablet = screenWidth >= 600 && screenWidth < 1200;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    
+    // Responsive sizing - enhanced for web
+    final double basePadding = isWeb 
+        ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
+        : (isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0));
+    final double cardPadding = isWeb
+        ? (isDesktop ? 24.0 : (isTablet ? 20.0 : 18.0))
+        : (isSmallScreen ? 14.0 : (isMediumScreen ? 18.0 : 20.0));
+    final double titleFontSize = isWeb
+        ? (isDesktop ? 24.0 : 22.0)
+        : (isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0));
+    final double iconSize = isWeb
+        ? (isDesktop ? 28.0 : 24.0)
+        : (isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0));
+    
+    // Max width for web to prevent content from stretching too wide
+    final double maxContentWidth = isWeb ? 1400.0 : double.infinity;
 
     // Theme-aware colors
     final backgroundColor = _isDarkMode
@@ -685,10 +779,10 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
               ),
               title: Text(
                 t('title'),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 22,
+                  fontSize: titleFontSize,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -716,11 +810,14 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
           ),
         ),
         body: SafeArea(
-          child: Column(
-            children: [
-              // Status Filter
-              Container(
-                padding: const EdgeInsets.all(16),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxContentWidth),
+              child: Column(
+                children: [
+                  // Status Filter
+                  Container(
+                    padding: EdgeInsets.all(basePadding),
                 decoration: BoxDecoration(
                   color: cardColor,
                   boxShadow: [
@@ -735,33 +832,39 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildStatusChip(null, t('all'), textPrimary, cardColor),
-                      const SizedBox(width: 8),
-                      _buildStatusChip('confirmed', t('confirmed'), textPrimary, cardColor),
-                      const SizedBox(width: 8),
-                      _buildStatusChip('pending', t('pending'), textPrimary, cardColor),
-                      const SizedBox(width: 8),
-                      _buildStatusChip('checked_in', t('checked_in'), textPrimary, cardColor),
-                      const SizedBox(width: 8),
-                      _buildStatusChip('cancelled', t('cancelled'), textPrimary, cardColor),
+                      _buildStatusChip(null, t('all'), textPrimary, cardColor, isSmallScreen),
+                      SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                      _buildStatusChip(
+                          'confirmed', t('confirmed'), textPrimary, cardColor, isSmallScreen),
+                      SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                      _buildStatusChip(
+                          'pending', t('pending'), textPrimary, cardColor, isSmallScreen),
+                      SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                      _buildStatusChip('checked_in', t('checked_in'),
+                          textPrimary, cardColor, isSmallScreen),
+                      SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                      _buildStatusChip(
+                          'cancelled', t('cancelled'), textPrimary, cardColor, isSmallScreen),
                     ],
                   ),
                 ),
-              ),
-              // Reservations List
-              Expanded(
-                child: _isLoading
+                  ),
+                // Reservations List
+                Expanded(
+                  child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : _error != null
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                                const Icon(Icons.error_outline,
+                                    color: Colors.red, size: 48),
                                 const SizedBox(height: 16),
                                 Text(
                                   _error!,
-                                  style: const TextStyle(color: Color(0xFF1E3A5F)),
+                                  style:
+                                      const TextStyle(color: Color(0xFF1E3A5F)),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 16),
@@ -771,7 +874,9 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                                     backgroundColor: Colors.blue,
                                     foregroundColor: Colors.white,
                                   ),
-                                  child: Text(t('refresh'), style: const TextStyle(color: Colors.white)),
+                                  child: Text(t('refresh'),
+                                      style:
+                                          const TextStyle(color: Colors.white)),
                                 ),
                               ],
                             ),
@@ -781,24 +886,46 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.book_online, color: Colors.grey.shade400, size: 64),
+                                    Icon(Icons.book_online,
+                                        color: Colors.grey.shade400, size: 64),
                                     const SizedBox(height: 16),
                                     Text(
                                       t('noReservations'),
-                                      style: TextStyle(color: Colors.grey.shade600, fontSize: 16, fontWeight: FontWeight.w500),
+                                      style: TextStyle(
+                                          color: Colors.grey.shade600,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500),
                                     ),
                                   ],
                                 ),
                               )
-                            : ListView.builder(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: _reservations.length,
-                                itemBuilder: (context, index) {
-                                  return _buildReservationCard(_reservations[index]);
-                                },
-                              ),
+                            : isWeb && (isDesktop || isTablet)
+                                ? GridView.builder(
+                                    padding: EdgeInsets.all(basePadding),
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: isDesktop ? 2 : 1,
+                                      crossAxisSpacing: 16.0,
+                                      mainAxisSpacing: 16.0,
+                                      childAspectRatio: isDesktop ? 1.1 : 1.3,
+                                    ),
+                                    itemCount: _reservations.length,
+                                    itemBuilder: (context, index) {
+                                      return _buildReservationCard(
+                                          _reservations[index], isSmallScreen, isMediumScreen, isWeb);
+                                    },
+                                  )
+                                : ListView.builder(
+                                    padding: EdgeInsets.all(basePadding),
+                                    itemCount: _reservations.length,
+                                    itemBuilder: (context, index) {
+                                      return _buildReservationCard(
+                                          _reservations[index], isSmallScreen, isMediumScreen, isWeb);
+                                    },
+                                  ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
         bottomNavigationBar: PassengerBottomNavBar(
@@ -813,10 +940,10 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     );
   }
 
-  Widget _buildDriverInfoRow(IconData icon, String label, String value, Color textColor) {
-    final iconColor = _isDarkMode
-        ? const Color(0xFF64B5F6)
-        : Colors.blue.shade700;
+  Widget _buildDriverInfoRow(
+      IconData icon, String label, String value, Color textColor) {
+    final iconColor =
+        _isDarkMode ? const Color(0xFF64B5F6) : Colors.blue.shade700;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -846,13 +973,16 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     );
   }
 
-  Widget _buildStatusChip(String? status, String label, Color textColor, Color bgColor) {
+  Widget _buildStatusChip(
+      String? status, String label, Color textColor, Color bgColor, bool isSmallScreen) {
     final isSelected = _selectedStatus == status;
     return FilterChip(
       label: Text(
         label,
         style: TextStyle(
-          color: isSelected ? Colors.white : textColor, // White when selected, theme color otherwise
+          color: isSelected
+              ? Colors.white
+              : textColor, // White when selected, theme color otherwise
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -869,45 +999,47 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
           : const Color(0xFF2C5F8D).withAlpha(51), // Theme-aware background
       checkmarkColor: Colors.white,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : textColor, // White when selected, theme color otherwise
+        color: isSelected
+            ? Colors.white
+            : textColor, // White when selected, theme color otherwise
         fontWeight: FontWeight.w500,
       ),
     );
   }
 
-  Widget _buildReservationCard(Map<String, dynamic> reservation) {
+  Widget _buildReservationCard(Map<String, dynamic> reservation, bool isSmallScreen, bool isMediumScreen, bool isWeb) {
     final bookingId = reservation['bookingid']?.toString() ?? '';
     final status = reservation['status']?.toString() ?? '';
     final bookingType = reservation['booking_type']?.toString() ?? 'instant';
     final price = reservation['bookingprice'] ?? 0.0;
     final seat = reservation['seatlocation']?.toString() ?? '-';
     final trip = reservation['trip'] as Map<String, dynamic>?;
-    final line = trip?['line'] as Map<String, dynamic>? ?? reservation['line'] as Map<String, dynamic>?;
-    final deptime = trip?['deptime']?.toString() ?? reservation['scheduled_trip_time']?.toString() ?? '';
+    final line = trip?['line'] as Map<String, dynamic>? ??
+        reservation['line'] as Map<String, dynamic>?;
+    final deptime = trip?['deptime']?.toString() ??
+        reservation['scheduled_trip_time']?.toString() ??
+        '';
 
     // Theme-aware colors
-    final cardColor = _isDarkMode
-        ? const Color(0xFF1C2541)
-        : const Color(0xFFFAFBFC);
+    final cardColor =
+        _isDarkMode ? const Color(0xFF1C2541) : const Color(0xFFFAFBFC);
 
-    final textPrimary = _isDarkMode
-        ? const Color(0xFFE8EAF6)
-        : const Color(0xFF1E3A5F);
+    final textPrimary =
+        _isDarkMode ? const Color(0xFFE8EAF6) : const Color(0xFF1E3A5F);
 
-    final borderColor = _isDarkMode
-        ? const Color(0xFF2C3E50)
-        : Colors.grey.shade200;
+    final borderColor =
+        _isDarkMode ? const Color(0xFF2C3E50) : Colors.grey.shade200;
 
     // Get line name based on current language
     final lineName = _isArabic
         ? (line?['name_ar']?.toString() ??
-           line?['linename']?.toString() ??
-           line?['name_en']?.toString() ??
-           '')
+            line?['linename']?.toString() ??
+            line?['name_en']?.toString() ??
+            '')
         : (line?['name_en']?.toString() ??
-           line?['linename']?.toString() ??
-           line?['name_ar']?.toString() ??
-           '');
+            line?['linename']?.toString() ??
+            line?['name_ar']?.toString() ??
+            '');
 
     DateTime? departureTime;
     try {
@@ -916,16 +1048,18 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
       // Ignore
     }
 
-    final canCancel = status != 'cancelled' && status != 'no_show' && status != 'checked_in';
+    final canCancel =
+        status != 'cancelled' && status != 'no_show' && status != 'checked_in';
     final tripStatus = trip?['status']?.toString();
-    final canRate = tripStatus == 'completed' && (status == 'checked_in' || status == 'confirmed');
+    final canRate = tripStatus == 'completed' &&
+        (status == 'checked_in' || status == 'confirmed');
     final existingRating = _ratings[bookingId];
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 18),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? 12.0 : 18.0),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         border: Border.all(
           color: borderColor,
           width: 1.5,
@@ -939,369 +1073,427 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isSmallScreen ? 14.0 : (isMediumScreen ? 17.0 : 20.0)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF57C00).withAlpha(51),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.route,
-                            color: Color(0xFFF57C00),
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            lineName,
-                            style: TextStyle(
-                              color: textPrimary,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF57C00).withAlpha(51),
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                              ),
+                              child: Icon(
+                                Icons.route,
+                                color: const Color(0xFFF57C00),
+                                size: isSmallScreen ? 16.0 : 20.0,
+                              ),
                             ),
-                          ),
+                            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                            Expanded(
+                              child: Text(
+                                lineName,
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0),
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: bookingType == 'future'
+                                      ? [
+                                          Colors.orange.withAlpha(77),
+                                          Colors.orange.withAlpha(51)
+                                        ]
+                                      : [
+                                          Colors.blue.withAlpha(77),
+                                          Colors.blue.withAlpha(51)
+                                        ],
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: bookingType == 'future'
+                                      ? Colors.orange.withAlpha(128)
+                                      : Colors.blue.withAlpha(128),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    bookingType == 'future'
+                                        ? Icons.calendar_today
+                                        : Icons.flash_on,
+                                    color: bookingType == 'future'
+                                        ? Colors.orange
+                                        : Colors.blue,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    bookingType == 'future'
+                                        ? t('future')
+                                        : t('instant'),
+                                    style: TextStyle(
+                                      color: bookingType == 'future'
+                                          ? Colors.orange
+                                          : Colors.blue,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(status).withAlpha(51),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _getStatusColor(status).withAlpha(128),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _getStatusIcon(status),
+                                    color: _getStatusColor(status),
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _getStatusText(status),
+                                    style: TextStyle(
+                                      color: _getStatusColor(status),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: bookingType == 'future'
-                                  ? [Colors.orange.withAlpha(77), Colors.orange.withAlpha(51)]
-                                  : [Colors.blue.withAlpha(77), Colors.blue.withAlpha(51)],
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: bookingType == 'future' ? Colors.orange.withAlpha(128) : Colors.blue.withAlpha(128),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                bookingType == 'future' ? Icons.calendar_today : Icons.flash_on,
-                                color: bookingType == 'future' ? Colors.orange : Colors.blue,
-                                size: 14,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                bookingType == 'future' ? t('future') : t('instant'),
-                                style: TextStyle(
-                                  color: bookingType == 'future' ? Colors.orange : Colors.blue,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(status).withAlpha(51),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: _getStatusColor(status).withAlpha(128),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _getStatusIcon(status),
-                                color: _getStatusColor(status),
-                                size: 14,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                _getStatusText(status),
-                                style: TextStyle(
-                                  color: _getStatusColor(status),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFFF57C00),
-                      Color(0xFFE65100),
-                    ],
                   ),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFF57C00).withAlpha(102),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+                  SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isSmallScreen ? 90.0 : 110.0,
                     ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 8.0 : 10.0, 
+                          vertical: isSmallScreen ? 6.0 : 8.0),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFFF57C00),
+                            Color(0xFFE65100),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 14.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFF57C00).withAlpha(102),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${price.toStringAsFixed(2)} ₪',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 18.0),
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            t('price'),
+                            style: TextStyle(
+                              color: Colors.white.withAlpha(230),
+                              fontSize: isSmallScreen ? 8.0 : 10.0,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (departureTime != null)
+                Row(
                   children: [
+                    Icon(Icons.access_time, color: textPrimary, size: 16),
+                    const SizedBox(width: 4),
                     Text(
-                      '${price.toStringAsFixed(2)} ₪',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    Text(
-                      t('price'),
+                      '${departureTime.day}/${departureTime.month}/${departureTime.year} ${departureTime.hour.toString().padLeft(2, '0')}:${departureTime.minute.toString().padLeft(2, '0')}',
                       style: TextStyle(
-                        color: Colors.white.withAlpha(230),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
+                          color: textPrimary, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (departureTime != null)
-            Row(
-              children: [
-                Icon(Icons.access_time, color: textPrimary, size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  '${departureTime.day}/${departureTime.month}/${departureTime.year} ${departureTime.hour.toString().padLeft(2, '0')}:${departureTime.minute.toString().padLeft(2, '0')}',
-                  style: TextStyle(color: textPrimary, fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.event_seat, color: textPrimary, size: 16),
-              const SizedBox(width: 4),
-              Text(
-                '${t('seat')}: $seat',
-                style: TextStyle(color: textPrimary, fontWeight: FontWeight.w500),
-              ),
-            ],
-          ),
-          // Rating button (if trip is completed)
-          if (canRate) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _showRatingDialog(reservation, existingRating),
-                icon: Icon(existingRating != null ? Icons.edit : Icons.star),
-                label: Text(
-                  existingRating != null ? t('rateAgain') : t('rateTrip'),
-                  style: const TextStyle(color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            // Show existing rating
-            if (existingRating != null) ...[
               const SizedBox(height: 8),
               Row(
                 children: [
-                  ...List.generate(5, (index) {
-                    return Icon(
-                      index < (existingRating['rating'] as int? ?? 0)
-                          ? Icons.star
-                          : Icons.star_border,
-                      color: Colors.orange,
-                      size: 20,
-                    );
-                  }),
-                  const SizedBox(width: 8),
+                  Icon(Icons.event_seat, color: textPrimary, size: 16),
+                  const SizedBox(width: 4),
                   Text(
-                    '${existingRating['rating']}/5',
-                    style: TextStyle(color: Colors.grey.shade700, fontSize: 14, fontWeight: FontWeight.w600),
+                    '${t('seat')}: $seat',
+                    style: TextStyle(
+                        color: textPrimary, fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
-              if (existingRating['comment'] != null && existingRating['comment'].toString().isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  existingRating['comment'].toString(),
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ],
-          ],
-          // Driver Information (if trip is assigned)
-          if (trip != null && trip['vehicle'] != null && trip['vehicle']['driver'] != null) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _isDarkMode
-                    ? const Color(0xFF1E3A5F).withAlpha(128)
-                    : Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _isDarkMode
-                      ? const Color(0xFF2C5F8D)
-                      : Colors.blue.shade200,
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: _isDarkMode
-                        ? Colors.blue.withAlpha(26)
-                        : Colors.blue.withAlpha(26),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+              // Rating button (if trip is completed)
+              if (canRate) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () =>
+                        _showRatingDialog(reservation, existingRating),
+                    icon:
+                        Icon(existingRating != null ? Icons.edit : Icons.star),
+                    label: Text(
+                      existingRating != null ? t('rateAgain') : t('rateTrip'),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                ),
+                // Show existing rating
+                if (existingRating != null) ...[
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(
-                        Icons.person,
-                        color: _isDarkMode
-                            ? const Color(0xFF64B5F6)
-                            : Colors.blue.shade700,
-                        size: 20,
-                      ),
+                      ...List.generate(5, (index) {
+                        return Icon(
+                          index < (existingRating['rating'] as int? ?? 0)
+                              ? Icons.star
+                              : Icons.star_border,
+                          color: Colors.orange,
+                          size: 20,
+                        );
+                      }),
                       const SizedBox(width: 8),
                       Text(
-                        t('driverInfo'),
+                        '${existingRating['rating']}/5',
                         style: TextStyle(
-                          color: _isDarkMode
-                              ? const Color(0xFF64B5F6)
-                              : Colors.blue.shade700,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
+                            color: Colors.grey.shade700,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  if (trip['vehicle']['driver']['user'] != null) ...[
-                    _buildDriverInfoRow(
-                      Icons.person,
-                      t('driverName'),
-                      trip['vehicle']['driver']['user']['fullname']?.toString() ?? '-',
-                      textPrimary,
-                    ),
-                    if (trip['vehicle']['driver']['user']['phone'] != null)
-                      _buildDriverInfoRow(
-                        Icons.phone,
-                        t('driverPhone'),
-                        trip['vehicle']['driver']['user']['phone']?.toString() ?? '-',
-                        textPrimary,
-                      ),
-                  ],
-                  if (trip['vehicle'] != null) ...[
-                    // عرض رقم المركبة دائماً (حتى لو كان null)
-                    _buildDriverInfoRow(
-                      Icons.directions_car,
-                      t('vehiclePlate'),
-                      trip['vehicle']['platenum']?.toString() ??
-                      trip['vehicle']['plateno']?.toString() ??
-                      (_isArabic ? 'غير متوفر' : 'Not Available'),
-                      textPrimary,
-                    ),
-                    _buildDriverInfoRow(
-                      Icons.local_taxi,
-                      t('vehicleType'),
-                      trip['vehicle']['seatnum'] == 5 ? '4+1' : trip['vehicle']['seatnum'] == 8 ? '7+1' : '${trip['vehicle']['seatnum']} seats',
-                      textPrimary,
+                  if (existingRating['comment'] != null &&
+                      existingRating['comment'].toString().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      existingRating['comment'].toString(),
+                      style:
+                          TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],
+              ],
+              // Driver Information (if trip is assigned)
+              if (trip != null &&
+                  trip['vehicle'] != null &&
+                  trip['vehicle']['driver'] != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _isDarkMode
+                        ? const Color(0xFF1E3A5F).withAlpha(128)
+                        : Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _isDarkMode
+                          ? const Color(0xFF2C5F8D)
+                          : Colors.blue.shade200,
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _isDarkMode
+                            ? Colors.blue.withAlpha(26)
+                            : Colors.blue.withAlpha(26),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.person,
+                            color: _isDarkMode
+                                ? const Color(0xFF64B5F6)
+                                : Colors.blue.shade700,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            t('driverInfo'),
+                            style: TextStyle(
+                              color: _isDarkMode
+                                  ? const Color(0xFF64B5F6)
+                                  : Colors.blue.shade700,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (trip['vehicle']['driver']['user'] != null) ...[
+                        _buildDriverInfoRow(
+                          Icons.person,
+                          t('driverName'),
+                          trip['vehicle']['driver']['user']['fullname']
+                                  ?.toString() ??
+                              '-',
+                          textPrimary,
+                        ),
+                        if (trip['vehicle']['driver']['user']['phone'] != null)
+                          _buildDriverInfoRow(
+                            Icons.phone,
+                            t('driverPhone'),
+                            trip['vehicle']['driver']['user']['phone']
+                                    ?.toString() ??
+                                '-',
+                            textPrimary,
+                          ),
+                      ],
+                      if (trip['vehicle'] != null) ...[
+                        // عرض رقم المركبة دائماً (حتى لو كان null)
+                        _buildDriverInfoRow(
+                          Icons.directions_car,
+                          t('vehiclePlate'),
+                          trip['vehicle']['platenum']?.toString() ??
+                              trip['vehicle']['plateno']?.toString() ??
+                              (_isArabic ? 'غير متوفر' : 'Not Available'),
+                          textPrimary,
+                        ),
+                        _buildDriverInfoRow(
+                          Icons.local_taxi,
+                          t('vehicleType'),
+                          trip['vehicle']['seatnum'] == 5
+                              ? '4+1'
+                              : trip['vehicle']['seatnum'] == 8
+                                  ? '7+1'
+                                  : '${trip['vehicle']['seatnum']} seats',
+                          textPrimary,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+              // QR Code and Cancel buttons
+              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+              Row(
+                children: [
+                  if (status != 'cancelled' && status != 'checked_in')
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showQRCodeDialog(bookingId),
+                        icon: Icon(Icons.qr_code, size: isSmallScreen ? 16.0 : 20.0),
+                        label: Text(t('showQRCode'), style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.green.shade700,
+                          side: BorderSide(
+                              color: Colors.green.shade700, width: 2),
+                          padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 14.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (status != 'cancelled' && status != 'checked_in')
+                    SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                  if (canCancel)
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => _cancelReservation(bookingId),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red.shade700,
+                          side:
+                              BorderSide(color: Colors.red.shade700, width: 2),
+                          padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 14.0),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                          ),
+                        ),
+                        child: Text(
+                          t('cancel'),
+                          style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontWeight: FontWeight.w600,
+                              fontSize: isSmallScreen ? 12.0 : 14.0),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ),
-          ],
-          // QR Code and Cancel buttons
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              if (status != 'cancelled' && status != 'checked_in')
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showQRCodeDialog(bookingId),
-                    icon: const Icon(Icons.qr_code, size: 20),
-                    label: Text(t('showQRCode')),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.green.shade700,
-                      side: BorderSide(color: Colors.green.shade700, width: 2),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              if (status != 'cancelled' && status != 'checked_in') const SizedBox(width: 12),
-              if (canCancel)
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _cancelReservation(bookingId),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red.shade700,
-                      side: BorderSide(color: Colors.red.shade700, width: 2),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      t('cancel'),
-                      style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
             ],
           ),
-        ],
-      ),
         ),
       ),
     );
   }
 }
-

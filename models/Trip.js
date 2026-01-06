@@ -1,4 +1,5 @@
 import supabase from '../config/dbcon.js';
+import { getUtcNow, parseUtcDate, addTimeFlagsToTrip, addTimeFlagsToTrips } from '../utils/timeUtils.js';
 
 class Trip {
   static async create(tripData) {
@@ -7,7 +8,7 @@ class Trip {
       .insert([tripData])
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   }
@@ -15,128 +16,115 @@ class Trip {
   static async findById(tripid) {
     const { data, error } = await supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*))), schedule_template(*)')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*))), schedule_template(*)')
       .eq('tripid', tripid)
       .single();
-    
+
     if (error) throw error;
-    return data;
+    return addTimeFlagsToTrip(data);
   }
 
   static async findAll(filters = {}) {
     let query = supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*))), schedule_template(*)');
-    
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*))), schedule_template(*)');
+
     if (filters.lineid) {
       query = query.eq('lineid', filters.lineid);
     }
-    
+
     if (filters.status) {
       query = query.eq('status', filters.status);
     }
-    
+
     if (filters.date) {
-      // Filter by date: get trips on the specified date only
-      // Parse the date string (could be YYYY-MM-DD or full ISO string)
       const dateStr = filters.date;
       let startDate, endDate;
-      
-      // If date is in YYYY-MM-DD format, convert to date range
+
       if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        // Start of the day (00:00:00)
         startDate = new Date(dateStr + 'T00:00:00.000Z');
-        // End of the day (23:59:59.999)
         endDate = new Date(dateStr + 'T23:59:59.999Z');
       } else {
-        // If it's already a full ISO string, use it as start and calculate end
         startDate = new Date(dateStr);
         startDate = new Date(startDate);
         startDate.setHours(0, 0, 0, 0);
         endDate = new Date(startDate);
         endDate.setHours(23, 59, 59, 999);
       }
-      
+
       query = query.gte('deptime', startDate.toISOString())
-                   .lte('deptime', endDate.toISOString());
+        .lte('deptime', endDate.toISOString());
     }
-    
+
     if (filters.templateid) {
       query = query.eq('templateid', filters.templateid);
     }
-    
+
     const { data, error } = await query.order('deptime', { ascending: true });
     if (error) throw error;
-    return data;
+    return addTimeFlagsToTrips(data || []);
   }
 
   static async findUpcoming(filters = {}) {
     let query = supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))');
-    
-    // Support date filtering for upcoming trips
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))');
+
     if (filters.date) {
       const dateStr = filters.date;
       let startDate, endDate;
-      
-      // If date is in YYYY-MM-DD format, convert to date range
+
       if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        // Start of the day (00:00:00)
         startDate = new Date(dateStr + 'T00:00:00.000Z');
-        // End of the day (23:59:59.999)
         endDate = new Date(dateStr + 'T23:59:59.999Z');
       } else {
-        // If it's already a full ISO string, use it as start and calculate end
         startDate = new Date(dateStr);
         startDate = new Date(startDate);
         startDate.setHours(0, 0, 0, 0);
         endDate = new Date(startDate);
         endDate.setHours(23, 59, 59, 999);
       }
-      
+
       const dateStartISO = startDate.toISOString();
       const dateEndISO = endDate.toISOString();
-      const now = new Date().toISOString();
-      
-      // Use the later of "now" or "startDate" to ensure we only show upcoming trips
+      const now = getUtcNow().toISOString();
+
       const filterStart = dateStartISO > now ? dateStartISO : now;
-      
+
       query = query.gte('deptime', filterStart)
-                   .lte('deptime', dateEndISO);
+        .lte('deptime', dateEndISO);
     } else {
-      // No date filter - only show upcoming trips from now
-      const now = new Date().toISOString();
+      const now = getUtcNow().toISOString();
       query = query.gte('deptime', now);
     }
-    
+
     if (filters.lineid) {
       query = query.eq('lineid', filters.lineid);
     }
-    
+
     if (filters.status) {
       query = query.eq('status', filters.status);
     }
-    
+
     const { data, error } = await query.order('deptime', { ascending: true });
     if (error) throw error;
-    return data;
+    return addTimeFlagsToTrips(data || []);
   }
 
   static async findUpcomingByVehicle(vehicleid) {
-    const now = new Date().toISOString();
+    const now = getUtcNow().toISOString();
     const { data, error } = await supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))')
       .eq('vehicleid', vehicleid)
-      .in('status', ['scheduled', 'in_progress'])
+      .in('status', ['scheduled', 'open', 'in_progress'])
       .gte('deptime', now)
       .order('deptime', { ascending: true })
       .limit(1)
       .maybeSingle();
 
     if (error && error.code !== 'PGRST116') throw error;
-    return data || null;
+    return data ? addTimeFlagsToTrip(data) : null;
   }
 
   static async findByVehicleIds(vehicleIds = [], filters = {}) {
@@ -146,7 +134,7 @@ class Trip {
 
     let query = supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))')
       .in('vehicleid', vehicleIds);
 
     if (filters.status) {
@@ -167,11 +155,11 @@ class Trip {
       .from('trip')
       .update(updates)
       .eq('tripid', tripid)
-      .select()
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*))), schedule_template(*)')
       .single();
-    
+
     if (error) throw error;
-    return data;
+    return addTimeFlagsToTrip(data);
   }
 
   static async updateAvailableSeats(tripid, seats) {
@@ -181,7 +169,7 @@ class Trip {
       .eq('tripid', tripid)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   }
@@ -190,60 +178,69 @@ class Trip {
     const { data, error } = await supabase.rpc('increment_trip_bookings', {
       trip_id: tripid
     });
-    
+
     if (error) {
-      
+
       const trip = await this.findById(tripid);
       return await this.update(tripid, { totalbookings: (trip.totalbookings || 0) + 1 });
     }
-    
+
     return data;
   }
 
   static async findOpenTrips(filters = {}) {
-    const now = new Date().toISOString();
+    const now = getUtcNow().toISOString();
     let query = supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))')
       .lte('trip_opening_time', now)
-      .eq('status', 'scheduled');
-    
+      .eq('status', 'open');
+
     if (filters.lineid) {
       query = query.eq('lineid', filters.lineid);
     }
-    
+
     const { data, error } = await query.order('deptime', { ascending: true });
     if (error) throw error;
-    return data;
+    return addTimeFlagsToTrips(data || []);
   }
 
   static async findTripsNeedingOpening(openingWindowMinutes = 45) {
-    const now = new Date();
+    const now = getUtcNow();
     const openingTime = new Date(now.getTime() + openingWindowMinutes * 60 * 1000);
-    
+
     const { data, error } = await supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .select('*')
       .eq('status', 'scheduled')
-      .is('trip_opening_time', null)
       .lte('deptime', openingTime.toISOString())
       .order('deptime', { ascending: true });
-    
+
     if (error) throw error;
-    return data;
+
+    const nowISO = now.toISOString();
+    const tripsToOpen = (data || []).filter(trip => {
+      if (!trip.trip_opening_time) {
+        return true;
+      }
+      const openingTime = parseUtcDate(trip.trip_opening_time);
+      return openingTime && openingTime.getTime() <= now.getTime();
+    });
+
+    return tripsToOpen;
   }
 
   static async findTripsNeedingDeparture() {
-    const now = new Date().toISOString();
+    const now = getUtcNow().toISOString();
     const { data, error } = await supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
-      .eq('status', 'scheduled')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))')
+      .in('status', ['scheduled', 'open', 'delayed'])
       .lte('deptime', now)
       .order('deptime', { ascending: true });
-    
+
     if (error) throw error;
-    return data;
+    return addTimeFlagsToTrips(data || []);
   }
 
   static async assignDriver(tripid, driverid) {
@@ -256,20 +253,20 @@ class Trip {
   static async findAssignedTrips(driverid, filters = {}) {
     let query = supabase
       .from('trip')
-      .select('*, line(*), vehicle(*, driver(*, user(*)))')
+      .select('*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))')
       .eq('assigned_driverid', driverid);
-    
+
     if (filters.status) {
       query = query.eq('status', filters.status);
     }
-    
+
     if (filters.fromNow) {
-      query = query.gte('deptime', new Date().toISOString());
+      query = query.gte('deptime', getUtcNow().toISOString());
     }
-    
+
     const { data, error } = await query.order('deptime', { ascending: true });
     if (error) throw error;
-    return data;
+    return addTimeFlagsToTrips(data || []);
   }
 
   static async getCapacityUtilizationByLineAndTime(lineid, options = {}) {

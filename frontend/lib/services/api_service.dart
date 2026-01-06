@@ -34,6 +34,58 @@ class ApiService {
     await prefs.remove('user_data');
   }
 
+  static Future<Map<String, dynamic>> uploadProfileImage(
+      String imagePath) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/auth/profile/avatar');
+      final request = http.MultipartRequest('POST', uri);
+
+      request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Accept'] = 'application/json';
+
+      final file = await http.MultipartFile.fromPath('avatar', imagePath);
+      request.files.add(file);
+
+      final streamedResponse =
+          await request.send().timeout(AppConfig.requestTimeout);
+      final response = await http.Response.fromStream(streamedResponse);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        if (decoded['user'] != null && decoded['user'] is Map) {
+          await saveUserData(Map<String, dynamic>.from(decoded['user'] as Map));
+        }
+
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Avatar uploaded successfully',
+          'avatarUrl': decoded['avatarUrl'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to upload avatar',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
   static Future<void> saveLanguagePreference(bool isArabic) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('language_arabic', isArabic);
@@ -42,6 +94,48 @@ class ApiService {
   static Future<bool> getLanguagePreference() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('language_arabic') ?? true;
+  }
+
+  /// Check system health status (API, Database, etc.)
+  static Future<Map<String, dynamic>> getSystemHealth() async {
+    try {
+      // Remove /api from base URL since /health is at root
+      final baseUrl = AppConfig.apiBaseUrl.replaceAll('/api', '');
+      final response = await http.get(
+        Uri.parse('$baseUrl/health'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'success': true,
+          'apiHealthy': true,
+          'dbHealthy': data['database']?['connected'] ?? false,
+          'dbConfigured': data['database']?['configured'] ?? false,
+          'timestamp': data['timestamp'] ?? DateTime.now().toIso8601String(),
+          'message': data['message'] ?? 'OK',
+        };
+      } else {
+        return {
+          'success': false,
+          'apiHealthy': false,
+          'dbHealthy': false,
+          'dbConfigured': false,
+          'timestamp': DateTime.now().toIso8601String(),
+          'message': 'API returned status ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'apiHealthy': false,
+        'dbHealthy': false,
+        'dbConfigured': false,
+        'timestamp': DateTime.now().toIso8601String(),
+        'message': e.toString(),
+      };
+    }
   }
 
   static Future<Map<String, dynamic>> login({
@@ -88,12 +182,15 @@ class ApiService {
           return {
             'success': false,
             'message': responseData['message'] ?? 'Login failed',
+            'approvalStatus': responseData['approvalStatus'],
           };
         }
       } else {
+        // Handle 403 (Forbidden) for non-approved drivers
         return {
           'success': false,
           'message': responseData['message'] ?? 'Login failed',
+          'approvalStatus': responseData['approvalStatus'],
         };
       }
     } catch (exception) {
@@ -150,7 +247,6 @@ class ApiService {
         requestBody['vehicleSeatLayout'] = vehicleSeatLayout.trim();
       }
 
-      
       print('[ApiService.register] 📤 Sending registration data:');
       print('  - fullname: ${requestBody['fullname']}');
       print('  - email: ${requestBody['email']}');
@@ -188,7 +284,6 @@ class ApiService {
         print('  - Vehicle data: ${responseData['vehicle']}');
       }
 
-      
       final isSuccess = response.statusCode == 201 ||
           response.statusCode == 200 ||
           responseData['success'] == true ||
@@ -196,7 +291,6 @@ class ApiService {
 
       if (isSuccess && responseData['token'] != null) {
         try {
-          
           if (responseData['token'] != null) {
             await saveToken(responseData['token']);
           }
@@ -207,23 +301,26 @@ class ApiService {
           print('[ApiService.register] ✅ Registration successful');
           print('  - User saved: ${responseData['user'] != null}');
           print('  - Token saved: ${responseData['token'] != null}');
+          print('  - Approval Status: ${responseData['approvalStatus'] ?? 'N/A'}');
 
           return {
             'success': true,
             'message': responseData['message'] ?? 'Registration successful',
             'token': responseData['token'],
             'user': responseData['user'],
-            'vehicle': responseData['vehicle'], 
+            'vehicle': responseData['vehicle'],
+            'approvalStatus': responseData['approvalStatus'],
           };
         } catch (saveError) {
           print('[ApiService.register] ⚠️ Error saving data: $saveError');
-          
+
           return {
             'success': true,
             'message': responseData['message'] ?? 'Registration successful',
             'token': responseData['token'],
             'user': responseData['user'],
             'vehicle': responseData['vehicle'],
+            'approvalStatus': responseData['approvalStatus'],
           };
         }
       } else {
@@ -778,7 +875,6 @@ class ApiService {
     };
   }
 
-  
   static Future<Map<String, dynamic>> getDriverProfile() async {
     try {
       final token = await getToken();
@@ -970,9 +1066,6 @@ class ApiService {
     };
   }
 
-  
-
-  
   static Future<List<Map<String, dynamic>>> fetchUpcomingTrips({
     String? lineid,
     String? date,
@@ -1004,7 +1097,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> fetchTripById(String tripId) async {
     try {
       final response = await http.get(
@@ -1024,7 +1116,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> createReservation({
     String? tripid,
     String? lineid,
@@ -1032,8 +1123,8 @@ class ApiService {
     String? dropoffpoint,
     String? aging,
     String? paymentmethod,
-    String? booking_type, 
-    String? scheduled_trip_time, 
+    String? booking_type,
+    String? scheduled_trip_time,
   }) async {
     try {
       final token = await getToken();
@@ -1090,7 +1181,6 @@ class ApiService {
     }
   }
 
-  
   static Future<List<Map<String, dynamic>>> fetchPassengerReservations({
     String? status,
   }) async {
@@ -1127,7 +1217,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> cancelReservation(
       String bookingId) async {
     try {
@@ -1171,7 +1260,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> fetchWallet() async {
     try {
       final token = await getToken();
@@ -1214,7 +1302,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> addWalletBalance(double amount) async {
     try {
       final token = await getToken();
@@ -1260,7 +1347,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> createStripeWalletTopup(
       double amount) async {
     try {
@@ -1304,9 +1390,6 @@ class ApiService {
     }
   }
 
-  
-
-  
   static Future<Map<String, dynamic>> startTrip(String tripId) async {
     try {
       final token = await getToken();
@@ -1317,7 +1400,7 @@ class ApiService {
         };
       }
 
-      final response = await http.post(
+      final response = await http.put(
         Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripId/start'),
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
@@ -1349,7 +1432,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> endTrip(String tripId) async {
     try {
       final token = await getToken();
@@ -1360,7 +1442,7 @@ class ApiService {
         };
       }
 
-      final response = await http.post(
+      final response = await http.put(
         Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripId/end'),
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
@@ -1392,7 +1474,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> checkInReservation(String? bookingId,
       {String? qrData}) async {
     try {
@@ -1443,7 +1524,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> getReservationQRCode(
       String bookingId) async {
     try {
@@ -1486,11 +1566,6 @@ class ApiService {
     }
   }
 
-  
-  
-  
-
-  
   static Future<List<Map<String, dynamic>>> fetchSchedules(
       {String? lineid, bool? active}) async {
     try {
@@ -1541,7 +1616,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> getScheduleById(String templateid) async {
     try {
       final token = await getToken();
@@ -1580,13 +1654,14 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> createSchedule({
     required String lineid,
     required int startHour,
     required int endHour,
     required int intervalMinutes,
     bool active = true,
+    bool? autoDepartureEnabled,
+    bool? scheduledDepartureEnforced,
   }) async {
     try {
       final token = await getToken();
@@ -1611,6 +1686,8 @@ class ApiService {
               'end_hour': endHour,
               'interval_minutes': intervalMinutes,
               'active': active,
+              if (autoDepartureEnabled != null) 'auto_departure_enabled': autoDepartureEnabled,
+              if (scheduledDepartureEnforced != null) 'scheduled_departure_enforced': scheduledDepartureEnforced,
             })),
           )
           .timeout(AppConfig.requestTimeout);
@@ -1639,7 +1716,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> updateSchedule(
     String templateid, {
     String? lineid,
@@ -1647,6 +1723,8 @@ class ApiService {
     int? endHour,
     int? intervalMinutes,
     bool? active,
+    bool? autoDepartureEnabled,
+    bool? scheduledDepartureEnforced,
   }) async {
     try {
       final token = await getToken();
@@ -1663,6 +1741,8 @@ class ApiService {
       if (endHour != null) body['end_hour'] = endHour;
       if (intervalMinutes != null) body['interval_minutes'] = intervalMinutes;
       if (active != null) body['active'] = active;
+      if (autoDepartureEnabled != null) body['auto_departure_enabled'] = autoDepartureEnabled;
+      if (scheduledDepartureEnforced != null) body['scheduled_departure_enforced'] = scheduledDepartureEnforced;
 
       final response = await http
           .put(
@@ -1700,7 +1780,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> deleteSchedule(String templateid) async {
     try {
       final token = await getToken();
@@ -1742,7 +1821,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> createTripsForSchedule(
     String templateid, {
     String? targetDate,
@@ -1796,7 +1874,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> triggerDailyTripCreation() async {
     try {
       final token = await getToken();
@@ -1838,10 +1915,6 @@ class ApiService {
       };
     }
   }
-
-  
-  
-  
 
   static Future<Map<String, dynamic>> getRushHourPredictionsAdmin({
     required String lineId,
@@ -2065,11 +2138,6 @@ class ApiService {
     };
   }
 
-  
-  
-  
-
-  
   static Future<List<Map<String, dynamic>>> getAllLines() async {
     try {
       final response = await http.get(
@@ -2095,11 +2163,10 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> createLine({
     String? nameAr,
     String? nameEn,
-    String? linename, 
+    String? linename,
     required double baseprice,
     double? additionalprice,
     int? estduration,
@@ -2118,14 +2185,13 @@ class ApiService {
         'active': active,
       };
 
-      
       if (nameAr != null && nameAr.isNotEmpty) {
         body['name_ar'] = nameAr;
       }
       if (nameEn != null && nameEn.isNotEmpty) {
         body['name_en'] = nameEn;
       }
-      
+
       if ((nameAr == null || nameAr.isEmpty) &&
           linename != null &&
           linename.isNotEmpty) {
@@ -2159,12 +2225,11 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> updateLine(
     String lineid, {
     String? nameAr,
     String? nameEn,
-    String? linename, 
+    String? linename,
     double? baseprice,
     double? additionalprice,
     int? estduration,
@@ -2178,7 +2243,7 @@ class ApiService {
       }
 
       final body = <String, dynamic>{};
-      
+
       if (nameAr != null && nameAr.isNotEmpty) {
         body['name_ar'] = nameAr;
       }
@@ -2218,7 +2283,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> deleteLine(String lineid) async {
     try {
       final token = await getToken();
@@ -2245,11 +2309,6 @@ class ApiService {
     }
   }
 
-  
-  
-  
-
-  
   static Future<Map<String, dynamic>> getDashboardStats() async {
     try {
       final token = await getToken();
@@ -2276,7 +2335,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> getRevenueAnalytics({
     String? startDate,
     String? endDate,
@@ -2316,11 +2374,6 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // ADMIN - REPORTS API
-  // ============================================
-
-  /// Get revenue time series data (admin)
   static Future<Map<String, dynamic>> getRevenueTimeSeries({
     String? startDate,
     String? endDate,
@@ -2361,7 +2414,6 @@ class ApiService {
     }
   }
 
-  /// Get booking time series data (admin)
   static Future<Map<String, dynamic>> getBookingTimeSeries({
     String? startDate,
     String? endDate,
@@ -2402,7 +2454,6 @@ class ApiService {
     }
   }
 
-  /// Get trip statistics (admin)
   static Future<Map<String, dynamic>> getTripStatistics({
     String? startDate,
     String? endDate,
@@ -2441,7 +2492,6 @@ class ApiService {
     }
   }
 
-  /// Get user growth data (admin)
   static Future<Map<String, dynamic>> getUserGrowth({
     String? startDate,
     String? endDate,
@@ -2481,7 +2531,6 @@ class ApiService {
     }
   }
 
-  /// Get vehicle utilization data (admin)
   static Future<Map<String, dynamic>> getVehicleUtilization({
     String? startDate,
     String? endDate,
@@ -2520,7 +2569,6 @@ class ApiService {
     }
   }
 
-  /// Get line performance data (admin)
   static Future<Map<String, dynamic>> getLinePerformance({
     String? startDate,
     String? endDate,
@@ -2559,11 +2607,6 @@ class ApiService {
     }
   }
 
-  // ============================================
-  // ADMIN - USERS API
-  // ============================================
-
-  
   static Future<List<Map<String, dynamic>>> getAllUsers() async {
     try {
       final token = await getToken();
@@ -2581,7 +2624,7 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-        
+
         if (decoded is List) {
           return decoded.map((u) => Map<String, dynamic>.from(u)).toList();
         } else if (decoded is Map && decoded['users'] is List) {
@@ -2598,7 +2641,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> updateUser({
     required String userid,
     String? fullname,
@@ -2642,7 +2684,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> deleteUser(String userid) async {
     try {
       final token = await getToken();
@@ -2669,11 +2710,6 @@ class ApiService {
     }
   }
 
-  
-  
-  
-
-  
   static Future<List<Map<String, dynamic>>> getAllVehicles() async {
     try {
       final token = await getToken();
@@ -2703,11 +2739,6 @@ class ApiService {
     }
   }
 
-  
-  
-  
-
-  
   static Future<List<Map<String, dynamic>>> getAllTrips(
       {String? lineid, String? status}) async {
     try {
@@ -2740,11 +2771,6 @@ class ApiService {
     }
   }
 
-  
-  
-  
-
-  
   static Future<List<Map<String, dynamic>>> getAllPayments({
     String? status,
     String? method,
@@ -2775,7 +2801,7 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(utf8.decode(response.bodyBytes));
-        
+
         if (decoded is List) {
           return decoded.map((p) => Map<String, dynamic>.from(p)).toList();
         } else if (decoded is Map && decoded['payments'] is List) {
@@ -2792,11 +2818,6 @@ class ApiService {
     }
   }
 
-  
-  
-  
-
-  
   static Future<Map<String, dynamic>> submitRating({
     required String bookingid,
     required int rating,
@@ -2836,7 +2857,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> updateRating({
     required String ratingid,
     int? rating,
@@ -2876,7 +2896,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>?> getRatingByBookingId(
       String bookingid) async {
     try {
@@ -2905,7 +2924,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> getTripRatings(String tripid) async {
     try {
       final response = await http.get(
@@ -2927,7 +2945,6 @@ class ApiService {
     }
   }
 
-  
   static Future<List<Map<String, dynamic>>> getMyRatings() async {
     try {
       final token = await getToken();
@@ -2957,15 +2974,6 @@ class ApiService {
     }
   }
 
-  
-  
-  
-
-  
-  
-  
-
-  
   static Future<Map<String, dynamic>> updateDriverLocation({
     required double latitude,
     required double longitude,
@@ -3024,7 +3032,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> getMyLocation() async {
     try {
       final token = await getToken();
@@ -3066,7 +3073,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> getAllVehicleLocations({
     int? maxAgeMinutes,
     String? lineid,
@@ -3122,7 +3128,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> getDriversAtBaseStation({
     String? stationid,
   }) async {
@@ -3175,11 +3180,6 @@ class ApiService {
     }
   }
 
-  
-  
-  
-
-  
   static Future<Map<String, dynamic>> getAllBaseStations({
     bool? isActive,
     String? lineid,
@@ -3235,7 +3235,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> getBaseStationById(
       String stationid) async {
     try {
@@ -3278,7 +3277,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> createBaseStation({
     required String name,
     required double latitude,
@@ -3340,7 +3338,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> updateBaseStation({
     required String stationid,
     String? name,
@@ -3403,7 +3400,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> deleteBaseStation(
       String stationid) async {
     try {
@@ -3446,11 +3442,6 @@ class ApiService {
     }
   }
 
-  
-  
-  
-
-  
   static Future<Map<String, dynamic>> getLinePath(String lineid) async {
     try {
       final token = await getToken();
@@ -3491,7 +3482,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> createOrUpdateLinePath({
     required String lineid,
     required List<Map<String, dynamic>> waypoints,
@@ -3547,7 +3537,6 @@ class ApiService {
     }
   }
 
-  
   static Future<Map<String, dynamic>> deleteLinePath(String lineid) async {
     try {
       final token = await getToken();
@@ -3618,6 +3607,105 @@ class ApiService {
       return {
         'success': false,
         'message': 'Failed to get Supabase config',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Get timezone configuration (Admin only)
+  static Future<Map<String, dynamic>> getTimezoneConfig() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/config/timezone'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'timezone_offset': decoded['timezone_offset'] ?? 2,
+          'timezone_name': decoded['timezone_name'] ?? 'UTC+2',
+          'description': decoded['description'] ?? 'Palestine Standard Time',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to get timezone configuration',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Update timezone configuration (Admin only)
+  static Future<Map<String, dynamic>> updateTimezoneConfig(
+      int timezoneOffset) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http
+          .put(
+            Uri.parse('${AppConfig.apiBaseUrl}/admin/config/timezone'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode({
+              'timezone_offset': timezoneOffset,
+            })),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'message': decoded['message'] ??
+              'Timezone configuration updated successfully',
+          'timezone_offset': decoded['timezone_offset'] ?? timezoneOffset,
+          'timezone_name': decoded['timezone_name'] ??
+              (timezoneOffset >= 0
+                  ? 'UTC+$timezoneOffset'
+                  : 'UTC$timezoneOffset'),
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to update timezone configuration',
       };
     } catch (exception) {
       return {

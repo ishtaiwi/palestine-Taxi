@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/passenger_bottom_nav_bar.dart';
@@ -20,8 +21,12 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
   String? _error;
   List<Map<String, dynamic>> _trips = [];
   List<Map<String, dynamic>> _lines = [];
+  bool _isLineDropdownOpen = false;
   String? _selectedLineId;
   DateTime? _selectedDate;
+
+  final TextEditingController _lineSearchController = TextEditingController();
+  String _lineSearchQuery = '';
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -31,6 +36,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'filterByLine': 'فلترة حسب الخط',
       'filterByDate': 'فلترة حسب التاريخ',
       'allLines': 'جميع الخطوط',
+      'searchLine': 'بحث باسم الخط',
       'departure': 'موعد الانطلاق',
       'availableSeats': 'المقاعد المتاحة',
       'available': 'متاح',
@@ -51,6 +57,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'filterByLine': 'Filter by Line',
       'filterByDate': 'Filter by Date',
       'allLines': 'All Lines',
+      'searchLine': 'Search by line name',
       'departure': 'Departure Time',
       'availableSeats': 'Available Seats',
       'available': 'Available',
@@ -72,6 +79,12 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
   void initState() {
     super.initState();
     _initialize();
+  }
+
+  @override
+  void dispose() {
+    _lineSearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _initialize() async {
@@ -99,9 +112,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
           _lines = lines;
         });
       }
-    } catch (e) {
-      // Ignore error, lines are optional
-    }
+    } catch (e) {}
   }
 
   Future<void> _loadTrips() async {
@@ -153,11 +164,57 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     }
   }
 
+  String _getLineNameById(String lineId) {
+    try {
+      final line = _lines.firstWhere(
+        (l) => l['lineid']?.toString() == lineId,
+        orElse: () => {},
+      );
+      if (line.isEmpty) return _isArabic ? 'غير معروف' : 'Unknown';
+
+      return _isArabic
+          ? (line['name_ar']?.toString() ??
+              line['linename']?.toString() ??
+              line['name_en']?.toString() ??
+              (_isArabic ? 'غير معروف' : 'Unknown'))
+          : (line['name_en']?.toString() ??
+              line['linename']?.toString() ??
+              line['name_ar']?.toString() ??
+              (_isArabic ? 'غير معروف' : 'Unknown'));
+    } catch (_) {
+      return _isArabic ? 'غير معروف' : 'Unknown';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Web-specific responsive breakpoints
+    final isWeb = kIsWeb;
+    final isDesktop = isWeb && screenWidth >= 1200;
+    final isTablet = screenWidth >= 600 && screenWidth < 1200;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
+    
+    // Responsive sizing - enhanced for web
+    final double basePadding = isWeb 
+        ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
+        : (isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0));
+    final double cardPadding = isWeb
+        ? (isDesktop ? 24.0 : (isTablet ? 20.0 : 18.0))
+        : (isSmallScreen ? 14.0 : (isMediumScreen ? 18.0 : 20.0));
+    final double titleFontSize = isWeb
+        ? (isDesktop ? 24.0 : 22.0)
+        : (isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0));
+    final double iconSize = isWeb
+        ? (isDesktop ? 28.0 : 24.0)
+        : (isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0));
+    
+    // Max width for web to prevent content from stretching too wide
+    final double maxContentWidth = isWeb ? 1400.0 : double.infinity;
 
-    // Theme-aware colors
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
         : const Color(0xFFECF0F3); // Soft blue-gray background
@@ -179,6 +236,22 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
         : const Color(0xFF2C5F8D); // Professional blue
 
     const accentColor = Color(0xFFF57C00); // Orange accent
+
+    final List<Map<String, dynamic>> filteredLines = _lines.where((line) {
+      if (_lineSearchQuery.isEmpty) return true;
+
+      final lineName = _isArabic
+          ? (line['name_ar']?.toString() ??
+              line['linename']?.toString() ??
+              line['name_en']?.toString() ??
+              '')
+          : (line['name_en']?.toString() ??
+              line['linename']?.toString() ??
+              line['name_ar']?.toString() ??
+              '');
+
+      return lineName.toLowerCase().contains(_lineSearchQuery.toLowerCase());
+    }).toList();
 
     return Directionality(
       textDirection: textDirection,
@@ -236,10 +309,10 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
               ),
               title: Text(
                 t('title'),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: 22,
+                  fontSize: titleFontSize,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -267,11 +340,13 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
           ),
         ),
         body: SafeArea(
-          child: Column(
-            children: [
-              // Filters
-              Container(
-                padding: const EdgeInsets.all(16),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxContentWidth),
+              child: Column(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(basePadding),
                 decoration: BoxDecoration(
                   color: cardColor,
                   boxShadow: [
@@ -284,267 +359,321 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                 ),
                 child: Column(
                   children: [
-                    // Line Filter
-                    Container(
-                      decoration: BoxDecoration(
-                        color: _isDarkMode
-                            ? const Color(0xFF1E3A5F).withAlpha(77)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _isDarkMode
-                              ? const Color(0xFF2C5F8D)
-                              : Colors.grey.shade300,
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedLineId,
-                        dropdownColor: cardColor,
-                        decoration: InputDecoration(
-                          labelText: t('filterByLine'),
-                          labelStyle: TextStyle(
-                            color: textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          filled: false,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
-                          ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          prefixIcon: Icon(
-                            Icons.directions_bus_rounded,
-                            color: _isDarkMode
-                                ? const Color(0xFF64B5F6)
-                                : const Color(0xFF1E3A5F),
-                          ),
-                        ),
-                        style: TextStyle(
-                            color: textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold),
-                        icon: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: _isDarkMode
-                                ? const Color(0xFF2C5F8D).withOpacity(0.5)
-                                : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: textPrimary,
-                            size: 20,
-                          ),
-                        ),
-                        iconSize: 24,
-                        menuMaxHeight: 350,
-                        isExpanded: true,
-                        borderRadius: BorderRadius.circular(16),
-                        elevation: 4,
-                        items: [
-                          DropdownMenuItem<String>(
-                            value: null,
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 4),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: _selectedLineId == null
-                                    ? (_isDarkMode
-                                        ? const Color(0xFF2C5F8D).withOpacity(0.3)
-                                        : const Color(0xFFE3F2FD))
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(12),
+                    Column(
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            setState(() {
+                              _isLineDropdownOpen = !_isLineDropdownOpen;
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _isDarkMode
+                                  ? const Color(0xFF1E3A5F).withAlpha(77)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: _isDarkMode
+                                    ? const Color(0xFF2C5F8D)
+                                    : Colors.grey.shade300,
+                                width: 1.5,
                               ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: _selectedLineId == null
-                                          ? (_isDarkMode
-                                              ? const Color(0xFF64B5F6)
-                                              : const Color(0xFF1E3A5F))
-                                          : textSecondary.withOpacity(0.5),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    t('allLines'),
-                                    style: TextStyle(
-                                      color: _selectedLineId == null
-                                          ? (_isDarkMode
-                                              ? Colors.white
-                                              : const Color(0xFF1E3A5F))
-                                          : textPrimary,
-                                      fontSize: 16,
-                                      fontWeight: _selectedLineId == null
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  if (_selectedLineId == null)
-                                    Icon(
-                                      Icons.check_circle_rounded,
-                                      color: _isDarkMode
-                                          ? const Color(0xFF64B5F6)
-                                          : const Color(0xFF1E3A5F),
-                                      size: 20,
-                                    ),
-                                ],
-                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ),
-                          ..._lines.map((line) {
-                            // Get line name based on current language
-                            final lineName = _isArabic
-                                ? (line['name_ar']?.toString() ??
-                                    line['linename']?.toString() ??
-                                    line['name_en']?.toString() ??
-                                    '')
-                                : (line['name_en']?.toString() ??
-                                    line['linename']?.toString() ??
-                                    line['name_ar']?.toString() ??
-                                    '');
-                            final isSelected =
-                                _selectedLineId == line['lineid']?.toString();
-
-                            return DropdownMenuItem<String>(
-                              value: line['lineid']?.toString(),
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(vertical: 4),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? (_isDarkMode
-                                          ? const Color(0xFF2C5F8D).withOpacity(0.3)
-                                          : const Color(0xFFE3F2FD))
-                                      : (_isDarkMode
-                                          ? Colors.white.withOpacity(0.05)
-                                          : Colors.grey.withOpacity(0.05)),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? (_isDarkMode
-                                            ? const Color(0xFF64B5F6)
-                                            : const Color(0xFF1E3A5F))
-                                        : Colors.transparent,
-                                    width: 1,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: isSmallScreen ? 12.0 : 16.0, 
+                                vertical: isSmallScreen ? 12.0 : 14.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.directions_bus_rounded,
+                                  color: _isDarkMode
+                                      ? const Color(0xFF64B5F6)
+                                      : const Color(0xFF1E3A5F),
+                                  size: iconSize,
+                                ),
+                                SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        t('filterByLine'),
+                                        style: TextStyle(
+                                          color: textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _selectedLineId == null
+                                            ? t('allLines')
+                                            : _getLineNameById(
+                                                _selectedLineId!),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: textPrimary,
+                                          fontSize: isSmallScreen ? 14.0 : 16.0,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? (_isDarkMode
-                                                ? const Color(0xFF64B5F6)
-                                                : const Color(0xFF1E3A5F))
-                                            : textSecondary.withOpacity(0.5),
-                                        shape: BoxShape.circle,
-                                      ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: _isDarkMode
+                                        ? const Color(0xFF2C5F8D)
+                                            .withOpacity(0.5)
+                                        : Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    _isLineDropdownOpen
+                                        ? Icons.keyboard_arrow_up_rounded
+                                        : Icons.keyboard_arrow_down_rounded,
+                                    color: textPrimary,
+                                    size: 20,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_isLineDropdownOpen) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: _isDarkMode
+                                  ? const Color(0xFF1E3A5F).withAlpha(200)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: _isDarkMode
+                                    ? const Color(0xFF2C5F8D)
+                                    : Colors.grey.shade300,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  child: TextField(
+                                    controller: _lineSearchController,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _lineSearchQuery = value.trim();
+                                      });
+                                    },
+                                    style: TextStyle(
+                                      color: textPrimary,
+                                      fontSize: 14,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        lineName.isEmpty
-                                            ? (_isArabic
-                                                ? 'غير معروف'
-                                                : 'Unknown')
-                                            : lineName,
-                                        style: TextStyle(
-                                          color: isSelected
-                                              ? (_isDarkMode
-                                                  ? Colors.white
-                                                  : const Color(0xFF1E3A5F))
-                                              : textPrimary,
-                                          fontSize: 16,
-                                          fontWeight: isSelected
-                                              ? FontWeight.bold
-                                              : FontWeight.w500,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
+                                    decoration: InputDecoration(
+                                      hintText: t('searchLine'),
+                                      hintStyle: TextStyle(
+                                        color: textSecondary.withOpacity(0.8),
+                                        fontSize: 14,
                                       ),
-                                    ),
-                                    if (isSelected)
-                                      Icon(
-                                        Icons.check_circle_rounded,
+                                      prefixIcon: Icon(
+                                        Icons.search,
                                         color: _isDarkMode
                                             ? const Color(0xFF64B5F6)
                                             : const Color(0xFF1E3A5F),
                                         size: 20,
                                       ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedLineId = value;
-                          });
-                          _loadTrips();
-                        },
-                        selectedItemBuilder: (BuildContext context) {
-                          return [
-                            DropdownMenuItem<String>(
-                              value: null,
-                              child: Text(
-                                t('allLines'),
-                                style: TextStyle(
-                                  color: textPrimary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            ..._lines.map<DropdownMenuItem<String>>((line) {
-                              final lineName = _isArabic
-                                  ? (line['name_ar']?.toString() ??
-                                      line['linename']?.toString() ??
-                                      line['name_en']?.toString() ??
-                                      '')
-                                  : (line['name_en']?.toString() ??
-                                      line['linename']?.toString() ??
-                                      line['name_ar']?.toString() ??
-                                      '');
-                              return DropdownMenuItem<String>(
-                                value: line['lineid']?.toString(),
-                                child: Text(
-                                  lineName.isEmpty
-                                      ? (_isArabic ? 'غير معروف' : 'Unknown')
-                                      : lineName,
-                                  style: TextStyle(
-                                    color: textPrimary,
-                                    fontWeight: FontWeight.bold,
+                                      isDense: true,
+                                      filled: true,
+                                      fillColor: _isDarkMode
+                                          ? const Color(0xFF1C2541)
+                                          : Colors.grey.shade50,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 10,
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: _isDarkMode
+                                              ? const Color(0xFF2C5F8D)
+                                              : Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: _isDarkMode
+                                              ? const Color(0xFF64B5F6)
+                                              : const Color(0xFF1E3A5F),
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      suffixIcon: _lineSearchQuery.isNotEmpty
+                                          ? IconButton(
+                                              icon: Icon(
+                                                Icons.clear,
+                                                color: textSecondary,
+                                                size: 18,
+                                              ),
+                                              onPressed: () {
+                                                setState(() {
+                                                  _lineSearchQuery = '';
+                                                  _lineSearchController.clear();
+                                                });
+                                              },
+                                            )
+                                          : null,
+                                    ),
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              );
-                            }),
-                          ];
-                        },
-                      ),
+                                const Divider(height: 1),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxHeight: 260, // fits under button
+                                  ),
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    padding: EdgeInsets.zero,
+                                    itemCount: filteredLines.length + 1,
+                                    itemBuilder: (context, index) {
+                                      if (index == 0) {
+                                        final isSelected =
+                                            _selectedLineId == null;
+                                        return ListTile(
+                                          leading: Icon(
+                                            Icons.all_inclusive,
+                                            color: isSelected
+                                                ? (_isDarkMode
+                                                    ? const Color(0xFF64B5F6)
+                                                    : const Color(0xFF1E3A5F))
+                                                : textSecondary,
+                                          ),
+                                          title: Text(
+                                            t('allLines'),
+                                            style: TextStyle(
+                                              fontWeight: isSelected
+                                                  ? FontWeight.bold
+                                                  : FontWeight.w500,
+                                              color: isSelected
+                                                  ? (_isDarkMode
+                                                      ? Colors.white
+                                                      : const Color(0xFF1E3A5F))
+                                                  : textPrimary,
+                                            ),
+                                          ),
+                                          trailing: isSelected
+                                              ? Icon(
+                                                  Icons.check_circle_rounded,
+                                                  color: _isDarkMode
+                                                      ? const Color(0xFF64B5F6)
+                                                      : const Color(0xFF1E3A5F),
+                                                )
+                                              : null,
+                                          onTap: () {
+                                            setState(() {
+                                              _selectedLineId = null;
+                                              _isLineDropdownOpen = false;
+                                              _lineSearchQuery = '';
+                                              _lineSearchController.clear();
+                                            });
+                                            _loadTrips();
+                                          },
+                                        );
+                                      }
+
+                                      final line =
+                                          filteredLines[index - 1]; // offset
+                                      final lineId = line['lineid']?.toString();
+                                      final lineName = _isArabic
+                                          ? (line['name_ar']?.toString() ??
+                                              line['linename']?.toString() ??
+                                              line['name_en']?.toString() ??
+                                              '')
+                                          : (line['name_en']?.toString() ??
+                                              line['linename']?.toString() ??
+                                              line['name_ar']?.toString() ??
+                                              '');
+                                      final isSelected =
+                                          _selectedLineId == lineId;
+
+                                      return ListTile(
+                                        leading: Icon(
+                                          Icons.directions_bus,
+                                          color: isSelected
+                                              ? (_isDarkMode
+                                                  ? const Color(0xFF64B5F6)
+                                                  : const Color(0xFF1E3A5F))
+                                              : textSecondary,
+                                        ),
+                                        title: Text(
+                                          lineName.isEmpty
+                                              ? (_isArabic
+                                                  ? 'غير معروف'
+                                                  : 'Unknown')
+                                              : lineName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: isSelected
+                                                ? FontWeight.bold
+                                                : FontWeight.w500,
+                                            color: isSelected
+                                                ? (_isDarkMode
+                                                    ? Colors.white
+                                                    : const Color(0xFF1E3A5F))
+                                                : textPrimary,
+                                          ),
+                                        ),
+                                        trailing: isSelected
+                                            ? Icon(
+                                                Icons.check_circle_rounded,
+                                                color: _isDarkMode
+                                                    ? const Color(0xFF64B5F6)
+                                                    : const Color(0xFF1E3A5F),
+                                              )
+                                            : null,
+                                        onTap: () {
+                                          setState(() {
+                                            _selectedLineId = lineId;
+                                            _isLineDropdownOpen = false;
+                                          });
+                                          _loadTrips();
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 12),
-                    // Date Filter
                     InkWell(
                       onTap: _selectDate,
                       child: Container(
@@ -592,8 +721,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                   ],
                 ),
               ),
-              // Trips List
-              Expanded(
+                Expanded(
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : _error != null
@@ -641,15 +769,31 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                                   ],
                                 ),
                               )
-                            : ListView.builder(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: _trips.length,
-                                itemBuilder: (context, index) {
-                                  return _buildTripCard(_trips[index]);
-                                },
-                              ),
+                            : isWeb && (isDesktop || isTablet)
+                                ? GridView.builder(
+                                    padding: EdgeInsets.all(basePadding),
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: isDesktop ? 3 : 2,
+                                      crossAxisSpacing: 16.0,
+                                      mainAxisSpacing: 16.0,
+                                      childAspectRatio: isDesktop ? 0.85 : 0.9,
+                                    ),
+                                    itemCount: _trips.length,
+                                    itemBuilder: (context, index) {
+                                      return _buildTripCard(_trips[index], isSmallScreen, isMediumScreen, isWeb);
+                                    },
+                                  )
+                                : ListView.builder(
+                                    padding: EdgeInsets.all(basePadding),
+                                    itemCount: _trips.length,
+                                    itemBuilder: (context, index) {
+                                      return _buildTripCard(_trips[index], isSmallScreen, isMediumScreen, isWeb);
+                                    },
+                                  ),
+                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
         bottomNavigationBar: PassengerBottomNavBar(
@@ -664,9 +808,8 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     );
   }
 
-  Widget _buildTripCard(Map<String, dynamic> trip) {
+  Widget _buildTripCard(Map<String, dynamic> trip, bool isSmallScreen, bool isMediumScreen, bool isWeb) {
     final line = trip['line'] as Map<String, dynamic>? ?? {};
-    // Get line name based on current language
     final lineName = _isArabic
         ? (line['name_ar']?.toString() ??
             line['linename']?.toString() ??
@@ -681,85 +824,76 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     final baseprice = line['baseprice'] ?? 0.0;
     final tripid = trip['tripid']?.toString() ?? '';
     final status = trip['status']?.toString() ?? '';
-    final tripOpeningTimeStr = trip['trip_opening_time']?.toString();
+    // Use backend-computed flags instead of calculating locally
+    // Backend handles all timezone logic and returns boolean flags
+    final canBookInstantBackend = trip['canBookInstant'] as bool? ?? false;
 
-    // Parse departure time
+    // Parse UTC times for display only (convert to device local timezone)
+    // Supabase returns timestamps like "2025-12-23 21:00:00+00" - normalize to ISO format
     DateTime? departureTime;
     try {
-      // Parse as server local time (strip timezone and treat as local)
-      // Backend sends UTC but it should be interpreted as server local time
-      final tzRegex = RegExp(r'([+-]\d{2}):(\d{2})$');
-      final datePart = deptime.replaceFirst(tzRegex, "");
-      departureTime = DateTime.parse(datePart);
+      if (deptime.isNotEmpty) {
+        // Normalize Supabase timestamp format to ISO 8601
+        String normalized = deptime.toString();
+        // Replace space with T
+        normalized = normalized.replaceFirst(' ', 'T');
+        // Replace +00 or +00:00 with Z (UTC indicator)
+        normalized = normalized.replaceFirst(RegExp(r'\+00:?00?$'), 'Z');
+        // If no timezone, assume UTC
+        if (!normalized.contains('Z') &&
+            !normalized.contains('+') &&
+            !normalized.contains('-')) {
+          normalized += 'Z';
+        }
+        departureTime = DateTime.parse(normalized).toLocal();
+      }
     } catch (e) {
-      // Ignore
+      // Ignore parse errors
+      debugPrint('Error parsing deptime: $deptime, error: $e');
     }
 
-    // Parse trip opening time
     DateTime? tripOpeningTime;
+    final tripOpeningTimeStr = trip['trip_opening_time']?.toString();
     if (tripOpeningTimeStr != null && tripOpeningTimeStr.isNotEmpty) {
       try {
-        // Parse as server local time (strip timezone and treat as local)
-        // Backend sends UTC but it should be interpreted as server local time
-        final tzRegex = RegExp(r'([+-]\d{2}):(\d{2})$');
-        final datePart = tripOpeningTimeStr.replaceFirst(tzRegex, "");
-        tripOpeningTime = DateTime.parse(datePart);
+        // Normalize Supabase timestamp format to ISO 8601
+        String normalized = tripOpeningTimeStr;
+        normalized = normalized.replaceFirst(' ', 'T');
+        normalized = normalized.replaceFirst(RegExp(r'\+00:?00?$'), 'Z');
+        if (!normalized.contains('Z') &&
+            !normalized.contains('+') &&
+            !normalized.contains('-')) {
+          normalized += 'Z';
+        }
+        tripOpeningTime = DateTime.parse(normalized).toLocal();
       } catch (e) {
-        // Ignore
+        // Ignore parse errors
+        debugPrint(
+            'Error parsing trip_opening_time: $tripOpeningTimeStr, error: $e');
       }
     }
 
-    // Get server time (already in server's local timezone)
-    DateTime now = TimeSyncService.now();
-
-    bool isTripOpened;
-
-    if (tripOpeningTime != null) {
-      final opening = tripOpeningTime;
-      isTripOpened = opening.isBefore(now) || opening.isAtSameMomentAs(now);
-    } else if (departureTime != null) {
-      final departure = departureTime;
-      final defaultOpening = departure.subtract(const Duration(minutes: 45));
-      isTripOpened =
-          defaultOpening.isBefore(now) || defaultOpening.isAtSameMomentAs(now);
-    } else {
-      isTripOpened = false;
-    }
-    print("************************************************************");
-    print("now (server local): ${now}");
-    print("opening (original): ${tripOpeningTimeStr}");
-    print("opening (parsed, local): ${tripOpeningTime}");
-    print("opening.isBefore(now): ${tripOpeningTime?.isBefore(now) ?? 'N/A'}");
-    print(
-        "opening.isAtSameMomentAs(now): ${tripOpeningTime?.isAtSameMomentAs(now) ?? 'N/A'}");
-    print("isTripOpened: $isTripOpened");
-
     final isScheduled = status == 'scheduled' || status == 'open';
 
-    // Instant booking: trip must be opened (trip_opening_time passed) AND have available seats
-    final canBookInstant = isScheduled && isTripOpened && availableseats > 0;
+    // Use backend flag for instant booking (backend already checked status, opening time, and seats)
+    final canBookInstant = canBookInstantBackend;
 
-    // Future booking: always available if trip is scheduled (regardless of opening time)
     final canBookFuture = isScheduled;
 
-    // Theme-aware colors
-    final cardColor = _isDarkMode
-        ? const Color(0xFF1C2541)
-        : const Color(0xFFFAFBFC);
+    final cardColor =
+        _isDarkMode ? const Color(0xFF1C2541) : const Color(0xFFFAFBFC);
 
-    final textPrimary = _isDarkMode
-        ? const Color(0xFFE8EAF6)
-        : const Color(0xFF1E3A5F);
+    final textPrimary =
+        _isDarkMode ? const Color(0xFFE8EAF6) : const Color(0xFF1E3A5F);
 
-    final borderColor = _isDarkMode
-        ? const Color(0xFF2C3E50)
-        : Colors.grey.shade200;
+    final borderColor =
+        _isDarkMode ? const Color(0xFF2C3E50) : Colors.grey.shade200;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 18),
+      margin: EdgeInsets.only(bottom: isSmallScreen ? 12.0 : 18.0),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         border: Border.all(
           color: borderColor,
           width: 1.5,
@@ -773,9 +907,9 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isSmallScreen ? 14.0 : (isMediumScreen ? 17.0 : 20.0)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -788,24 +922,24 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF57C00).withAlpha(51),
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.directions_bus,
-                                color: Color(0xFFF57C00),
-                                size: 20,
+                                color: const Color(0xFFF57C00),
+                                size: isSmallScreen ? 16.0 : 20.0,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                             Expanded(
                               child: Text(
                                 lineName,
                                 style: TextStyle(
                                   color: textPrimary,
-                                  fontSize: 20,
+                                  fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0),
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 0.5,
                                 ),
@@ -853,7 +987,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.all(14),
+                    padding: EdgeInsets.all(isSmallScreen ? 10.0 : 14.0),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [
@@ -861,7 +995,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                           Color(0xFFE65100),
                         ],
                       ),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                       boxShadow: [
                         BoxShadow(
                           color: const Color(0xFFF57C00).withAlpha(102),
@@ -874,9 +1008,9 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                       children: [
                         Text(
                           '${baseprice.toStringAsFixed(2)} ₪',
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white,
-                            fontSize: 22,
+                            fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 19.0 : 22.0),
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.5,
                           ),
@@ -885,7 +1019,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                           t('price'),
                           style: TextStyle(
                             color: Colors.white.withAlpha(230),
-                            fontSize: 11,
+                            fontSize: isSmallScreen ? 9.0 : 11.0,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -932,7 +1066,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: isSmallScreen ? 12.0 : 18.0),
               Row(
                 children: [
                   Expanded(
@@ -961,8 +1095,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                                 openingTime.hour.toString().padLeft(2, '0');
                             final minute =
                                 openingTime.minute.toString().padLeft(2, '0');
-                            message =
-                                '${t('tripOpensAt')} $hour:$minute $isTripOpened';
+                            message = '${t('tripOpensAt')} $hour:$minute';
                           } else {
                             message = t('tripNotOpenedYet');
                           }
@@ -978,9 +1111,9 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                       },
                       icon: Icon(
                         canBookInstant ? Icons.flash_on : Icons.schedule,
-                        size: 18,
+                        size: isSmallScreen ? 16.0 : 18.0,
                       ),
-                      label: Text(t('bookNow')),
+                      label: Text(t('bookNow'), style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: canBookInstant
                             ? Colors.white
@@ -994,14 +1127,14 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                               : Colors.orange.withOpacity(0.5),
                           width: canBookInstant ? 1.5 : 2,
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 14.0),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: canBookFuture
@@ -1019,14 +1152,14 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                               ).then((_) => _loadTrips());
                             }
                           : null,
-                      icon: const Icon(Icons.calendar_today, size: 18),
-                      label: Text(t('bookFuture')),
+                      icon: Icon(Icons.calendar_today, size: isSmallScreen ? 16.0 : 18.0),
+                      label: Text(t('bookFuture'), style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0)),
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFFF57C00),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 14.0),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                         ),
                         elevation: 4,
                       ),

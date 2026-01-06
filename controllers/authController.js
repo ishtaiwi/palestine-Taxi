@@ -13,6 +13,10 @@ import appConfig from '../config/app.js';
 import logger from '../utils/logger.js';
 import { sendPasswordResetEmail } from '../utils/email.js';
 
+const generateSecureVerificationCode = () => {
+  return crypto.randomInt(100000, 999999).toString();
+};
+
 const RESET_TOKEN_EXPIRATION_MINUTES = 60;
 const isProduction = appConfig.nodeEnv === 'production';
 
@@ -108,6 +112,14 @@ export const register = async (req, res, next) => {
         });
       }
 
+      const trimmedLicenseId = licenseid.trim();
+      const existingDriver = await Driver.findByLicenseId(trimmedLicenseId);
+      if (existingDriver) {
+        return res.status(409).json({
+          message: req.t('driver.license_exists') || 'This license ID is already registered',
+        });
+      }
+
       if (!lineid || !lineid.trim()) {
         return res.status(400).json({
           message: req.t('driver.line_required') || 'Line is required for drivers',
@@ -129,8 +141,9 @@ export const register = async (req, res, next) => {
       const driverData = {
         driverid: uuidv4(),
         userid: user.userid,
-        licenseid: licenseid.trim(),
+        licenseid: trimmedLicenseId,
         lineid: lineid.trim(),
+        approval_status: 'pending', // Drivers require admin approval
       };
 
       logger.info('Creating driver record', {
@@ -140,7 +153,16 @@ export const register = async (req, res, next) => {
         lineid: driverData.lineid,
       });
 
-      roleRecord = await Driver.create(driverData);
+      try {
+        roleRecord = await Driver.create(driverData);
+      } catch (error) {
+        if (error.code === '23505' || (error.message && error.message.includes('unique'))) {
+          return res.status(409).json({
+            message: req.t('driver.license_exists') || 'This license ID is already registered',
+          });
+        }
+        throw error;
+      }
 
       logger.info('Driver record created successfully', {
         driverid: roleRecord.driverid,
@@ -463,15 +485,24 @@ export const register = async (req, res, next) => {
     });
 
 
+    let registrationMessage = req.t('auth.register_success') || 'Registration successful';
+    if (normalizedRole === 'DRIVER' && roleRecord?.approval_status === 'pending') {
+      registrationMessage = req.t('auth.driver_pending_approval') || 'Registration successful. Your account is pending admin approval.';
+    }
+
     const responseData = {
       success: true,
-      message: req.t('auth.register_success') || 'Registration successful',
+      message: registrationMessage,
       token,
       user: {
         ...sanitizedUser,
         [roleKey || 'roleData']: roleRecord,
       },
     };
+
+    if (normalizedRole === 'DRIVER') {
+      responseData.approvalStatus = roleRecord?.approval_status || 'pending';
+    }
 
 
     if (normalizedRole === 'DRIVER' && createdVehicle) {
@@ -498,6 +529,7 @@ export const register = async (req, res, next) => {
       hasVehicle: normalizedRole === 'DRIVER' && !!createdVehicle,
       roleRecordType: normalizedRole,
       roleRecordId: roleRecord?.driverid || roleRecord?.passengerid || roleRecord?.id,
+      approvalStatus: normalizedRole === 'DRIVER' ? roleRecord?.approval_status : null,
     });
 
 
@@ -606,6 +638,23 @@ export const login = async (req, res, next) => {
     try {
       if (normalizedRole === 'DRIVER') {
         roleData = await Driver.findByUserId(user.userid);
+        
+        if (roleData && roleData.approval_status !== 'approved') {
+          const status = roleData.approval_status || 'pending';
+          logger.warn('Driver login attempt with non-approved status', {
+            email,
+            userid: user.userid,
+            approval_status: status,
+          });
+          
+          return res.status(403).json({
+            success: false,
+            message: status === 'rejected' 
+              ? (req.t('auth.driver_rejected') || 'Your driver account has been rejected. Please contact support.')
+              : (req.t('auth.driver_pending_approval') || 'Your driver account is pending admin approval. Please wait for approval before logging in.'),
+            approvalStatus: status,
+          });
+        }
       } else if (normalizedRole === 'PASSENGER') {
         roleData = await Passenger.findByUserId(user.userid);
       } else if (normalizedRole === 'ADMIN') {
@@ -800,7 +849,7 @@ export const requestPasswordReset = async (req, res, next) => {
     await PasswordResetToken.invalidateAllForUser(user.userid);
 
 
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationCode = generateSecureVerificationCode();
     const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRATION_MINUTES * 60 * 1000).toISOString();
 
     await PasswordResetToken.create({

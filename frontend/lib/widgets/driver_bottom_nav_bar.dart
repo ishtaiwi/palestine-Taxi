@@ -41,6 +41,11 @@ class DriverBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     final cardColor = isDarkMode
         ? const Color(0xFF1C2541)
         : const Color(0xFFFAFBFC);
@@ -70,7 +75,10 @@ class DriverBottomNavBar extends StatelessWidget {
       ),
       child: SafeArea(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 2.0 : 4.0, 
+            vertical: isSmallScreen ? 4.0 : 6.0
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -82,6 +90,8 @@ class DriverBottomNavBar extends StatelessWidget {
                 index: 0,
                 textSecondaryColor: textSecondaryColor,
                 accentColor: accentColor,
+                isSmallScreen: isSmallScreen,
+                isMediumScreen: isMediumScreen,
               ),
               // Check-in (index 1)
               _buildNavItem(
@@ -91,6 +101,8 @@ class DriverBottomNavBar extends StatelessWidget {
                 index: 1,
                 textSecondaryColor: textSecondaryColor,
                 accentColor: accentColor,
+                isSmallScreen: isSmallScreen,
+                isMediumScreen: isMediumScreen,
               ),
               // Home - Center item with special design (index 2)
               _buildCenterNavItem(
@@ -100,6 +112,8 @@ class DriverBottomNavBar extends StatelessWidget {
                 index: 2,
                 accentColor: accentColor,
                 cardColor: cardColor,
+                isSmallScreen: isSmallScreen,
+                isMediumScreen: isMediumScreen,
               ),
               // My Vehicle (index 3)
               _buildNavItem(
@@ -109,6 +123,8 @@ class DriverBottomNavBar extends StatelessWidget {
                 index: 3,
                 textSecondaryColor: textSecondaryColor,
                 accentColor: accentColor,
+                isSmallScreen: isSmallScreen,
+                isMediumScreen: isMediumScreen,
               ),
               // Profile (index 4)
               _buildNavItem(
@@ -118,6 +134,8 @@ class DriverBottomNavBar extends StatelessWidget {
                 index: 4,
                 textSecondaryColor: textSecondaryColor,
                 accentColor: accentColor,
+                isSmallScreen: isSmallScreen,
+                isMediumScreen: isMediumScreen,
               ),
             ],
           ),
@@ -133,15 +151,20 @@ class DriverBottomNavBar extends StatelessWidget {
     required int index,
     required Color textSecondaryColor,
     required Color accentColor,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     final isSelected = currentIndex == index;
     
     return Expanded(
       child: InkWell(
         onTap: () => onTap(index),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+          padding: EdgeInsets.symmetric(
+            vertical: isSmallScreen ? 2.0 : 4.0, 
+            horizontal: isSmallScreen ? 2.0 : 4.0
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -149,25 +172,29 @@ class DriverBottomNavBar extends StatelessWidget {
               AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOut,
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? accentColor.withOpacity(0.12)
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 14.0),
                 ),
                 child: Icon(
                   icon,
                   color: isSelected ? accentColor : textSecondaryColor,
-                  size: isSelected ? 24 : 22,
+                  size: isSelected 
+                      ? (isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0))
+                      : (isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0)),
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: isSmallScreen ? 2.0 : 4.0),
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 250),
                 style: TextStyle(
                   color: isSelected ? accentColor : textSecondaryColor,
-                  fontSize: isSelected ? 10.5 : 10,
+                  fontSize: isSelected 
+                      ? (isSmallScreen ? 9.0 : (isMediumScreen ? 9.5 : 10.5))
+                      : (isSmallScreen ? 8.5 : (isMediumScreen ? 9.0 : 10.0)),
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   letterSpacing: 0.2,
                   height: 1.2,
@@ -193,11 +220,20 @@ class DriverBottomNavBar extends StatelessWidget {
     required int index,
     required Color accentColor,
     required Color cardColor,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     final isSelected = currentIndex == index;
     final textSecondaryColor = isDarkMode
         ? const Color(0xFFB0BEC5)
         : const Color(0xFF546E7A);
+    
+    final centerItemSize = isSelected 
+        ? (isSmallScreen ? 44.0 : (isMediumScreen ? 48.0 : 52.0))
+        : (isSmallScreen ? 40.0 : (isMediumScreen ? 44.0 : 48.0));
+    final centerIconSize = isSelected
+        ? (isSmallScreen ? 22.0 : (isMediumScreen ? 24.0 : 26.0))
+        : (isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0));
     
     return Expanded(
       child: Column(
@@ -206,12 +242,12 @@ class DriverBottomNavBar extends StatelessWidget {
         children: [
           InkWell(
             onTap: () => onTap(index),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 18.0 : 20.0),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOutCubic,
-              width: isSelected ? 52 : 48,
-              height: isSelected ? 52 : 48,
+              width: centerItemSize,
+              height: centerItemSize,
               decoration: BoxDecoration(
                 gradient: isSelected
                     ? LinearGradient(
@@ -224,7 +260,7 @@ class DriverBottomNavBar extends StatelessWidget {
                       )
                     : null,
                 color: isSelected ? null : cardColor,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(isSmallScreen ? 18.0 : 20.0),
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
@@ -258,16 +294,18 @@ class DriverBottomNavBar extends StatelessWidget {
               child: Icon(
                 icon,
                 color: isSelected ? Colors.white : accentColor,
-                size: isSelected ? 26 : 22,
+                size: centerIconSize,
               ),
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: isSmallScreen ? 2.0 : 4.0),
           AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 250),
             style: TextStyle(
               color: isSelected ? accentColor : textSecondaryColor,
-              fontSize: isSelected ? 10.5 : 10,
+              fontSize: isSelected 
+                  ? (isSmallScreen ? 9.0 : (isMediumScreen ? 9.5 : 10.5))
+                  : (isSmallScreen ? 8.5 : (isMediumScreen ? 9.0 : 10.0)),
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               letterSpacing: 0.2,
               height: 1.2,

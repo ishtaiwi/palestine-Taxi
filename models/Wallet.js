@@ -66,6 +66,16 @@ class Wallet {
     if (error) throw error;
     return data;
   }
+
+  static async deleteByUserId(userid) {
+    const { error } = await supabase
+      .from('wallet')
+      .delete()
+      .eq('userid', userid);
+    
+    if (error) throw error;
+    return true;
+  }
 }
 
 export default Wallet;

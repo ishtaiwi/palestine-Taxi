@@ -46,7 +46,7 @@ export const getScheduleById = async (req, res, next) => {
 
 export const createSchedule = async (req, res, next) => {
   try {
-    const { lineid, start_hour, end_hour, interval_minutes, active } = req.body;
+    const { lineid, start_hour, end_hour, interval_minutes, active, auto_departure_enabled, scheduled_departure_enforced } = req.body;
     
     
     if (!lineid) {
@@ -79,12 +79,27 @@ export const createSchedule = async (req, res, next) => {
       });
     }
     
+    // Validate boolean fields
+    if (auto_departure_enabled !== undefined && typeof auto_departure_enabled !== 'boolean') {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_auto_departure') || 'auto_departure_enabled must be a boolean',
+      });
+    }
+    
+    if (scheduled_departure_enforced !== undefined && typeof scheduled_departure_enforced !== 'boolean') {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_scheduled_departure') || 'scheduled_departure_enforced must be a boolean',
+      });
+    }
+    
     const scheduleData = {
       lineid,
       start_hour: parseInt(start_hour, 10),
       end_hour: parseInt(end_hour, 10),
       interval_minutes: parseInt(interval_minutes, 10),
       active: active !== undefined ? active : true,
+      auto_departure_enabled: auto_departure_enabled !== undefined ? auto_departure_enabled : false,
+      scheduled_departure_enforced: scheduled_departure_enforced !== undefined ? scheduled_departure_enforced : false,
     };
     
     const schedule = await ScheduleTemplate.create(scheduleData);
@@ -128,6 +143,19 @@ export const updateSchedule = async (req, res, next) => {
     if (updates.interval_minutes !== undefined && updates.interval_minutes <= 0) {
       return res.status(400).json({
         message: req.t('schedule.invalid_interval') || 'interval_minutes must be > 0',
+      });
+    }
+    
+    // Validate boolean fields
+    if (updates.auto_departure_enabled !== undefined && typeof updates.auto_departure_enabled !== 'boolean') {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_auto_departure') || 'auto_departure_enabled must be a boolean',
+      });
+    }
+    
+    if (updates.scheduled_departure_enforced !== undefined && typeof updates.scheduled_departure_enforced !== 'boolean') {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_scheduled_departure') || 'scheduled_departure_enforced must be a boolean',
       });
     }
     

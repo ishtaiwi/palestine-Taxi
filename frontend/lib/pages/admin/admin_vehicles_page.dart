@@ -286,6 +286,10 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
   }
 
   void _openEditDialog(Map<String, dynamic> vehicle) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     final plateController = TextEditingController(text: vehicle['plateno']);
     String status = vehicle['status'] ?? 'active';
     final formKey = GlobalKey<FormState>();
@@ -293,11 +297,20 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0)
+        ),
         backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
+        titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
         title: Text(
           t('editVehicle'),
-          style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary, 
+            fontWeight: FontWeight.bold,
+            fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+          ),
         ),
         content: SingleChildScrollView(
           child: Form(
@@ -308,45 +321,85 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
               children: [
                 TextFormField(
                   controller: plateController,
-                  style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
+                  style: TextStyle(
+                    color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                    fontSize: isSmallScreen ? 14.0 : 16.0,
+                  ),
                   decoration: InputDecoration(
                     labelText: t('plateNumber'),
-                    labelStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
-                    prefixIcon: Icon(Icons.confirmation_number_rounded, color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.textSecondary),
+                    labelStyle: TextStyle(
+                      color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.confirmation_number_rounded, 
+                      color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.textSecondary,
+                      size: isSmallScreen ? 20.0 : 24.0,
+                    ),
                     filled: true,
                     fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : AppTheme.backgroundColor,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                       borderSide: BorderSide.none,
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 16.0 : 20.0,
+                      vertical: isSmallScreen ? 12.0 : 16.0,
                     ),
                   ),
                   validator: (value) =>
                       value == null || value.trim().isEmpty ? t('plateRequired') : null,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                 DropdownButtonFormField<String>(
                   value: status,
                   dropdownColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
-                  style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
+                  style: TextStyle(
+                    color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                    fontSize: isSmallScreen ? 14.0 : 16.0,
+                  ),
                   decoration: InputDecoration(
                     labelText: t('status'),
-                    labelStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
-                    prefixIcon: Icon(Icons.info_outline_rounded, color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.textSecondary),
+                    labelStyle: TextStyle(
+                      color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.info_outline_rounded, 
+                      color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.textSecondary,
+                      size: isSmallScreen ? 20.0 : 24.0,
+                    ),
                     filled: true,
                     fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : AppTheme.backgroundColor,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                       borderSide: BorderSide.none,
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 16.0 : 20.0,
+                      vertical: isSmallScreen ? 12.0 : 16.0,
                     ),
                   ),
                   items: [
                     DropdownMenuItem(
                       value: 'active',
-                      child: Text(t('active'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+                      child: Text(
+                        t('active'), 
+                        style: TextStyle(
+                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                          fontSize: isSmallScreen ? 14.0 : 16.0,
+                        ),
+                      ),
                     ),
                     DropdownMenuItem(
                       value: 'inactive',
-                      child: Text(t('inactive'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+                      child: Text(
+                        t('inactive'), 
+                        style: TextStyle(
+                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                          fontSize: isSmallScreen ? 14.0 : 16.0,
+                        ),
+                      ),
                     ),
                   ],
                   onChanged: (value) {
@@ -360,7 +413,13 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(t('cancel'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
+            child: Text(
+              t('cancel'), 
+              style: TextStyle(
+                color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                fontSize: isSmallScreen ? 13.0 : 14.0,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -373,9 +432,21 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0)
+              ),
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 20.0 : 24.0,
+                vertical: isSmallScreen ? 10.0 : 12.0,
+              ),
             ),
-            child: Text(t('save'), style: const TextStyle(color: Colors.white)),
+            child: Text(
+              t('save'), 
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: isSmallScreen ? 13.0 : 14.0,
+              ),
+            ),
           ),
         ],
       ),
@@ -385,12 +456,18 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
+    
+    // Responsive design variables
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
 
     return Directionality(
       textDirection: textDirection,
       child: Scaffold(
         backgroundColor: AppTheme.backgroundColor,
-        appBar: _buildAppBar(),
+        appBar: _buildAppBar(context),
         body: _isLoading
             ? Center(
                 child: CircularProgressIndicator(
@@ -399,18 +476,22 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
               )
             : Column(
                 children: [
-                  _buildSearchBar(),
-                  _buildFilterSection(),
+                  _buildSearchBar(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                  _buildFilterSection(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                   Expanded(
                     child: _filteredVehicles.isEmpty
-                        ? _buildEmptyState()
+                        ? _buildEmptyState(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen)
                         : ListView.separated(
-                            padding: const EdgeInsets.all(16),
+                            padding: EdgeInsets.all(basePadding),
                             itemCount: _filteredVehicles.length,
                             separatorBuilder: (context, index) =>
-                                const SizedBox(height: 12),
+                                SizedBox(height: isSmallScreen ? 10.0 : 12.0),
                             itemBuilder: (context, index) {
-                              return _buildVehicleCard(_filteredVehicles[index]);
+                              return _buildVehicleCard(
+                                _filteredVehicles[index],
+                                isSmallScreen: isSmallScreen,
+                                isMediumScreen: isMediumScreen,
+                              );
                             },
                           ),
                   ),
@@ -420,7 +501,11 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
+    
     return AppBar(
       backgroundColor: AppTheme.isDarkMode
           ? const Color(0xFF1C2541) // Dark card color for better integration
@@ -428,15 +513,19 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
       elevation: 0,
       centerTitle: true,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+        icon: Icon(
+          Icons.arrow_back_ios_new_rounded, 
+          color: Colors.white,
+          size: isSmallScreen ? 18.0 : 20.0,
+        ),
         onPressed: () => Navigator.pop(context),
       ),
       title: Text(
         t('title'),
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,
-          fontSize: 20,
+          fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
         ),
       ),
       actions: [
@@ -444,6 +533,7 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
           icon: Icon(
             _isArabic ? Icons.language : Icons.translate,
             color: Colors.white,
+            size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 24.0),
           ),
           onPressed: () {
             setState(() {
@@ -452,20 +542,27 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
             });
           },
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: isSmallScreen ? 4.0 : 8.0),
       ],
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(isSmallScreen ? 16.0 : 20.0),
+        ),
       ),
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      margin: EdgeInsets.fromLTRB(
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        isSmallScreen ? 16.0 : 20.0, 
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        0
+      ),
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 15.0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -476,16 +573,33 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
       ),
       child: TextField(
         controller: _searchController,
-        style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
+        style: TextStyle(
+          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+          fontSize: isSmallScreen ? 14.0 : 16.0,
+        ),
         decoration: InputDecoration(
           hintText: t('search'),
-          hintStyle: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
-          prefixIcon: Icon(Icons.search_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+          hintStyle: TextStyle(
+            color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+            fontSize: isSmallScreen ? 14.0 : 16.0,
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded, 
+            color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+            size: isSmallScreen ? 20.0 : 24.0,
+          ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 16.0 : 20.0, 
+            vertical: isSmallScreen ? 12.0 : 15.0
+          ),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                  icon: Icon(
+                    Icons.close_rounded, 
+                    color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                    size: isSmallScreen ? 20.0 : 24.0,
+                  ),
                   onPressed: () {
                     _searchController.clear();
                     FocusScope.of(context).unfocus();
@@ -497,22 +611,25 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
     );
   }
 
-  Widget _buildFilterSection() {
+  Widget _buildFilterSection({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      padding: EdgeInsets.symmetric(
+        vertical: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0), 
+        horizontal: isSmallScreen ? 12.0 : 16.0
+      ),
       child: Row(
         children: [
-          _buildFilterChip(null, t('filterAll')),
-          const SizedBox(width: 12),
-          _buildFilterChip('active', t('active'), color: Colors.green),
-          const SizedBox(width: 12),
-          _buildFilterChip('inactive', t('inactive'), color: Colors.red),
+          _buildFilterChip(null, t('filterAll'), isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+          SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+          _buildFilterChip('active', t('active'), color: Colors.green, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+          SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+          _buildFilterChip('inactive', t('inactive'), color: Colors.red, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
         ],
       ),
     );
   }
 
-  Widget _buildFilterChip(String? status, String label, {Color? color}) {
+  Widget _buildFilterChip(String? status, String label, {Color? color, bool isSmallScreen = false, bool isMediumScreen = false}) {
     final isSelected = _statusFilter == status;
     final activeColor = color ?? AppTheme.appBarColor;
     final isDark = AppTheme.isDarkMode;
@@ -526,12 +643,15 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+          vertical: isSmallScreen ? 6.0 : 8.0
+        ),
         decoration: BoxDecoration(
           color: isSelected 
               ? (isDark && status == null ? Colors.blueAccent : activeColor) 
               : AppTheme.cardBackground,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
           border: Border.all(
             color: isSelected 
                 ? (isDark && status == null ? Colors.blueAccent : activeColor) 
@@ -553,21 +673,21 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
           style: TextStyle(
             color: isSelected ? Colors.white : (isDark ? Colors.white : AppTheme.textSecondary),
             fontWeight: FontWeight.bold,
-            fontSize: 14,
+            fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildVehicleCard(Map<String, dynamic> vehicle) {
+  Widget _buildVehicleCard(Map<String, dynamic> vehicle, {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final isActive = vehicle['status'] == 'active';
     final statusColor = isActive ? Colors.green : Colors.red;
 
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -582,13 +702,13 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
                 decoration: BoxDecoration(
                   color: AppTheme.isDarkMode ? Colors.blueAccent.withOpacity(0.1) : AppTheme.appBarColor.withOpacity(0.1),
                   shape: BoxShape.circle,
@@ -596,10 +716,10 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                 child: Icon(
                   Icons.directions_car_rounded,
                   color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
-                  size: 28,
+                  size: isSmallScreen ? 24.0 : (isMediumScreen ? 26.0 : 28.0),
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: isSmallScreen ? 12.0 : 16.0),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -608,31 +728,41 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                       vehicle['plateno'] ?? 'No Plate',
                       style: TextStyle(
                         color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
-                        fontSize: 18,
+                        fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: isSmallScreen ? 4.0 : 6.0),
                     Row(
                       children: [
-                        Icon(Icons.event_seat_rounded, size: 14, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
-                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.event_seat_rounded, 
+                          size: isSmallScreen ? 12.0 : 14.0, 
+                          color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary
+                        ),
+                        SizedBox(width: isSmallScreen ? 3.0 : 4.0),
                         Text(
                           '${t('seats')}: ${vehicle['seatnum'] ?? 0}',
-                          style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary, fontSize: 13),
+                          style: TextStyle(
+                            color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary, 
+                            fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0)
+                          ),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 6.0 : 8.0, 
+                            vertical: isSmallScreen ? 1.0 : 2.0
+                          ),
                           decoration: BoxDecoration(
                             color: statusColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
                           ),
                           child: Text(
                             isActive ? t('active') : t('inactive'),
                             style: TextStyle(
                               color: statusColor,
-                              fontSize: 11,
+                              fontSize: isSmallScreen ? 10.0 : 11.0,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -647,12 +777,16 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
                   _buildActionButton(
                     icon: Icons.edit_rounded,
                     color: Colors.blueAccent,
+                    isSmallScreen: isSmallScreen,
+                    isMediumScreen: isMediumScreen,
                     onTap: () => _openEditDialog(vehicle),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: isSmallScreen ? 6.0 : 8.0),
                   _buildActionButton(
                     icon: Icons.delete_outline_rounded,
                     color: Colors.redAccent,
+                    isSmallScreen: isSmallScreen,
+                    isMediumScreen: isMediumScreen,
                     onTap: () => _deleteVehicle(vehicle['vehicleid']),
                   ),
                 ],
@@ -668,18 +802,20 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
   }) {
     return Material(
       color: AppTheme.isDarkMode ? color.withOpacity(0.2) : color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
           child: Icon(
             icon,
-            size: 20,
+            size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
             color: color,
           ),
         ),
@@ -687,13 +823,13 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(30),
+            padding: EdgeInsets.all(isSmallScreen ? 24.0 : (isMediumScreen ? 27.0 : 30.0)),
             decoration: BoxDecoration(
               color: AppTheme.cardBackground,
               shape: BoxShape.circle,
@@ -707,16 +843,16 @@ class _AdminVehiclesPageState extends State<AdminVehiclesPage> {
             ),
             child: Icon(
               Icons.directions_car_outlined,
-              size: 80,
+              size: isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0),
               color: AppTheme.isDarkMode ? Colors.white24 : AppTheme.textSecondary.withOpacity(0.5),
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: isSmallScreen ? 16.0 : 20.0),
           Text(
             t('noVehicles'),
             style: TextStyle(
               color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
-              fontSize: 18,
+              fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
               fontWeight: FontWeight.w600,
             ),
           ),

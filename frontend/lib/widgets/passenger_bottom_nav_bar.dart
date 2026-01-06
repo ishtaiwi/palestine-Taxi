@@ -41,6 +41,9 @@ class PassengerBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    
     final cardColor = isDarkMode
         ? const Color(0xFF1C2541)
         : const Color(0xFFFAFBFC);
@@ -70,7 +73,10 @@ class PassengerBottomNavBar extends StatelessWidget {
       ),
       child: SafeArea(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 2.0 : 4.0, 
+            vertical: isSmallScreen ? 4.0 : 6.0
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -82,6 +88,7 @@ class PassengerBottomNavBar extends StatelessWidget {
                 index: 0,
                 textSecondaryColor: textSecondaryColor,
                 accentColor: accentColor,
+                isSmallScreen: isSmallScreen,
               ),
               // My Reservations (index 1)
               _buildNavItem(
@@ -91,6 +98,7 @@ class PassengerBottomNavBar extends StatelessWidget {
                 index: 1,
                 textSecondaryColor: textSecondaryColor,
                 accentColor: accentColor,
+                isSmallScreen: isSmallScreen,
               ),
               // Home - Center item with special design (index 2)
               _buildCenterNavItem(
@@ -100,6 +108,7 @@ class PassengerBottomNavBar extends StatelessWidget {
                 index: 2,
                 accentColor: accentColor,
                 cardColor: cardColor,
+                isSmallScreen: isSmallScreen,
               ),
               // My Wallet (index 3)
               _buildNavItem(
@@ -109,6 +118,7 @@ class PassengerBottomNavBar extends StatelessWidget {
                 index: 3,
                 textSecondaryColor: textSecondaryColor,
                 accentColor: accentColor,
+                isSmallScreen: isSmallScreen,
               ),
               // Profile (index 4)
               _buildNavItem(
@@ -118,6 +128,7 @@ class PassengerBottomNavBar extends StatelessWidget {
                 index: 4,
                 textSecondaryColor: textSecondaryColor,
                 accentColor: accentColor,
+                isSmallScreen: isSmallScreen,
               ),
             ],
           ),
@@ -133,6 +144,7 @@ class PassengerBottomNavBar extends StatelessWidget {
     required int index,
     required Color textSecondaryColor,
     required Color accentColor,
+    bool isSmallScreen = false,
   }) {
     final isSelected = currentIndex == index;
     
@@ -159,15 +171,19 @@ class PassengerBottomNavBar extends StatelessWidget {
                 child: Icon(
                   icon,
                   color: isSelected ? accentColor : textSecondaryColor,
-                  size: isSelected ? 24 : 22,
+                  size: isSelected 
+                      ? (isSmallScreen ? 20.0 : 24.0) 
+                      : (isSmallScreen ? 18.0 : 22.0),
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: isSmallScreen ? 2.0 : 4.0),
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 250),
                 style: TextStyle(
                   color: isSelected ? accentColor : textSecondaryColor,
-                  fontSize: isSelected ? 10.5 : 10,
+                  fontSize: isSelected 
+                      ? (isSmallScreen ? 9.0 : 10.5) 
+                      : (isSmallScreen ? 8.5 : 10.0),
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                   letterSpacing: 0.2,
                   height: 1.2,
@@ -193,6 +209,7 @@ class PassengerBottomNavBar extends StatelessWidget {
     required int index,
     required Color accentColor,
     required Color cardColor,
+    bool isSmallScreen = false,
   }) {
     final isSelected = currentIndex == index;
     final textSecondaryColor = isDarkMode
@@ -210,8 +227,12 @@ class PassengerBottomNavBar extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOutCubic,
-              width: isSelected ? 52 : 48,
-              height: isSelected ? 52 : 48,
+              width: isSelected 
+                  ? (isSmallScreen ? 44.0 : 52.0) 
+                  : (isSmallScreen ? 40.0 : 48.0),
+              height: isSelected 
+                  ? (isSmallScreen ? 44.0 : 52.0) 
+                  : (isSmallScreen ? 40.0 : 48.0),
               decoration: BoxDecoration(
                 gradient: isSelected
                     ? LinearGradient(
@@ -224,7 +245,7 @@ class PassengerBottomNavBar extends StatelessWidget {
                       )
                     : null,
                 color: isSelected ? null : cardColor,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
@@ -258,16 +279,20 @@ class PassengerBottomNavBar extends StatelessWidget {
               child: Icon(
                 icon,
                 color: isSelected ? Colors.white : accentColor,
-                size: isSelected ? 26 : 22,
+                size: isSelected 
+                    ? (isSmallScreen ? 22.0 : 26.0) 
+                    : (isSmallScreen ? 18.0 : 22.0),
               ),
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: isSmallScreen ? 2.0 : 4.0),
           AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 250),
             style: TextStyle(
               color: isSelected ? accentColor : textSecondaryColor,
-              fontSize: isSelected ? 10.5 : 10,
+              fontSize: isSelected 
+                  ? (isSmallScreen ? 9.0 : 10.5) 
+                  : (isSmallScreen ? 8.5 : 10.0),
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               letterSpacing: 0.2,
               height: 1.2,

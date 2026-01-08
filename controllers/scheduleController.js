@@ -80,6 +80,13 @@ export const createSchedule = async (req, res, next) => {
       });
     }
     
+    // Only allow 30 or 60 minute intervals
+    if (interval_minutes !== 30 && interval_minutes !== 60) {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_interval_value') || 'interval_minutes must be either 30 or 60 minutes',
+      });
+    }
+    
     // Validate boolean fields
     if (auto_departure_enabled !== undefined && typeof auto_departure_enabled !== 'boolean') {
       return res.status(400).json({
@@ -153,6 +160,13 @@ export const updateSchedule = async (req, res, next) => {
     if (updates.interval_minutes !== undefined && updates.interval_minutes <= 0) {
       return res.status(400).json({
         message: req.t('schedule.invalid_interval') || 'interval_minutes must be > 0',
+      });
+    }
+    
+    // Only allow 30 or 60 minute intervals
+    if (updates.interval_minutes !== undefined && updates.interval_minutes !== 30 && updates.interval_minutes !== 60) {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_interval_value') || 'interval_minutes must be either 30 or 60 minutes',
       });
     }
     

@@ -9,6 +9,7 @@ import Wallet from '../models/Wallet.js';
 import { v4 as uuidv4 } from 'uuid';
 import { RESERVATION_STATUS, PAYMENT_STATUS, PAYMENT_METHOD } from '../utils/constants.js';
 import { checkAndAssignWaitingTrips } from '../services/tripOpeningService.js';
+import { syncTripStats } from '../services/matchingService.js';
 
 const buildQueueResponse = (queue = [], driverid) => {
   const normalizedQueue = queue.map((entry, index) => ({
@@ -186,10 +187,25 @@ export const getDriverTrips = async (req, res, next) => {
       new Map(allTrips.map(trip => [trip.tripid, trip])).values()
     );
 
-    // Filter out trips with no bookings (only show trips with at least 1 booking)
-    const tripsWithBookings = uniqueTrips.filter(trip => {
+    // Show ALL trips assigned to driver (don't filter by booking count)
+    // Driver needs to see their assigned trips even if no bookings yet
+    // Only filter completed/cancelled old trips without bookings
+    const relevantTrips = uniqueTrips.filter(trip => {
       const totalBookings = trip.totalbookings || 0;
-      return totalBookings > 0;
+      const status = trip.status;
+      
+      // Always show trips with bookings
+      if (totalBookings > 0) return true;
+      
+      // Show trips with no bookings ONLY if they are active (assigned to driver)
+      // These are trips the driver is assigned to but haven't received bookings yet
+      if (status === 'scheduled' || status === 'open' || status === 'delayed' || status === 'in_progress') {
+        // Only show if this driver is explicitly assigned
+        return trip.assigned_driverid === driverRecord.driverid;
+      }
+      
+      // Hide completed/cancelled trips with no bookings
+      return false;
     });
 
     // If upcoming=true, filter to include:
@@ -199,7 +215,7 @@ export const getDriverTrips = async (req, res, next) => {
     // - Open/scheduled trips that have passed departure time (should be marked as delayed but include them anyway)
     if (req.query.upcoming === 'true') {
       const now = new Date().toISOString();
-      const filteredTrips = tripsWithBookings.filter(trip => {
+      const filteredTrips = relevantTrips.filter(trip => {
         // Include delayed trips (passengers are waiting)
         if (trip.status === 'delayed') return true;
         // Include in-progress trips
@@ -216,7 +232,7 @@ export const getDriverTrips = async (req, res, next) => {
       return res.json(filteredTrips);
     }
 
-    res.json(tripsWithBookings);
+    res.json(relevantTrips);
   } catch (error) {
     next(error);
   }
@@ -340,26 +356,9 @@ export const updateDriverReservationStatus = async (req, res, next) => {
         }
       }
 
-      // Free up the seat - make it available again
+      // Sync trip stats after rejection - this will recalculate based on actual active reservations
       if (reservation.tripid && (reservation.status === RESERVATION_STATUS.CONFIRMED || reservation.status === RESERVATION_STATUS.CHECKED_IN)) {
-        // Fetch latest trip data to ensure we have current seat count
-        const currentTrip = await Trip.findById(reservation.tripid);
-        if (currentTrip) {
-          // Get vehicle to know max seats
-          const Vehicle = (await import('../models/Vehicle.js')).default;
-          let maxSeats = null;
-          if (currentTrip.vehicleid) {
-            const vehicle = await Vehicle.findById(currentTrip.vehicleid);
-            if (vehicle) {
-              maxSeats = vehicle.seatnum - 1; // Exclude driver seat
-            }
-          }
-
-          // Update available seats (increase by 1), but don't exceed max
-          const newSeatCount = currentTrip.availableseats + 1;
-          const finalSeatCount = (maxSeats !== null && newSeatCount > maxSeats) ? maxSeats : newSeatCount;
-          await Trip.updateAvailableSeats(reservation.tripid, finalSeatCount);
-        }
+        await syncTripStats(reservation.tripid);
       }
     } else if (action === 'checkin') {
       updates.driver_status = 'approved';

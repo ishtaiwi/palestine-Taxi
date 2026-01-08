@@ -17,35 +17,35 @@ const shouldDepartEarly = async (trip) => {
       return false;
     }
 
-    // Validate trip has required IDs
+    
     if (!trip.tripid || !trip.vehicleid) {
       return false;
     }
 
-    // Get vehicle details
+    
     const vehicle = await Vehicle.findById(trip.vehicleid);
     if (!vehicle) {
       return false;
     }
 
-    // Get reservations for this trip
+    
     const reservations = await Reservation.findByTripId(trip.tripid);
     const confirmedReservations = reservations.filter(
       r => r.status === 'confirmed' || r.status === 'checked_in'
     );
 
-    // Get broken seats count (for logging only, not used in calculation)
+    
     const brokenSeats = (vehicle.broken_seats || []).length;
 
-    // Available passenger seats = (total seats - 1 driver seat) - reserved
-    // Note: broken seats are NOT subtracted - they are handled in seat selection UI
+    
+    
     const availableSeats = calculateAvailablePassengerSeats(
       vehicle.seatnum,
       confirmedReservations.length,
       0
     );
 
-    // Should depart if vehicle is full (no available seats for passengers)
+    
     return availableSeats <= 0;
   } catch (error) {
     console.error('[DepartureService] Error checking early departure:', error);
@@ -69,7 +69,7 @@ const shouldDepartScheduled = async (trip) => {
 
     if (!deptime) return false;
 
-    // Should depart if scheduled time has arrived (UTC comparison)
+    
     return deptime.getTime() <= now.getTime();
   } catch (error) {
     console.error('[DepartureService] Error checking scheduled departure:', error);
@@ -84,7 +84,7 @@ const shouldDepartScheduled = async (trip) => {
  */
 const hasFutureBooking = async (trip) => {
   try {
-    // Validate trip has required ID
+    
     if (!trip.tripid) {
       return false;
     }
@@ -110,13 +110,13 @@ export const departTrip = async (tripid) => {
   try {
     console.log(`[DepartureService] 🚗 Departing trip ${tripid}`);
 
-    // Get trip details
+    
     const trip = await Trip.findById(tripid);
     if (!trip) {
       throw new Error(`Trip ${tripid} not found`);
     }
 
-    // Allow scheduled, open, or delayed trips to depart
+    
     if (trip.status !== 'scheduled' && trip.status !== 'open' && trip.status !== 'delayed') {
       console.log(`[DepartureService] ⚠️ Trip ${tripid} is not in scheduled/open/delayed status: ${trip.status}`);
       return {
@@ -125,20 +125,20 @@ export const departTrip = async (tripid) => {
       };
     }
 
-    // Update trip status to in_progress
+    
     const updatedTrip = await Trip.update(tripid, {
       status: 'in_progress',
-      deptime: getUtcNow().toISOString(), // Update actual departure time (UTC)
+      deptime: getUtcNow().toISOString(), 
     });
 
-    // Remove driver from queue if assigned
+    
     if (trip.assigned_driverid) {
       try {
         await DriverQueue.removeDriverFromQueue(trip.assigned_driverid);
         console.log(`[DepartureService] ✅ Removed driver ${trip.assigned_driverid} from queue`);
       } catch (error) {
         console.error(`[DepartureService] ⚠️ Error removing driver from queue:`, error);
-        // Don't fail the departure if queue removal fails
+        
       }
     }
 
@@ -160,7 +160,7 @@ export const checkAndDepartTrips = async () => {
   try {
     console.log(`[DepartureService] 🔍 Checking trips that should depart`);
 
-    // Find trips that need departure
+    
     const tripsNeedingDeparture = await Trip.findTripsNeedingDeparture();
 
     if (tripsNeedingDeparture.length === 0) {
@@ -176,26 +176,26 @@ export const checkAndDepartTrips = async () => {
 
     const results = [];
 
-    // Check each trip
+    
     for (const trip of tripsNeedingDeparture) {
       try {
         let shouldDepart = false;
         let reason = '';
 
-        // Rule 1: Early Departure (vehicle is full)
+        
         if (await shouldDepartEarly(trip)) {
           shouldDepart = true;
           reason = 'early_departure_full';
         }
-        // Rule 2: Scheduled Departure (time has arrived)
+        
         else if (await shouldDepartScheduled(trip)) {
-          // Rule 3: Future Booking Rule (must have at least one future booking)
+          
           const hasFuture = await hasFutureBooking(trip);
           if (hasFuture) {
             shouldDepart = true;
             reason = 'scheduled_departure_with_future_booking';
           } else {
-            // Check if trip has any bookings at all
+            
             if (!trip.tripid) {
               console.log(`[DepartureService] ⚠️ Trip ${trip.tripid} scheduled time arrived but no trip ID`);
             } else {
@@ -213,13 +213,13 @@ export const checkAndDepartTrips = async () => {
         if (shouldDepart) {
           const result = await departTrip(trip.tripid);
 
-          // Mark No-Show reservations when trip departs
+          
           try {
             await markNoShowForTrip(trip.tripid);
             console.log(`[DepartureService] ✅ Checked No-Show for trip ${trip.tripid}`);
           } catch (error) {
             console.error(`[DepartureService] ⚠️ Error checking No-Show for trip ${trip.tripid}:`, error);
-            // Don't fail departure if No-Show check fails
+            
           }
 
           results.push({

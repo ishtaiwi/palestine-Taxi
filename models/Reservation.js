@@ -116,6 +116,20 @@ class Reservation {
 
     const { data, error } = await query.order('bookedat', { ascending: true });
     if (error) throw error;
+    
+    
+    
+    if (filters.lineid && data) {
+      return data.filter(booking => {
+        
+        if (booking.trip && booking.trip.lineid) {
+          return booking.trip.lineid === filters.lineid;
+        }
+        
+        return true;
+      });
+    }
+    
     return data;
   }
 

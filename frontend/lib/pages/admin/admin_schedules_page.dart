@@ -76,6 +76,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'required': 'مطلوب',
       'invalidHour': 'يجب أن تكون الساعة بين 0 و 23',
       'invalidInterval': 'يجب أن تكون الفترة أكبر من 0',
+      'invalidIntervalValue': 'يجب أن تكون الفترة إما 30 أو 60 دقيقة',
       'endBeforeStart': 'ساعة النهاية يجب أن تكون بعد ساعة البداية',
       'trips': 'الرحلات',
       'search': 'بحث عن جدول...',
@@ -127,6 +128,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'required': 'Required',
       'invalidHour': 'Hour must be between 0 and 23',
       'invalidInterval': 'Interval must be > 0',
+      'invalidIntervalValue': 'Interval must be either 30 or 60 minutes',
       'endBeforeStart': 'End time must be after start time',
       'trips': 'Trips',
       'search': 'Search schedules...',
@@ -409,12 +411,16 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
     
     if (schedule != null) {
+      final interval = schedule['interval_minutes'] ?? 60;
+      // Ensure interval is either 30 or 60, default to 60 if invalid
+      final validInterval = (interval == 30 || interval == 60) ? interval : 60;
+      
       setState(() {
         _editingTemplateId = schedule['templateid'] as String;
         _selectedLineId = schedule['lineid'];
         _startHour = schedule['start_hour'] ?? 7;
         _endHour = schedule['end_hour'] ?? 19;
-        _intervalMinutes = schedule['interval_minutes'] ?? 60;
+        _intervalMinutes = validInterval;
         _active = schedule['active'] ?? true;
         _autoDepartureEnabled = schedule['auto_departure_enabled'] ?? false;
         _scheduledDepartureEnforced = schedule['scheduled_departure_enforced'] ?? false;
@@ -667,11 +673,10 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                       ],
                     ),
                     SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                    _buildNumberInput(
+                    _buildIntervalDropdown(
                       label: t('interval'),
                       value: _intervalMinutes,
-                      onChanged: (val) => _intervalMinutes = val,
-                      min: 1,
+                      onChanged: (val) => setState(() => _intervalMinutes = val!),
                       isSmallScreen: isSmallScreen,
                       isMediumScreen: isMediumScreen,
                     ),
@@ -850,6 +855,113 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         ),
         prefixIcon: Icon(
           icon,
+          color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+          size: isSmallScreen ? 20.0 : 24.0,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+          borderSide: BorderSide(
+            color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+            width: 2,
+          ),
+        ),
+        filled: true,
+        fillColor: AppTheme.isDarkMode
+            ? Colors.white.withOpacity(0.05)
+            : Colors.grey.shade100,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 16.0 : 20.0, 
+          vertical: isSmallScreen ? 12.0 : 16.0
+        ),
+      ),
+      validator: (val) => val == null ? t('required') : null,
+    );
+  }
+
+  Widget _buildIntervalDropdown({
+    required String label,
+    required int value,
+    required Function(int?) onChanged,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+  }) {
+    // Ensure value is either 30 or 60, default to 60 if invalid
+    final validValue = (value == 30 || value == 60) ? value : 60;
+    
+    return DropdownButtonFormField<int>(
+      value: validValue,
+      items: [
+        DropdownMenuItem<int>(
+          value: 30,
+          child: Row(
+            children: [
+              Icon(
+                Icons.timer_rounded,
+                size: isSmallScreen ? 18.0 : 20.0,
+                color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+              ),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+              Text(
+                '30 ${t('minutes')}',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: isSmallScreen ? 14.0 : 15.0,
+                ),
+              ),
+            ],
+          ),
+        ),
+        DropdownMenuItem<int>(
+          value: 60,
+          child: Row(
+            children: [
+              Icon(
+                Icons.timer_rounded,
+                size: isSmallScreen ? 18.0 : 20.0,
+                color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+              ),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+              Text(
+                '60 ${t('minutes')}',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: isSmallScreen ? 14.0 : 15.0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      onChanged: onChanged,
+      isExpanded: true,
+      dropdownColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+      borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+      style: TextStyle(
+        color: AppTheme.textPrimary,
+        fontWeight: FontWeight.w500,
+        fontSize: isSmallScreen ? 14.0 : 15.0,
+      ),
+      icon: Icon(
+        Icons.keyboard_arrow_down_rounded,
+        color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+        size: isSmallScreen ? 20.0 : 24.0,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(
+          color: AppTheme.textSecondary,
+          fontSize: isSmallScreen ? 13.0 : 14.0,
+        ),
+        prefixIcon: Icon(
+          Icons.timer_rounded,
           color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
           size: isSmallScreen ? 20.0 : 24.0,
         ),

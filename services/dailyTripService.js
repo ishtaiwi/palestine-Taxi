@@ -6,7 +6,7 @@ import logger from '../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';
 import supabase from '../config/dbcon.js';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
-import { getServerTimezoneOffset, parseUtcDate, getUtcNow } from '../utils/timeUtils.js';
+import { getServerTimezoneOffset, parseUtcDate, getUtcNow, getOpeningWindowMinutes } from '../utils/timeUtils.js';
 
 /**
  * Generate trip times based on schedule template
@@ -18,21 +18,21 @@ import { getServerTimezoneOffset, parseUtcDate, getUtcNow } from '../utils/timeU
  * @returns {Promise<Date[]>} Array of trip departure times in UTC
  */
 async function generateTripTimes(startHour, endHour, intervalMinutes, targetDate) {
-  // Get admin-configured timezone offset
+  
   const timezoneOffset = await getServerTimezoneOffset();
 
   const tripTimes = [];
 
-  // Extract date components
+  
   const year = targetDate.getFullYear();
   const month = String(targetDate.getMonth() + 1).padStart(2, '0');
   const day = String(targetDate.getDate()).padStart(2, '0');
 
-  // Format timezone offset (e.g., "+02:00" or "-05:00")
+  
   const offsetSign = timezoneOffset >= 0 ? '+' : '-';
   const offsetHours = String(Math.abs(timezoneOffset)).padStart(2, '0');
 
-  // Calculate start and end in minutes from midnight
+  
   let currentMinutes = startHour * 60;
   const endMinutes = endHour * 60;
 
@@ -40,11 +40,11 @@ async function generateTripTimes(startHour, endHour, intervalMinutes, targetDate
     const hours = Math.floor(currentMinutes / 60);
     const mins = currentMinutes % 60;
 
-    // Create ISO string with explicit admin timezone offset
-    // Example: "2025-12-23T18:00:00+02:00" (for 6 PM UTC+2)
+    
+    
     const localTimeString = `${year}-${month}-${day}T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00${offsetSign}${offsetHours}:00`;
 
-    // Parse as UTC - this correctly converts "18:00+02:00" to "16:00Z" (UTC)
+    
     const utcTime = parseUtcDate(localTimeString);
     if (utcTime) {
       tripTimes.push(utcTime);
@@ -63,7 +63,7 @@ async function generateTripTimes(startHour, endHour, intervalMinutes, targetDate
  */
 async function getVehicleForLine(lineid) {
   try {
-    // Try to find an active vehicle for this line
+    
     const { data: vehicles, error } = await supabase
       .from('vehicle')
       .select('*')
@@ -80,7 +80,7 @@ async function getVehicleForLine(lineid) {
       return vehicles[0];
     }
 
-    // If no vehicle found, return null (trip will be created without vehicle assignment)
+    
     logger.warn('No vehicle found for line', { lineid });
     return null;
   } catch (error) {
@@ -99,7 +99,7 @@ async function createTripsForDate(template, targetDate) {
   const { templateid, lineid, start_hour, end_hour, interval_minutes } = template;
 
   try {
-    // Generate trip times for the target date (converted to UTC)
+    
     const tripTimes = await generateTripTimes(start_hour, end_hour, interval_minutes, targetDate);
 
     if (tripTimes.length === 0) {
@@ -107,25 +107,25 @@ async function createTripsForDate(template, targetDate) {
       return { created: 0, errors: [] };
     }
 
-    // Get line info
+    
     const line = await Line.findById(lineid);
     if (!line) {
       logger.error('Line not found', { lineid });
       return { created: 0, errors: ['Line not found'] };
     }
 
-    // Note: Vehicle will be assigned from driver queue at trip opening time
-    // We still check for a vehicle to get default seat count, but don't require it
+    
+    
     const vehicle = await getVehicleForLine(lineid);
 
     const createdTrips = [];
     const errors = [];
 
-    // Create trips for each time
+    
     const now = getUtcNow();
     for (const deptime of tripTimes) {
       try {
-        // Skip trips in the past
+        
         if (deptime.getTime() <= now.getTime()) {
           logger.debug('Skipping trip in the past', {
             lineid,
@@ -135,8 +135,8 @@ async function createTripsForDate(template, targetDate) {
           continue;
         }
 
-        // Check if trip already exists for this time and line
-        // Use a time window of ±5 minutes to avoid duplicates
+        
+        
         const timeWindowStart = new Date(deptime.getTime() - 5 * 60 * 1000);
         const timeWindowEnd = new Date(deptime.getTime() + 5 * 60 * 1000);
 
@@ -162,20 +162,21 @@ async function createTripsForDate(template, targetDate) {
           continue;
         }
 
-        // Calculate trip_opening_time (45 minutes before departure)
-        const openingTime = new Date(deptime.getTime() - 45 * 60 * 1000);
+        
+        const openingWindowMinutes = getOpeningWindowMinutes(interval_minutes);
+        const openingTime = new Date(deptime.getTime() - openingWindowMinutes * 60 * 1000);
 
-        // Calculate available passenger seats based on default vehicle size if available
-        // If no vehicle found, use default seats (will be updated when vehicle is assigned)
-        const defaultSeats = vehicle ? vehicle.seatnum : 5; // Default to 4+1 if no vehicle
+        
+        
+        const defaultSeats = vehicle ? vehicle.seatnum : 5; 
         const defaultAvailableSeats = calculateAvailablePassengerSeats(defaultSeats, 0, 0);
 
-        // Create trip with vehicleid = null (will be assigned from driver queue at opening time)
-        // Use departure settings from template (default to false if not set)
+        
+        
         const tripData = {
           tripid: uuidv4(),
           lineid,
-          vehicleid: null, // Vehicle will be assigned from driver queue at trip opening
+          vehicleid: null, 
           deptime: deptime.toISOString(),
           status: 'scheduled',
           availableseats: defaultAvailableSeats,
@@ -184,7 +185,7 @@ async function createTripsForDate(template, targetDate) {
           auto_departure_enabled: template.auto_departure_enabled ?? false,
           early_departure_allowed: true,
           scheduled_departure_enforced: template.scheduled_departure_enforced ?? false,
-          templateid: templateid, // Link trip to schedule template
+          templateid: templateid, 
         };
 
         const trip = await Trip.create(tripData);
@@ -194,7 +195,7 @@ async function createTripsForDate(template, targetDate) {
           tripid: trip.tripid,
           lineid,
           deptime: deptime.toISOString(),
-          vehicleid: null, // Will be assigned from driver queue at opening time
+          vehicleid: null, 
         });
       } catch (error) {
         logger.error('Error creating trip', {
@@ -235,7 +236,7 @@ export async function createDailyTrips() {
   try {
     logger.info('Starting daily trip creation job');
 
-    // Get all active schedule templates
+    
     const templates = await ScheduleTemplate.getActiveTemplates();
 
     if (templates.length === 0) {
@@ -248,17 +249,17 @@ export async function createDailyTrips() {
       };
     }
 
-    // Target date: tomorrow
+    
     const tomorrow = new Date();
-    ///////////////////////////////////////////////////////////////////////////////////
+    
     tomorrow.setDate(tomorrow.getDate());
-    ///////////////////////////////////////////////////////////////////////////////////
+    
     tomorrow.setHours(0, 0, 0, 0);
 
     const results = [];
     let totalCreated = 0;
 
-    // Process each template
+    
     for (const template of templates) {
       try {
         const result = await createTripsForDate(template, tomorrow);

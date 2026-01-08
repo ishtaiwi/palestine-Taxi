@@ -7,45 +7,47 @@ import '../../services/api_service.dart';
 import '../../pages/passenger/passenger_home.dart';
 import '../../pages/driver/driver_home.dart';
 import '../../pages/admin/admin_dashboard.dart';
+import 'package:responsive_sizer/responsive_sizer.dart';
 
 class TaxiPalestineApp extends StatelessWidget {
   const TaxiPalestineApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Pal Taxi',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        fontFamily: 'Roboto',
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFf57c00),
-          primary: const Color(0xFFf57c00),
-          secondary: const Color(0xFF0B132B),
-        ),
-        scaffoldBackgroundColor: const Color(0xFF060A1A),
-        useMaterial3: true,
-      ),
-      // Add localization support for DatePicker and other Material widgets
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en', ''), // English
-        Locale('ar', ''), // Arabic
-      ],
-      // Start with a small router that decides whether to go to login
-      // or directly into the appropriate dashboard based on saved session.
-      home: const _StartupRouter(),
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/passenger': (context) => const PassengerHomePage(),
-        '/driver': (context) => const DriverHomePage(),
-        '/admin': (context) => const AdminDashboardPage(),
-      },
-    );
+    return ResponsiveSizer(builder: (context, orientation, screenType) {
+      return MaterialApp(
+          title: 'Pal Taxi',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            fontFamily: 'Roboto',
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFFf57c00),
+              primary: const Color(0xFFf57c00),
+              secondary: const Color(0xFF0B132B),
+            ),
+            scaffoldBackgroundColor: const Color(0xFF060A1A),
+            useMaterial3: true,
+          ),
+          // Add localization support for DatePicker and other Material widgets
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('en', ''), // English
+            Locale('ar', ''), // Arabic
+          ],
+          // Start with a small router that decides whether to go to login
+          // or directly into the appropriate dashboard based on saved session.
+          home: const _StartupRouter(),
+          routes: {
+            '/login': (context) => const LoginScreen(),
+            '/passenger': (context) => const PassengerHomePage(),
+            '/driver': (context) => const DriverHomePage(),
+            '/admin': (context) => const AdminDashboardPage(),
+          });
+    });
   }
 }
 
@@ -184,7 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     // Responsive breakpoints for mobile
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
@@ -212,15 +214,11 @@ class _LoginScreenState extends State<LoginScreen> {
               top: -120,
               left: -60,
               child: _GlowCircle(
-                diameter: isDesktop 
-                    ? 400 
-                    : (isTablet 
-                        ? 320 
-                        : (isLargeScreen 
-                            ? 280 
-                            : (isMediumScreen 
-                                ? 260 
-                                : 240))),
+                diameter: isDesktop
+                    ? 400
+                    : (isTablet
+                        ? 320
+                        : (isLargeScreen ? 280 : (isMediumScreen ? 260 : 240))),
                 colors: [
                   Colors.orange.withOpacity(0.35),
                   Colors.orange.withOpacity(0.05),
@@ -231,15 +229,11 @@ class _LoginScreenState extends State<LoginScreen> {
               bottom: 40,
               right: -120,
               child: _GlowCircle(
-                diameter: isDesktop 
-                    ? 450 
-                    : (isTablet 
-                        ? 340 
-                        : (isLargeScreen 
-                            ? 300 
-                            : (isMediumScreen 
-                                ? 280 
-                                : 260))),
+                diameter: isDesktop
+                    ? 450
+                    : (isTablet
+                        ? 340
+                        : (isLargeScreen ? 300 : (isMediumScreen ? 280 : 260))),
                 colors: [
                   const Color(0xFF00B4D8).withOpacity(0.25),
                   Colors.transparent,
@@ -250,24 +244,20 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Center(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.symmetric(
-                    horizontal: isDesktop 
-                        ? 24 
-                        : (isTablet 
-                            ? 32 
-                            : (isLargeScreen 
-                                ? 24 
-                                : (isMediumScreen 
-                                    ? 20 
-                                    : 16))),
-                    vertical: isDesktop 
-                        ? 16 
-                        : (isTablet 
-                            ? 24 
-                            : (isLargeScreen 
-                                ? 20 
-                                : (isMediumScreen 
-                                    ? 16 
-                                    : 12))),
+                    horizontal: isDesktop
+                        ? 24
+                        : (isTablet
+                            ? 32
+                            : (isLargeScreen
+                                ? 24
+                                : (isMediumScreen ? 20 : 16))),
+                    vertical: isDesktop
+                        ? 16
+                        : (isTablet
+                            ? 24
+                            : (isLargeScreen
+                                ? 20
+                                : (isMediumScreen ? 16 : 12))),
                   ),
                   child: Container(
                     width: isDesktop ? 480 : double.infinity,
@@ -310,48 +300,40 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         SizedBox(
-                          height: isDesktop 
-                              ? 16 
-                              : (isTablet 
-                                  ? 20 
-                                  : (isLargeScreen 
-                                      ? 18 
-                                      : (isMediumScreen 
-                                          ? 16 
-                                          : 12))),
+                          height: isDesktop
+                              ? 16
+                              : (isTablet
+                                  ? 20
+                                  : (isLargeScreen
+                                      ? 18
+                                      : (isMediumScreen ? 16 : 12))),
                         ),
                         Image.asset(
                           'images/logo-PM-removebg-preview.png',
-                          width: isDesktop 
-                              ? 160 
-                              : (isTablet 
-                                  ? 150 
-                                  : (isLargeScreen 
-                                      ? 140 
-                                      : (isMediumScreen 
-                                          ? 130 
-                                          : 120))),
-                          height: isDesktop 
-                              ? 160 
-                              : (isTablet 
-                                  ? 150 
-                                  : (isLargeScreen 
-                                      ? 140 
-                                      : (isMediumScreen 
-                                          ? 130 
-                                          : 120))),
+                          width: isDesktop
+                              ? 160
+                              : (isTablet
+                                  ? 150
+                                  : (isLargeScreen
+                                      ? 140
+                                      : (isMediumScreen ? 130 : 120))),
+                          height: isDesktop
+                              ? 160
+                              : (isTablet
+                                  ? 150
+                                  : (isLargeScreen
+                                      ? 140
+                                      : (isMediumScreen ? 130 : 120))),
                           fit: BoxFit.contain,
                         ),
                         SizedBox(
-                          height: isDesktop 
-                              ? 12 
-                              : (isTablet 
-                                  ? 16 
-                                  : (isLargeScreen 
-                                      ? 14 
-                                      : (isMediumScreen 
-                                          ? 12 
-                                          : 10))),
+                          height: isDesktop
+                              ? 12
+                              : (isTablet
+                                  ? 16
+                                  : (isLargeScreen
+                                      ? 14
+                                      : (isMediumScreen ? 12 : 10))),
                         ),
                         _FormCard(
                           formKey: _formKey,
@@ -471,9 +453,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                _isArabic
-                    ? 'الدور غير معروف'
-                    : 'Unknown role',
+                _isArabic ? 'الدور غير معروف' : 'Unknown role',
               ),
               backgroundColor: Colors.orange,
             ),
@@ -526,7 +506,7 @@ class _LanguageToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
-    
+
     final currentLabel = isArabic ? 'AR' : 'EN';
     return PopupMenuButton<String>(
       onSelected: (value) {
@@ -583,8 +563,8 @@ class _LanguageToggle extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.public, 
-              size: isSmallScreen ? 16.0 : 18.0, 
+              Icons.public,
+              size: isSmallScreen ? 16.0 : 18.0,
               color: Colors.grey.shade800,
             ),
             SizedBox(width: isSmallScreen ? 5.0 : 6.0),
@@ -599,8 +579,8 @@ class _LanguageToggle extends StatelessWidget {
             ),
             SizedBox(width: isSmallScreen ? 3.0 : 4.0),
             Icon(
-              Icons.keyboard_arrow_down, 
-              size: isSmallScreen ? 16.0 : 18.0, 
+              Icons.keyboard_arrow_down,
+              size: isSmallScreen ? 16.0 : 18.0,
               color: Colors.grey.shade600,
             ),
           ],
@@ -648,70 +628,47 @@ class _FormCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Calculate responsive padding
-    final cardPadding = isDesktop 
-        ? 28.0 
-        : (isTablet 
-            ? 26.0 
-            : (isLargeScreen 
-                ? 24.0 
-                : (isMediumScreen 
-                    ? 20.0 
-                    : 18.0)));
-    
+    final cardPadding = isDesktop
+        ? 28.0
+        : (isTablet
+            ? 26.0
+            : (isLargeScreen ? 24.0 : (isMediumScreen ? 20.0 : 18.0)));
+
     // Calculate responsive font sizes
-    final welcomeFontSize = isDesktop 
-        ? 18.0 
-        : (isTablet 
-            ? 17.0 
-            : (isLargeScreen 
-                ? 16.0 
-                : (isMediumScreen 
-                    ? 15.0 
-                    : 14.0)));
-    
-    final titleFontSize = isDesktop 
-        ? 32.0 
-        : (isTablet 
-            ? 28.0 
-            : (isLargeScreen 
-                ? 26.0 
-                : (isMediumScreen 
-                    ? 24.0 
-                    : 22.0)));
-    
-    final bodyFontSize = isDesktop 
-        ? 16.0 
-        : (isTablet 
-            ? 15.0 
-            : (isLargeScreen 
-                ? 15.0 
-                : (isMediumScreen 
-                    ? 14.0 
-                    : 13.0)));
-    
-    final inputPadding = isDesktop 
-        ? 20.0 
-        : (isTablet 
-            ? 18.0 
-            : (isLargeScreen 
-                ? 16.0 
-                : (isMediumScreen 
-                    ? 16.0 
-                    : 14.0)));
-    
-    final verticalInputPadding = isDesktop 
-        ? 18.0 
-        : (isTablet 
-            ? 16.0 
-            : (isLargeScreen 
-                ? 16.0 
-                : (isMediumScreen 
-                    ? 15.0 
-                    : 14.0)));
-    
+    final welcomeFontSize = isDesktop
+        ? 18.0
+        : (isTablet
+            ? 17.0
+            : (isLargeScreen ? 16.0 : (isMediumScreen ? 15.0 : 14.0)));
+
+    final titleFontSize = isDesktop
+        ? 32.0
+        : (isTablet
+            ? 28.0
+            : (isLargeScreen ? 26.0 : (isMediumScreen ? 24.0 : 22.0)));
+
+    final bodyFontSize = isDesktop
+        ? 16.0
+        : (isTablet
+            ? 15.0
+            : (isLargeScreen ? 15.0 : (isMediumScreen ? 14.0 : 13.0)));
+
+    final inputPadding = isDesktop
+        ? 20.0
+        : (isTablet
+            ? 18.0
+            : (isLargeScreen ? 16.0 : (isMediumScreen ? 16.0 : 14.0)));
+
+    final verticalInputPadding = isDesktop
+        ? 18.0
+        : (isTablet
+            ? 16.0
+            : (isLargeScreen ? 16.0 : (isMediumScreen ? 15.0 : 14.0)));
+
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(isDesktop ? 28 : (isTablet ? 26 : 24)),
+        borderRadius:
+            BorderRadius.circular(isDesktop ? 28 : (isTablet ? 26 : 24)),
         color: Colors.white,
         boxShadow: [
           BoxShadow(
@@ -746,15 +703,11 @@ class _FormCard extends StatelessWidget {
                     ),
               ),
               SizedBox(
-                height: isDesktop 
-                    ? 24 
-                    : (isTablet 
-                        ? 22 
-                        : (isLargeScreen 
-                            ? 20 
-                            : (isMediumScreen 
-                                ? 18 
-                                : 16))),
+                height: isDesktop
+                    ? 24
+                    : (isTablet
+                        ? 22
+                        : (isLargeScreen ? 20 : (isMediumScreen ? 18 : 16))),
               ),
               TextFormField(
                 controller: emailController,
@@ -771,8 +724,10 @@ class _FormCard extends StatelessWidget {
                     horizontal: inputPadding,
                     vertical: verticalInputPadding,
                   ),
-                  labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
-                  hintStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
+                  labelStyle:
+                      TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
+                  hintStyle:
+                      TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -785,15 +740,11 @@ class _FormCard extends StatelessWidget {
                 },
               ),
               SizedBox(
-                height: isDesktop 
-                    ? 18 
-                    : (isTablet 
-                        ? 17 
-                        : (isLargeScreen 
-                            ? 16 
-                            : (isMediumScreen 
-                                ? 15 
-                                : 14))),
+                height: isDesktop
+                    ? 18
+                    : (isTablet
+                        ? 17
+                        : (isLargeScreen ? 16 : (isMediumScreen ? 15 : 14))),
               ),
               TextFormField(
                 controller: passwordController,
@@ -809,7 +760,8 @@ class _FormCard extends StatelessWidget {
                   suffixIcon: IconButton(
                     icon: Icon(
                       obscurePassword ? Icons.visibility_off : Icons.visibility,
-                      size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0),
+                      size:
+                          isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0),
                     ),
                     onPressed: togglePassword,
                   ),
@@ -817,8 +769,10 @@ class _FormCard extends StatelessWidget {
                     horizontal: inputPadding,
                     vertical: verticalInputPadding,
                   ),
-                  labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
-                  hintStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
+                  labelStyle:
+                      TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
+                  hintStyle:
+                      TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -834,24 +788,16 @@ class _FormCard extends StatelessWidget {
                   onPressed: onForgotPassword,
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.symmetric(
-                      horizontal: isDesktop 
-                          ? 12 
-                          : (isTablet 
-                              ? 10 
-                              : (isLargeScreen 
-                                  ? 8 
-                                  : (isMediumScreen 
-                                      ? 7 
-                                      : 6))),
-                      vertical: isDesktop 
-                          ? 8 
-                          : (isTablet 
-                              ? 6 
-                              : (isLargeScreen 
-                                  ? 4 
-                                  : (isMediumScreen 
-                                      ? 4 
-                                      : 3))),
+                      horizontal: isDesktop
+                          ? 12
+                          : (isTablet
+                              ? 10
+                              : (isLargeScreen ? 8 : (isMediumScreen ? 7 : 6))),
+                      vertical: isDesktop
+                          ? 8
+                          : (isTablet
+                              ? 6
+                              : (isLargeScreen ? 4 : (isMediumScreen ? 4 : 3))),
                     ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -859,54 +805,44 @@ class _FormCard extends StatelessWidget {
                   child: Text(
                     t('forgot'),
                     style: TextStyle(
-                      fontSize: isDesktop 
-                          ? 15 
-                          : (isTablet 
-                              ? 14 
-                              : (isLargeScreen 
-                                  ? 14 
-                                  : (isMediumScreen 
-                                      ? 13 
-                                      : 12))),
+                      fontSize: isDesktop
+                          ? 15
+                          : (isTablet
+                              ? 14
+                              : (isLargeScreen
+                                  ? 14
+                                  : (isMediumScreen ? 13 : 12))),
                     ),
                   ),
                 ),
               ),
               SizedBox(
-                height: isDesktop 
-                    ? 20 
-                    : (isTablet 
-                        ? 18 
-                        : (isLargeScreen 
-                            ? 16 
-                            : (isMediumScreen 
-                                ? 14 
-                                : 12))),
+                height: isDesktop
+                    ? 20
+                    : (isTablet
+                        ? 18
+                        : (isLargeScreen ? 16 : (isMediumScreen ? 14 : 12))),
               ),
               FilledButton(
                 onPressed: isLoading ? null : onSubmit,
                 style: FilledButton.styleFrom(
                   padding: EdgeInsets.symmetric(
-                    vertical: isDesktop 
-                        ? 16 
-                        : (isTablet 
-                            ? 16 
-                            : (isLargeScreen 
-                                ? 15 
-                                : (isMediumScreen 
-                                    ? 14 
-                                    : 13))),
+                    vertical: isDesktop
+                        ? 16
+                        : (isTablet
+                            ? 16
+                            : (isLargeScreen
+                                ? 15
+                                : (isMediumScreen ? 14 : 13))),
                   ),
                   textStyle: TextStyle(
-                    fontSize: isDesktop 
-                        ? 17 
-                        : (isTablet 
-                            ? 16 
-                            : (isLargeScreen 
-                                ? 16 
-                                : (isMediumScreen 
-                                    ? 15 
-                                    : 14))),
+                    fontSize: isDesktop
+                        ? 17
+                        : (isTablet
+                            ? 16
+                            : (isLargeScreen
+                                ? 16
+                                : (isMediumScreen ? 15 : 14))),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -926,74 +862,62 @@ class _FormCard extends StatelessWidget {
                 onPressed: onRegister,
                 style: OutlinedButton.styleFrom(
                   padding: EdgeInsets.symmetric(
-                    vertical: isDesktop 
-                        ? 16 
-                        : (isTablet 
-                            ? 16 
-                            : (isLargeScreen 
-                                ? 15 
-                                : (isMediumScreen 
-                                    ? 14 
-                                    : 13))),
+                    vertical: isDesktop
+                        ? 16
+                        : (isTablet
+                            ? 16
+                            : (isLargeScreen
+                                ? 15
+                                : (isMediumScreen ? 14 : 13))),
                   ),
                 ),
                 child: Text(
                   t('ctaRegister'),
                   style: TextStyle(
-                    fontSize: isDesktop 
-                        ? 16 
-                        : (isTablet 
-                            ? 15 
-                            : (isLargeScreen 
-                                ? 15 
-                                : (isMediumScreen 
-                                    ? 14 
-                                    : 13))),
+                    fontSize: isDesktop
+                        ? 16
+                        : (isTablet
+                            ? 15
+                            : (isLargeScreen
+                                ? 15
+                                : (isMediumScreen ? 14 : 13))),
                   ),
                 ),
               ),
               SizedBox(height: isSmallScreen ? 8.0 : 10.0),
               Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isDesktop 
-                      ? 18 
-                      : (isTablet 
-                          ? 16 
-                          : (isLargeScreen 
-                              ? 16 
-                              : (isMediumScreen 
-                                  ? 14 
-                                  : 12))),
-                  vertical: isDesktop 
-                      ? 12 
-                      : (isTablet 
-                          ? 12 
-                          : (isLargeScreen 
-                              ? 11 
-                              : (isMediumScreen 
-                                  ? 10 
-                                  : 9))),
+                  horizontal: isDesktop
+                      ? 18
+                      : (isTablet
+                          ? 16
+                          : (isLargeScreen ? 16 : (isMediumScreen ? 14 : 12))),
+                  vertical: isDesktop
+                      ? 12
+                      : (isTablet
+                          ? 12
+                          : (isLargeScreen ? 11 : (isMediumScreen ? 10 : 9))),
                 ),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(
-                    isDesktop ? 20 : (isTablet ? 18 : (isLargeScreen ? 16 : 14)),
+                    isDesktop
+                        ? 20
+                        : (isTablet ? 18 : (isLargeScreen ? 16 : 14)),
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      Icons.verified, 
-                      color: Colors.orange.shade800, 
-                      size: isDesktop 
-                          ? 20 
-                          : (isTablet 
-                              ? 19 
-                              : (isLargeScreen 
-                                  ? 18 
-                                  : (isMediumScreen 
-                                      ? 17 
-                                      : 16))),
+                      Icons.verified,
+                      color: Colors.orange.shade800,
+                      size: isDesktop
+                          ? 20
+                          : (isTablet
+                              ? 19
+                              : (isLargeScreen
+                                  ? 18
+                                  : (isMediumScreen ? 17 : 16))),
                     ),
                     SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                     Expanded(
@@ -1002,15 +926,13 @@ class _FormCard extends StatelessWidget {
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: Colors.orange.shade900,
-                              fontSize: isDesktop 
-                                  ? 14 
-                                  : (isTablet 
-                                      ? 13 
-                                      : (isLargeScreen 
-                                          ? 13 
-                                          : (isMediumScreen 
-                                              ? 12 
-                                              : 11))),
+                              fontSize: isDesktop
+                                  ? 14
+                                  : (isTablet
+                                      ? 13
+                                      : (isLargeScreen
+                                          ? 13
+                                          : (isMediumScreen ? 12 : 11))),
                             ),
                       ),
                     ),
@@ -1176,5 +1098,3 @@ class _PalestineFlagPainter extends CustomPainter {
   bool shouldRepaint(covariant _PalestineFlagPainter oldDelegate) =>
       oldDelegate.glowIntensity != glowIntensity;
 }
-
-

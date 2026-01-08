@@ -2387,12 +2387,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final totalTransactions = _revenueStats?['totalTransactions'] ?? 0;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(_formatRevenue(totalRevenue),
                     style: TextStyle(
@@ -2404,6 +2406,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text('$totalTransactions',
                     style: TextStyle(
@@ -2417,10 +2420,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ],
         ),
         const SizedBox(height: 4),
-        RevenueChart(
-          data: _revenueChartData ?? const {},
-          isArabic: _isArabic,
-          showSummary: false,
+        Flexible(
+          child: SizedBox(
+            height: 200,
+            child: RevenueChart(
+              data: _revenueChartData ?? const {},
+              isArabic: _isArabic,
+              showSummary: false,
+            ),
+          ),
         ),
       ],
     );
@@ -2431,12 +2439,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final completed = _dashboardStats?['completedTrips'] ?? 0;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text('$totalTrips',
                     style: TextStyle(
@@ -2448,6 +2458,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text('$completed',
                     style: TextStyle(
@@ -2461,9 +2472,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ],
         ),
         const SizedBox(height: 4),
-        TripTimeSeriesChart(
-          data: _tripChartData ?? const {},
-          isArabic: _isArabic,
+        Flexible(
+          child: SizedBox(
+            height: 200,
+            child: TripTimeSeriesChart(
+              data: _tripChartData ?? const {},
+              isArabic: _isArabic,
+            ),
+          ),
         ),
       ],
     );

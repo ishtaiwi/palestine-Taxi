@@ -301,7 +301,8 @@ class ApiService {
           print('[ApiService.register] ✅ Registration successful');
           print('  - User saved: ${responseData['user'] != null}');
           print('  - Token saved: ${responseData['token'] != null}');
-          print('  - Approval Status: ${responseData['approvalStatus'] ?? 'N/A'}');
+          print(
+              '  - Approval Status: ${responseData['approvalStatus'] ?? 'N/A'}');
 
           return {
             'success': true,
@@ -1686,8 +1687,10 @@ class ApiService {
               'end_hour': endHour,
               'interval_minutes': intervalMinutes,
               'active': active,
-              if (autoDepartureEnabled != null) 'auto_departure_enabled': autoDepartureEnabled,
-              if (scheduledDepartureEnforced != null) 'scheduled_departure_enforced': scheduledDepartureEnforced,
+              if (autoDepartureEnabled != null)
+                'auto_departure_enabled': autoDepartureEnabled,
+              if (scheduledDepartureEnforced != null)
+                'scheduled_departure_enforced': scheduledDepartureEnforced,
             })),
           )
           .timeout(AppConfig.requestTimeout);
@@ -1741,8 +1744,10 @@ class ApiService {
       if (endHour != null) body['end_hour'] = endHour;
       if (intervalMinutes != null) body['interval_minutes'] = intervalMinutes;
       if (active != null) body['active'] = active;
-      if (autoDepartureEnabled != null) body['auto_departure_enabled'] = autoDepartureEnabled;
-      if (scheduledDepartureEnforced != null) body['scheduled_departure_enforced'] = scheduledDepartureEnforced;
+      if (autoDepartureEnabled != null)
+        body['auto_departure_enabled'] = autoDepartureEnabled;
+      if (scheduledDepartureEnforced != null)
+        body['scheduled_departure_enforced'] = scheduledDepartureEnforced;
 
       final response = await http
           .put(
@@ -2378,6 +2383,7 @@ class ApiService {
     String? startDate,
     String? endDate,
     String? groupBy,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2389,6 +2395,7 @@ class ApiService {
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
       if (groupBy != null) queryParams['groupBy'] = groupBy;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri =
           Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/revenue-timeseries')
@@ -2418,6 +2425,7 @@ class ApiService {
     String? startDate,
     String? endDate,
     String? groupBy,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2429,6 +2437,7 @@ class ApiService {
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
       if (groupBy != null) queryParams['groupBy'] = groupBy;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri =
           Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/booking-timeseries')
@@ -2457,6 +2466,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getTripStatistics({
     String? startDate,
     String? endDate,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2467,6 +2477,7 @@ class ApiService {
       final queryParams = <String, String>{};
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri =
           Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/trip-statistics')
@@ -2496,6 +2507,7 @@ class ApiService {
     String? startDate,
     String? endDate,
     String? groupBy,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2507,6 +2519,7 @@ class ApiService {
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
       if (groupBy != null) queryParams['groupBy'] = groupBy;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/user-growth')
           .replace(
@@ -2534,6 +2547,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getVehicleUtilization({
     String? startDate,
     String? endDate,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2544,6 +2558,7 @@ class ApiService {
       final queryParams = <String, String>{};
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri =
           Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/vehicle-utilization')
@@ -2572,6 +2587,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getLinePerformance({
     String? startDate,
     String? endDate,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2582,6 +2598,7 @@ class ApiService {
       final queryParams = <String, String>{};
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri =
           Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/line-performance')

@@ -7,6 +7,7 @@ class DateRangePicker extends StatefulWidget {
   final DateTime endDate;
   final Function(DateTime, DateTime) onDateRangeChanged;
   final bool isArabic;
+  final bool isCompact;
 
   const DateRangePicker({
     super.key,
@@ -14,6 +15,7 @@ class DateRangePicker extends StatefulWidget {
     required this.endDate,
     required this.onDateRangeChanged,
     this.isArabic = false,
+    this.isCompact = false,
   });
 
   @override
@@ -82,6 +84,121 @@ class _DateRangePickerState extends State<DateRangePicker> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isCompact) {
+      return _buildCompactPicker();
+    }
+    return _buildFullPicker();
+  }
+
+  Widget _buildCompactPicker() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Date display button
+        InkWell(
+          onTap: _selectDateRange,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.getCardBackground(0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.getCardBorder(0.15)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.calendar_today_rounded,
+                  color: AppTheme.textSecondary,
+                  size: 14,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${_formatCompactDate(_startDate)} - ${_formatCompactDate(_endDate)}',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: AppTheme.textSecondary,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        // Quick presets dropdown
+        PopupMenuButton<String>(
+          onSelected: _selectPreset,
+          tooltip: widget.isArabic ? 'فترات سريعة' : 'Quick presets',
+          offset: const Offset(0, 36),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          color: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.getCardBackground(0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.getCardBorder(0.15)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.timer_outlined,
+                  color: AppTheme.textSecondary,
+                  size: 14,
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: AppTheme.textSecondary,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+          itemBuilder: (context) => [
+            _buildPopupItem('today', widget.isArabic ? 'اليوم' : 'Today'),
+            _buildPopupItem('last7days', widget.isArabic ? '7 أيام' : '7 Days'),
+            _buildPopupItem(
+                'last30days', widget.isArabic ? '30 يوم' : '30 Days'),
+            _buildPopupItem(
+                'last90days', widget.isArabic ? '90 يوم' : '90 Days'),
+            _buildPopupItem(
+                'thisMonth', widget.isArabic ? 'هذا الشهر' : 'This Month'),
+            _buildPopupItem(
+                'lastMonth', widget.isArabic ? 'الشهر الماضي' : 'Last Month'),
+          ],
+        ),
+      ],
+    );
+  }
+
+  PopupMenuItem<String> _buildPopupItem(String value, String label) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 36,
+      child: Text(
+        label,
+        style: TextStyle(
+          color: AppTheme.textPrimary,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  String _formatCompactDate(DateTime date) {
+    return '${date.day}/${date.month}';
+  }
+
+  Widget _buildFullPicker() {
     final texts = widget.isArabic
         ? {
             'dateRange': 'نطاق التاريخ',
@@ -206,4 +323,3 @@ class _DateRangePickerState extends State<DateRangePicker> {
     );
   }
 }
-

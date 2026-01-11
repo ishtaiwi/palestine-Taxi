@@ -11,6 +11,7 @@ import { RESERVATION_STATUS, PAYMENT_STATUS, PAYMENT_METHOD, WALLET_TYPE } from 
 import { checkAndAssignWaitingTrips } from '../services/tripOpeningService.js';
 import { syncTripStats } from '../services/matchingService.js';
 import { reverseDriverEarnings } from '../services/driverEarningsService.js';
+import logger from '../utils/logger.js';
 
 const buildQueueResponse = (queue = [], driverid) => {
   const normalizedQueue = queue.map((entry, index) => ({
@@ -194,17 +195,17 @@ export const getDriverTrips = async (req, res, next) => {
     const relevantTrips = uniqueTrips.filter(trip => {
       const totalBookings = trip.totalbookings || 0;
       const status = trip.status;
-      
+
       // Always show trips with bookings
       if (totalBookings > 0) return true;
-      
+
       // Show trips with no bookings ONLY if they are active (assigned to driver)
       // These are trips the driver is assigned to but haven't received bookings yet
       if (status === 'scheduled' || status === 'open' || status === 'delayed' || status === 'in_progress') {
         // Only show if this driver is explicitly assigned
         return trip.assigned_driverid === driverRecord.driverid;
       }
-      
+
       // Hide completed/cancelled trips with no bookings
       return false;
     });
@@ -317,7 +318,10 @@ export const updateDriverReservationStatus = async (req, res, next) => {
 
     const updates = {};
     let refundAmount = null;
-    
+
+    // Capture the reservation status BEFORE updating it (needed for syncTripStats check after rejection)
+    const reservationWasActive = reservation.status === RESERVATION_STATUS.CONFIRMED || reservation.status === RESERVATION_STATUS.CHECKED_IN;
+
     if (action === 'approve') {
       updates.driver_status = 'approved';
       if (reservation.status === 'pending_driver') {
@@ -351,31 +355,53 @@ export const updateDriverReservationStatus = async (req, res, next) => {
           // Get passenger's userid from reservation
           const passenger = reservation.passenger;
           const passengerUserid = passenger?.user?.userid;
-          
+
+          // Capture driver wallet ID before potentially removing it
+          const driverWalletId = payment.towalletid;
+
+          // If payment was already transferred to driver (towalletid exists), deduct from driver's wallet
+          if (driverWalletId) {
+            try {
+              const driverWallet = await Wallet.findById(driverWalletId);
+              if (driverWallet) {
+                // Deduct the refund amount from driver's wallet
+                await Wallet.updateBalance(driverWalletId, refundAmount, 'subtract');
+                logger.info(`[DriverController] ✅ Deducted ${refundAmount} from driver wallet ${driverWalletId} due to reservation rejection`);
+
+                // Update payment to remove towalletid (payment reversed)
+                await Payment.update(reservation.paymentid, {
+                  towalletid: null,
+                });
+              }
+            } catch (driverWalletError) {
+              logger.error(`[DriverController] ❌ Error deducting from driver wallet:`, driverWalletError);
+              // Continue with passenger refund even if driver wallet deduction fails
+            }
+          }
+
           if (passengerUserid) {
             const wallets = await Wallet.findByUserId(passengerUserid, WALLET_TYPE.MAIN);
             if (wallets && wallets.length > 0) {
               // Refund full amount to passenger's wallet
               await Wallet.updateBalance(wallets[0].walletid, refundAmount, 'add');
+              logger.info(`[DriverController] ✅ Refunded ${refundAmount} to passenger wallet ${wallets[0].walletid} due to reservation rejection`);
 
               // Create refund payment record
+              // fromwalletid: Driver wallet if payment was transferred, null if not yet transferred
+              // towalletid: Passenger wallet (refund destination)
               await Payment.create({
                 paymentid: uuidv4(),
                 amount: refundAmount,
                 method: PAYMENT_METHOD.WALLET,
                 status: PAYMENT_STATUS.REFUNDED,
                 type: 'refund',
-                fromwalletid: wallets[0].walletid,
-                towalletid: wallets[0].walletid,
+                fromwalletid: driverWalletId || null, // Driver wallet if payment was transferred, null if not
+                towalletid: wallets[0].walletid, // Passenger wallet (refund destination)
+                tripid: reservation.tripid || null,
               });
             }
           }
         }
-      }
-
-      // Sync trip stats after rejection - this will recalculate based on actual active reservations
-      if (reservation.tripid && (reservation.status === RESERVATION_STATUS.CONFIRMED || reservation.status === RESERVATION_STATUS.CHECKED_IN)) {
-        await syncTripStats(reservation.tripid);
       }
     } else if (action === 'checkin') {
       updates.driver_status = 'approved';
@@ -383,6 +409,18 @@ export const updateDriverReservationStatus = async (req, res, next) => {
     }
 
     const updatedReservation = await Reservation.update(bookingid, updates);
+
+    // Sync trip stats after reservation status update
+    // This ensures available seats are recalculated correctly when reservation is cancelled/rejected
+    if (action === 'reject' && reservation.tripid && reservationWasActive) {
+      try {
+        await syncTripStats(reservation.tripid);
+        logger.info(`[DriverController] ✅ Synced trip stats for trip ${reservation.tripid} after reservation rejection - seat freed up`);
+      } catch (syncError) {
+        logger.error(`[DriverController] ❌ Error syncing trip stats after rejection:`, syncError);
+        // Don't fail the rejection if stats sync fails
+      }
+    }
 
     // Prepare response message
     let message;

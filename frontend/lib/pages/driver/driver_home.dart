@@ -13,6 +13,7 @@ import 'driver_queue_page.dart';
 import 'driver_trips_page.dart';
 import 'driver_vehicle_page.dart';
 import 'driver_profile_page.dart';
+import 'driver_wallet_page.dart';
 import 'driver_location_tracking_page.dart';
 
 class DriverHomePage extends StatefulWidget {
@@ -714,12 +715,12 @@ class _DriverHomePageState extends State<DriverHomePage>
                       // Action Cards Grid
                       isWeb && (isDesktop || isTablet)
                           ? GridView.count(
-                              crossAxisCount: isDesktop ? 4 : 2,
+                              crossAxisCount: isDesktop ? 5 : 2,
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               crossAxisSpacing: 16.0,
                               mainAxisSpacing: 16.0,
-                              childAspectRatio: isDesktop ? 1.1 : 1.0,
+                              childAspectRatio: isDesktop ? 1.0 : 1.0,
                               children: [
                                 _buildActionCard(
                                   icon: Icons.list_alt_rounded,
@@ -743,7 +744,7 @@ class _DriverHomePageState extends State<DriverHomePage>
                                 _buildActionCard(
                                   icon: Icons.check_circle_rounded,
                                   title: t('checkin'),
-                                  color: Colors.green,
+                                  color: Colors.teal,
                                   cardColor: cardColor,
                                   textColor: textPrimaryColor,
                                   isDarkMode: _isDarkMode,
@@ -775,6 +776,25 @@ class _DriverHomePageState extends State<DriverHomePage>
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) => const DriverVehiclePage(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                _buildActionCard(
+                                  icon: Icons.account_balance_wallet_rounded,
+                                  title: _isArabic ? 'محفظتي' : 'Wallet',
+                                  color: Colors.green,
+                                  cardColor: cardColor,
+                                  textColor: textPrimaryColor,
+                                  isDarkMode: _isDarkMode,
+                                  isSmallScreen: isSmallScreen,
+                                  isMediumScreen: isMediumScreen,
+                                  isWeb: isWeb,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const DriverWalletPage(),
                                       ),
                                     );
                                   },
@@ -830,7 +850,7 @@ class _DriverHomePageState extends State<DriverHomePage>
                                       child: _buildActionCard(
                                         icon: Icons.check_circle_rounded,
                                         title: t('checkin'),
-                                        color: Colors.green,
+                                        color: Colors.teal,
                                         cardColor: cardColor,
                                         textColor: textPrimaryColor,
                                         isDarkMode: _isDarkMode,
@@ -877,6 +897,32 @@ class _DriverHomePageState extends State<DriverHomePage>
                                     SizedBox(width: isSmallScreen ? 12.0 : 16.0),
                                     Expanded(
                                       child: _buildActionCard(
+                                        icon: Icons.account_balance_wallet_rounded,
+                                        title: _isArabic ? 'محفظتي' : 'Wallet',
+                                        color: Colors.green,
+                                        cardColor: cardColor,
+                                        textColor: textPrimaryColor,
+                                        isDarkMode: _isDarkMode,
+                                        isSmallScreen: isSmallScreen,
+                                        isMediumScreen: isMediumScreen,
+                                        isWeb: isWeb,
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => const DriverWalletPage(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildActionCard(
                                         icon: Icons.person_rounded,
                                         title: t('profile'),
                                         color: Colors.purple,
@@ -895,6 +941,10 @@ class _DriverHomePageState extends State<DriverHomePage>
                                           );
                                         },
                                       ),
+                                    ),
+                                    const SizedBox(width: 12.0),
+                                    Expanded(
+                                      child: Container(), // Empty space to maintain layout
                                     ),
                                   ],
                                 ),

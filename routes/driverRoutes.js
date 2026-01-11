@@ -10,6 +10,11 @@ import {
   getDriverTripReservations,
   updateDriverReservationStatus,
 } from '../controllers/driverController.js';
+import {
+  getDriverWallet,
+  getDriverTransactions,
+  getDriverEarningsSummary,
+} from '../controllers/driverWalletController.js';
 
 const router = express.Router();
 
@@ -22,6 +27,9 @@ router.post('/queue/leave', leaveDriverQueue);
 router.get('/trips', getDriverTrips);
 router.get('/trips/:tripid/reservations', getDriverTripReservations);
 router.patch('/trips/:tripid/reservations/:bookingid', updateDriverReservationStatus);
+router.get('/wallet', getDriverWallet);
+router.get('/wallet/transactions', getDriverTransactions);
+router.get('/wallet/summary', getDriverEarningsSummary);
 
 export default router;
 

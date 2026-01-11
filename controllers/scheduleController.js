@@ -4,6 +4,128 @@ import { createTripsForTemplate, createDailyTrips } from '../services/dailyTripS
 import logger from '../utils/logger.js';
 
 
+/**
+ * Validates schedule data (for both create and update operations)
+ * @param {Object} data - The schedule data to validate
+ * @param {Object} req - Express request object (for i18n)
+ * @param {boolean} isCreate - Whether this is for create (true) or update (false)
+ * @returns {Object|null} - Returns error response object if validation fails, null otherwise
+ */
+const validateScheduleData = (data, req, isCreate = false) => {
+  // For create, lineid is required
+  if (isCreate && !data.lineid) {
+    return {
+      status: 400,
+      body: {
+        message: req.t('schedule.lineid_required') || 'lineid is required',
+      },
+    };
+  }
+  
+  // For create, start_hour is required
+  if (isCreate && data.start_hour === undefined) {
+    return {
+      status: 400,
+      body: {
+        message: req.t('schedule.invalid_start_hour') || 'start_hour must be between 0 and 23',
+      },
+    };
+  }
+  
+  // Validate start_hour (if provided)
+  if (data.start_hour !== undefined && (data.start_hour < 0 || data.start_hour > 23)) {
+    return {
+      status: 400,
+      body: {
+        message: req.t('schedule.invalid_start_hour') || 'start_hour must be between 0 and 23',
+      },
+    };
+  }
+  
+  // For create, end_hour is required
+  if (isCreate && data.end_hour === undefined) {
+    return {
+      status: 400,
+      body: {
+        message: req.t('schedule.invalid_end_hour') || 'end_hour must be between 0 and 23',
+      },
+    };
+  }
+  
+  // Validate end_hour (if provided)
+  if (data.end_hour !== undefined && (data.end_hour < 0 || data.end_hour > 23)) {
+    return {
+      status: 400,
+      body: {
+        message: req.t('schedule.invalid_end_hour') || 'end_hour must be between 0 and 23',
+      },
+    };
+  }
+  
+  // Validate end_hour >= start_hour (if both are provided)
+  if (data.start_hour !== undefined && data.end_hour !== undefined && data.end_hour < data.start_hour) {
+    return {
+      status: 400,
+      body: {
+        message: req.t('schedule.end_before_start') || 'end_hour must be >= start_hour',
+      },
+    };
+  }
+  
+  // For create, interval_minutes is required
+  if (isCreate && data.interval_minutes === undefined) {
+    return {
+      status: 400,
+      body: {
+        message: req.t('schedule.invalid_interval') || 'interval_minutes must be > 0',
+      },
+    };
+  }
+  
+  // Validate interval_minutes (if provided)
+  if (data.interval_minutes !== undefined) {
+    if (data.interval_minutes <= 0) {
+      return {
+        status: 400,
+        body: {
+          message: req.t('schedule.invalid_interval') || 'interval_minutes must be > 0',
+        },
+      };
+    }
+    // Only allow 30 or 60 minute intervals
+    if (data.interval_minutes !== 30 && data.interval_minutes !== 60) {
+      return {
+        status: 400,
+        body: {
+          message: req.t('schedule.invalid_interval_value') || 'interval_minutes must be either 30 or 60 minutes',
+        },
+      };
+    }
+  }
+  
+  // Validate boolean fields
+  if (data.auto_departure_enabled !== undefined && typeof data.auto_departure_enabled !== 'boolean') {
+    return {
+      status: 400,
+      body: {
+        message: req.t('schedule.invalid_auto_departure') || 'auto_departure_enabled must be a boolean',
+      },
+    };
+  }
+  
+  if (data.scheduled_departure_enforced !== undefined && typeof data.scheduled_departure_enforced !== 'boolean') {
+    return {
+      status: 400,
+      body: {
+        message: req.t('schedule.invalid_scheduled_departure') || 'scheduled_departure_enforced must be a boolean',
+      },
+    };
+  }
+  
+  return null; // Validation passed
+};
+
+
 export const getAllSchedules = async (req, res, next) => {
   try {
     const { lineid, active } = req.query;
@@ -49,55 +171,10 @@ export const createSchedule = async (req, res, next) => {
   try {
     const { lineid, start_hour, end_hour, interval_minutes, active, auto_departure_enabled, scheduled_departure_enforced } = req.body;
     
-    
-    if (!lineid) {
-      return res.status(400).json({
-        message: req.t('schedule.lineid_required') || 'lineid is required',
-      });
-    }
-    
-    if (start_hour === undefined || start_hour < 0 || start_hour > 23) {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_start_hour') || 'start_hour must be between 0 and 23',
-      });
-    }
-    
-    if (end_hour === undefined || end_hour < 0 || end_hour > 23) {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_end_hour') || 'end_hour must be between 0 and 23',
-      });
-    }
-    
-    if (end_hour < start_hour) {
-      return res.status(400).json({
-        message: req.t('schedule.end_before_start') || 'end_hour must be >= start_hour',
-      });
-    }
-    
-    if (interval_minutes === undefined || interval_minutes <= 0) {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_interval') || 'interval_minutes must be > 0',
-      });
-    }
-    
-    // Only allow 30 or 60 minute intervals
-    if (interval_minutes !== 30 && interval_minutes !== 60) {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_interval_value') || 'interval_minutes must be either 30 or 60 minutes',
-      });
-    }
-    
-    // Validate boolean fields
-    if (auto_departure_enabled !== undefined && typeof auto_departure_enabled !== 'boolean') {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_auto_departure') || 'auto_departure_enabled must be a boolean',
-      });
-    }
-    
-    if (scheduled_departure_enforced !== undefined && typeof scheduled_departure_enforced !== 'boolean') {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_scheduled_departure') || 'scheduled_departure_enforced must be a boolean',
-      });
+    // Validate schedule data
+    const validationError = validateScheduleData(req.body, req, true);
+    if (validationError) {
+      return res.status(validationError.status).json(validationError.body);
     }
     
     // Check if a schedule already exists for this line
@@ -136,51 +213,10 @@ export const updateSchedule = async (req, res, next) => {
     const { templateid } = req.params;
     const updates = req.body;
     
-    
-    if (updates.start_hour !== undefined && (updates.start_hour < 0 || updates.start_hour > 23)) {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_start_hour') || 'start_hour must be between 0 and 23',
-      });
-    }
-    
-    if (updates.end_hour !== undefined && (updates.end_hour < 0 || updates.end_hour > 23)) {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_end_hour') || 'end_hour must be between 0 and 23',
-      });
-    }
-    
-    if (updates.start_hour !== undefined && updates.end_hour !== undefined) {
-      if (updates.end_hour < updates.start_hour) {
-        return res.status(400).json({
-          message: req.t('schedule.end_before_start') || 'end_hour must be >= start_hour',
-        });
-      }
-    }
-    
-    if (updates.interval_minutes !== undefined && updates.interval_minutes <= 0) {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_interval') || 'interval_minutes must be > 0',
-      });
-    }
-    
-    // Only allow 30 or 60 minute intervals
-    if (updates.interval_minutes !== undefined && updates.interval_minutes !== 30 && updates.interval_minutes !== 60) {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_interval_value') || 'interval_minutes must be either 30 or 60 minutes',
-      });
-    }
-    
-    // Validate boolean fields
-    if (updates.auto_departure_enabled !== undefined && typeof updates.auto_departure_enabled !== 'boolean') {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_auto_departure') || 'auto_departure_enabled must be a boolean',
-      });
-    }
-    
-    if (updates.scheduled_departure_enforced !== undefined && typeof updates.scheduled_departure_enforced !== 'boolean') {
-      return res.status(400).json({
-        message: req.t('schedule.invalid_scheduled_departure') || 'scheduled_departure_enforced must be a boolean',
-      });
+    // Validate schedule data
+    const validationError = validateScheduleData(updates, req, false);
+    if (validationError) {
+      return res.status(validationError.status).json(validationError.body);
     }
     
     const schedule = await ScheduleTemplate.update(templateid, updates);
@@ -202,9 +238,11 @@ export const deleteSchedule = async (req, res, next) => {
     // Check if there are any trips referencing this schedule template
     const trips = await Trip.findAll({ templateid });
     if (trips && trips.length > 0) {
+      const errorMessage = req.t('schedule.has_trips') || 
+        `Cannot delete schedule. There are ${trips.length} trip(s) associated with this schedule. Please delete or reassign the trips first.`;
       return res.status(400).json({
         success: false,
-        message: req.t('schedule.has_trips') || `Cannot delete schedule. There are ${trips.length} trip(s) associated with this schedule. Please delete or reassign the trips first.`,
+        message: errorMessage,
       });
     }
     
@@ -217,9 +255,11 @@ export const deleteSchedule = async (req, res, next) => {
   } catch (error) {
     // Handle foreign key constraint error
     if (error.code === '23503' || error.message?.includes('foreign key constraint')) {
+      const errorMessage = req.t('schedule.has_trips') || 
+        'Cannot delete schedule. There are trips associated with this schedule. Please delete or reassign the trips first.';
       return res.status(400).json({
         success: false,
-        message: req.t('schedule.has_trips') || 'Cannot delete schedule. There are trips associated with this schedule. Please delete or reassign the trips first.',
+        message: errorMessage,
       });
     }
     next(error);

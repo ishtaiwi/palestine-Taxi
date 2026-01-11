@@ -38,8 +38,9 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       'myReservations': 'حجوزاتي',
       'myWallet': 'محفظتي',
       'profile': 'الملف الشخصي',
-      'favoriteTrips': 'الرحلات المفضلة',
-      'noFavorites': 'لا توجد رحلات مفضلة حتى الآن',
+      'favoriteTrips': 'الخطوط المفضلة',
+      'favoriteLines': 'الخطوط المفضلة',
+      'noFavorites': 'لا توجد خطوط مفضلة حتى الآن',
       'accountInfo': 'معلومات الحساب',
       'name': 'الاسم',
       'email': 'البريد الإلكتروني',
@@ -61,8 +62,9 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       'myReservations': 'My Reservations',
       'myWallet': 'My Wallet',
       'profile': 'Profile',
-      'favoriteTrips': 'Favorite Trips',
-      'noFavorites': 'No favorite trips yet',
+      'favoriteTrips': 'Favorite Lines',
+      'favoriteLines': 'Favorite Lines',
+      'noFavorites': 'No favorite lines yet',
       'accountInfo': 'Account Information',
       'name': 'Name',
       'email': 'Email',
@@ -311,6 +313,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
           'fromEn': stat['fromEn'] as String? ?? '',
           'toEn': stat['toEn'] as String? ?? '',
           'line': stat['lineName'] as String? ?? '',
+          'lineId': stat['lineId'] as String? ?? '',
           'lastBookedAr': lastBookedText,
           'lastBookedEn': lastBookedText,
           'color': Colors.indigo, // default; can later be customized per line
@@ -961,7 +964,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                             ),
                             SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                             Text(
-                              t('favoriteTrips'),
+                              t('favoriteLines'),
                               style: TextStyle(
                                 color: textPrimaryColor,
                                 fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0),
@@ -1036,6 +1039,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                         ? trip['toAr'] as String
                                         : trip['toEn'] as String,
                                     line: trip['line'] as String,
+                                    lineId: trip['lineId'] as String?,
                                     lastBooked: _isArabic
                                         ? trip['lastBookedAr'] as String
                                         : trip['lastBookedEn'] as String,
@@ -1064,6 +1068,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                               ? trip['toAr'] as String
                                               : trip['toEn'] as String,
                                           line: trip['line'] as String,
+                                          lineId: trip['lineId'] as String?,
                                           lastBooked: _isArabic
                                               ? trip['lastBookedAr'] as String
                                               : trip['lastBookedEn'] as String,
@@ -1411,6 +1416,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     required String from,
     required String to,
     required String line,
+    String? lineId,
     required String lastBooked,
     required Color accentColor,
     required Color cardColor,
@@ -1425,7 +1431,20 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = isWeb && screenWidth >= 1200;
 
-    return Container(
+    return InkWell(
+      onTap: () {
+        // Navigate to trips page with this line selected
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PassengerTripsPage(initialLineId: lineId),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(isWeb 
+          ? (isDesktop ? 24.0 : 20.0)
+          : (isSmallScreen ? 16.0 : 20.0)),
+      child: Container(
       padding: EdgeInsets.all(isWeb 
           ? (isDesktop ? 28.0 : 24.0)
           : (isSmallScreen ? 16.0 : (isMediumScreen ? 19.0 : 22.0))),
@@ -1558,10 +1577,18 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () {},
-              icon: Icon(Icons.flash_on_rounded, size: isSmallScreen ? 16.0 : 20.0),
+              onPressed: () {
+                // Navigate to trips page with this line selected
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PassengerTripsPage(initialLineId: lineId),
+                  ),
+                );
+              },
+              icon: Icon(Icons.directions_bus_rounded, size: isSmallScreen ? 16.0 : 20.0),
               label: Text(
-                t('bookThisTrip'),
+                _isArabic ? 'عرض رحلات هذا الخط' : 'View Trips for This Line',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: isSmallScreen ? 13.0 : 15.0,
@@ -1580,6 +1607,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

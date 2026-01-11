@@ -1,7 +1,7 @@
 import Wallet from '../models/Wallet.js';
 import Payment from '../models/Payment.js';
 import { v4 as uuidv4 } from 'uuid';
-import { PAYMENT_STATUS, PAYMENT_METHOD } from '../utils/constants.js';
+import { PAYMENT_STATUS, PAYMENT_METHOD, WALLET_TYPE } from '../utils/constants.js';
 import { createPaymentIntent, getPaymentIntent } from '../services/stripeService.js';
 
 
@@ -44,7 +44,7 @@ export const createWallet = async (req, res, next) => {
     const walletData = {
       walletid: uuidv4(),
       userid,
-      type: type || 'main',
+      type: type || WALLET_TYPE.MAIN,
       balance: 0,
     };
     
@@ -87,14 +87,14 @@ export const getMyWallet = async (req, res, next) => {
     const userid = req.user.userid;
     
     
-    const wallets = await Wallet.findByUserId(userid, 'main');
+    const wallets = await Wallet.findByUserId(userid, WALLET_TYPE.MAIN);
     
     if (!wallets || wallets.length === 0) {
       
       const wallet = await Wallet.create({
         walletid: uuidv4(),
         userid,
-        type: 'main',
+        type: WALLET_TYPE.MAIN,
         balance: 0,
       });
       
@@ -139,7 +139,7 @@ export const addBalanceToMyWallet = async (req, res, next) => {
     }
     
     
-    const wallets = await Wallet.findByUserId(userid, 'main');
+    const wallets = await Wallet.findByUserId(userid, WALLET_TYPE.MAIN);
     
     let wallet;
     if (!wallets || wallets.length === 0) {
@@ -147,7 +147,7 @@ export const addBalanceToMyWallet = async (req, res, next) => {
       const newWallet = await Wallet.create({
         walletid: uuidv4(),
         userid,
-        type: 'main',
+        type: WALLET_TYPE.MAIN,
         balance: 0,
       });
       
@@ -199,14 +199,14 @@ export const createStripeTopUp = async (req, res, next) => {
     }
 
     
-    const wallets = await Wallet.findByUserId(userid, 'main');
+    const wallets = await Wallet.findByUserId(userid, WALLET_TYPE.MAIN);
     let wallet;
 
     if (!wallets || wallets.length === 0) {
       wallet = await Wallet.create({
         walletid: uuidv4(),
         userid,
-        type: 'main',
+        type: WALLET_TYPE.MAIN,
         balance: 0,
       });
     } else {

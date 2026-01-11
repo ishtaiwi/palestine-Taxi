@@ -7,7 +7,17 @@ const parseCorsOrigins = (originsValue) => {
   
   if (nodeEnv === 'development') {
     return (origin, callback) => {
-      if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      // Allow localhost and local network IPs in development
+      if (origin.startsWith('http://localhost:') || 
+          origin.startsWith('http://127.0.0.1:') ||
+          origin.startsWith('http://192.168.') ||
+          origin.startsWith('http://10.0.') ||
+          origin.startsWith('http://172.')) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));

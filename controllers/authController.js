@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import appConfig from '../config/app.js';
 import logger from '../utils/logger.js';
 import { sendPasswordResetEmail } from '../utils/email.js';
+import { WALLET_TYPE } from '../utils/constants.js';
 
 const generateSecureVerificationCode = () => {
   return crypto.randomInt(100000, 999999).toString();
@@ -459,7 +460,7 @@ export const register = async (req, res, next) => {
       await Wallet.create({
         walletid: uuidv4(),
         userid: user.userid,
-        type: 'main',
+        type: WALLET_TYPE.MAIN,
         balance: 0,
       });
 

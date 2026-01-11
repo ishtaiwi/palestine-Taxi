@@ -4,6 +4,7 @@ import '../pages/driver/driver_trips_page.dart';
 import '../pages/driver/driver_queue_page.dart';
 import '../pages/driver/driver_vehicle_page.dart';
 import '../pages/driver/driver_profile_page.dart';
+import '../pages/driver/driver_wallet_page.dart';
 
 class DriverBottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -26,14 +27,14 @@ class DriverBottomNavBar extends StatelessWidget {
         'myTrips': 'رحلاتي',
         'checkIn': 'Check-in',
         'myVehicle': 'مركبتي',
-        'profile': 'الملف الشخصي',
+        'wallet': 'محفظتي',
       },
       'en': {
         'home': 'Home',
         'myTrips': 'My Trips',
         'checkIn': 'Check-in',
         'myVehicle': 'My Vehicle',
-        'profile': 'Profile',
+        'wallet': 'Wallet',
       },
     };
     return texts[isArabic ? 'ar' : 'en']![key] ?? key;
@@ -126,11 +127,11 @@ class DriverBottomNavBar extends StatelessWidget {
                 isSmallScreen: isSmallScreen,
                 isMediumScreen: isMediumScreen,
               ),
-              // Profile (index 4)
+              // Wallet (index 4)
               _buildNavItem(
                 context: context,
-                icon: Icons.person_rounded,
-                label: t('profile'),
+                icon: Icons.account_balance_wallet_rounded,
+                label: t('wallet'),
                 index: 4,
                 textSecondaryColor: textSecondaryColor,
                 accentColor: accentColor,
@@ -361,11 +362,11 @@ class DriverBottomNavBar extends StatelessWidget {
         );
         break;
       case 4:
-        // Profile
+        // Wallet
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => const DriverProfilePage(),
+            builder: (_) => const DriverWalletPage(),
           ),
         );
         break;

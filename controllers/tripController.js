@@ -3,11 +3,13 @@ import Line from '../models/Line.js';
 import Vehicle from '../models/Vehicle.js';
 import Reservation from '../models/Reservation.js';
 import DriverQueue from '../models/DriverQueue.js';
+import Driver from '../models/Driver.js';
 import { buildSeatRows, normalizeSeatId } from '../utils/seatLayout.js';
 import { calculateAvailablePassengerSeats, getTotalPassengerSeats } from '../utils/seatCalculation.js';
 import { v4 as uuidv4 } from 'uuid';
 import { TRIP_STATUS } from '../utils/constants.js';
 import { getUtcNow, parseUtcDate, canBookInstant } from '../utils/timeUtils.js';
+import { processTripEarnings } from '../services/driverEarningsService.js';
 
 
 export const getAllTrips = async (req, res, next) => {
@@ -67,33 +69,47 @@ export const getUpcomingTrips = async (req, res, next) => {
 
     const allTrips = await Trip.findUpcoming(filters);
     
-    // Group trips by deptime and show only the first trip for each time
-    // This ensures frontend shows one trip per time, even though backend may have multiple
-    const tripsByTime = new Map();
+    // Only group trips by deptime when filtering by a specific line
+    // When showing all lines, display all trips even if they have the same departure time
+    let uniqueTrips;
     
-    for (const trip of allTrips) {
-      const deptime = trip.deptime;
-      if (!tripsByTime.has(deptime)) {
-        tripsByTime.set(deptime, trip);
-      } else {
-        // If multiple trips exist for same time, prefer the one with more bookings or earlier created
-        const existingTrip = tripsByTime.get(deptime);
-        const existingBookings = existingTrip.totalbookings || 0;
-        const currentBookings = trip.totalbookings || 0;
-        
-        // Prefer trip with more bookings, or if equal, keep the existing one (first found)
-        if (currentBookings > existingBookings) {
+    if (lineid) {
+      // Group trips by deptime and show only the first trip for each time when filtering by line
+      // This ensures frontend shows one trip per time for a specific line
+      const tripsByTime = new Map();
+      
+      for (const trip of allTrips) {
+        const deptime = trip.deptime;
+        if (!tripsByTime.has(deptime)) {
           tripsByTime.set(deptime, trip);
+        } else {
+          // If multiple trips exist for same time, prefer the one with more bookings or earlier created
+          const existingTrip = tripsByTime.get(deptime);
+          const existingBookings = existingTrip.totalbookings || 0;
+          const currentBookings = trip.totalbookings || 0;
+          
+          // Prefer trip with more bookings, or if equal, keep the existing one (first found)
+          if (currentBookings > existingBookings) {
+            tripsByTime.set(deptime, trip);
+          }
         }
       }
+      
+      // Convert map values back to array and sort by deptime
+      uniqueTrips = Array.from(tripsByTime.values()).sort((a, b) => {
+        const timeA = new Date(a.deptime).getTime();
+        const timeB = new Date(b.deptime).getTime();
+        return timeA - timeB;
+      });
+    } else {
+      // When showing all lines, return all trips sorted by deptime
+      // No grouping needed - show all trips from all lines
+      uniqueTrips = allTrips.sort((a, b) => {
+        const timeA = new Date(a.deptime).getTime();
+        const timeB = new Date(b.deptime).getTime();
+        return timeA - timeB;
+      });
     }
-    
-    // Convert map values back to array and sort by deptime
-    const uniqueTrips = Array.from(tripsByTime.values()).sort((a, b) => {
-      const timeA = new Date(a.deptime).getTime();
-      const timeB = new Date(b.deptime).getTime();
-      return timeA - timeB;
-    });
     
     res.json(uniqueTrips);
   } catch (error) {
@@ -256,6 +272,9 @@ export const endTrip = async (req, res, next) => {
       status: TRIP_STATUS.COMPLETED,
       arrivaltime: getUtcNow().toISOString(),
     });
+
+    // Earnings are now recorded when passenger books, not when trip completes
+    // No need to process earnings here anymore
 
     res.json({
       message: req.t('trip.ended') || 'Trip ended successfully',

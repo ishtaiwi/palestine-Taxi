@@ -124,6 +124,31 @@ export const assignVehicleFromQueue = async (tripid, lineid) => {
     
     await DriverQueue.removeDriverFromQueue(driverid);
 
+    // Record earnings for all existing reservations now that driver is assigned
+    try {
+      const { checkAndRecordReservationEarnings } = await import('./driverEarningsService.js');
+      const allReservations = await Reservation.findByTripId(tripid);
+      const activeReservations = allReservations.filter(
+        r => r.status === 'confirmed' || r.status === 'checked_in'
+      );
+      
+      logger.info(`[TripOpeningService] 📝 Recording earnings for ${activeReservations.length} existing reservation(s) on trip ${tripid}`);
+      
+      for (const reservation of activeReservations) {
+        try {
+          await checkAndRecordReservationEarnings(reservation.bookingid, tripid);
+        } catch (earningsError) {
+          logger.warn(`[TripOpeningService] ⚠️ Error recording earnings for reservation ${reservation.bookingid}:`, earningsError);
+          // Continue with other reservations even if one fails
+        }
+      }
+      
+      logger.info(`[TripOpeningService] ✅ Earnings recording completed for trip ${tripid}`);
+    } catch (earningsError) {
+      logger.error(`[TripOpeningService] ⚠️ Error recording earnings for trip ${tripid}:`, earningsError);
+      // Don't fail driver assignment if earnings recording fails
+    }
+
     
     const updatedTrip = await Trip.findById(tripid);
 

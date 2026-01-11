@@ -52,6 +52,14 @@ export const PAYMENT_METHOD = {
   CARD: 'card',
 };
 
+export const WALLET_TYPE = {
+  MAIN: 'main',  // Primary wallet for users (both drivers and passengers)
+  // Future wallet types could include:
+  // SAVINGS: 'savings',
+  // BONUS: 'bonus',
+  // ESCROW: 'escrow',
+};
+
 export const PASSENGER_TYPE = {
   WALK_IN: 'walk_in',
   APP_BASED: 'app_based',

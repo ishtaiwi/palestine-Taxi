@@ -7,9 +7,10 @@ import Reservation from '../models/Reservation.js';
 import Payment from '../models/Payment.js';
 import Wallet from '../models/Wallet.js';
 import { v4 as uuidv4 } from 'uuid';
-import { RESERVATION_STATUS, PAYMENT_STATUS, PAYMENT_METHOD } from '../utils/constants.js';
+import { RESERVATION_STATUS, PAYMENT_STATUS, PAYMENT_METHOD, WALLET_TYPE } from '../utils/constants.js';
 import { checkAndAssignWaitingTrips } from '../services/tripOpeningService.js';
 import { syncTripStats } from '../services/matchingService.js';
+import { reverseDriverEarnings } from '../services/driverEarningsService.js';
 
 const buildQueueResponse = (queue = [], driverid) => {
   const normalizedQueue = queue.map((entry, index) => ({
@@ -331,12 +332,28 @@ export const updateDriverReservationStatus = async (req, res, next) => {
       if (refundAmount > 0 && reservation.paymentid) {
         const payment = await Payment.findById(reservation.paymentid);
         if (payment && payment.status === PAYMENT_STATUS.COMPLETED) {
+          // Reverse driver earnings first (deduct from driver wallet)
+          try {
+            const driver = await Driver.findById(req.user.driverid);
+            if (driver && driver.userid) {
+              await reverseDriverEarnings(
+                driver.userid,
+                refundAmount,
+                reservation.bookingid
+              );
+              console.log(`[DriverController] ✅ Reversed ${refundAmount} ₪ from driver ${driver.userid} wallet for rejected reservation ${reservation.bookingid}`);
+            }
+          } catch (reverseError) {
+            console.error(`[DriverController] ⚠️ Error reversing driver earnings:`, reverseError);
+            // Continue with passenger refund even if driver reversal fails
+          }
+
           // Get passenger's userid from reservation
           const passenger = reservation.passenger;
           const passengerUserid = passenger?.user?.userid;
           
           if (passengerUserid) {
-            const wallets = await Wallet.findByUserId(passengerUserid, 'main');
+            const wallets = await Wallet.findByUserId(passengerUserid, WALLET_TYPE.MAIN);
             if (wallets && wallets.length > 0) {
               // Refund full amount to passenger's wallet
               await Wallet.updateBalance(wallets[0].walletid, refundAmount, 'add');

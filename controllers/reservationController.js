@@ -3,13 +3,15 @@ import Trip from '../models/Trip.js';
 import Payment from '../models/Payment.js';
 import Wallet from '../models/Wallet.js';
 import DriverQueue from '../models/DriverQueue.js';
+import Driver from '../models/Driver.js';
 import { v4 as uuidv4 } from 'uuid';
 import { generateQRCode } from '../utils/qrcode.js';
-import { BOOKING_TYPE, PAYMENT_STATUS, PAYMENT_METHOD, RESERVATION_STATUS, TRIP_STATUS } from '../utils/constants.js';
+import { BOOKING_TYPE, PAYMENT_STATUS, PAYMENT_METHOD, RESERVATION_STATUS, TRIP_STATUS, WALLET_TYPE } from '../utils/constants.js';
 import { validateReservationData } from '../utils/validation.js';
 import { syncTripStats } from '../services/matchingService.js';
 import { updateModelIncremental } from '../services/rushHourPredictionService.js';
 import { assignVehicleFromQueue } from '../services/tripOpeningService.js';
+import { recordDriverEarnings } from '../services/driverEarningsService.js';
 import logger from '../utils/logger.js';
 import { canBookInstant } from '../utils/timeUtils.js';
 
@@ -347,7 +349,7 @@ export const createReservation = async (req, res, next) => {
 
 
     if (paymentMethod === PAYMENT_METHOD.WALLET) {
-      const wallets = await Wallet.findByUserId(req.user.userid, 'main');
+      const wallets = await Wallet.findByUserId(req.user.userid, WALLET_TYPE.MAIN);
       const wallet = wallets?.[0];
 
       if (!wallet) {
@@ -642,6 +644,28 @@ export const createReservation = async (req, res, next) => {
                 // Don't fail the reservation creation if distribution fails
               }
               
+              // Step 2.5: Record earnings for this reservation now that driver is assigned
+              if (reservation && reservation.status === RESERVATION_STATUS.CONFIRMED && paymentRecord && paymentRecord.status === PAYMENT_STATUS.COMPLETED) {
+                try {
+                  const tripWithDriver = await Trip.findById(tripid);
+                  if (tripWithDriver && tripWithDriver.assigned_driverid) {
+                    const driver = await Driver.findById(tripWithDriver.assigned_driverid);
+                    if (driver && driver.userid && bookingPrice > 0) {
+                      await recordDriverEarnings(
+                        driver.userid,
+                        bookingPrice,
+                        tripid,
+                        reservation.bookingid,
+                        reservation.bookedat || new Date().toISOString()
+                      );
+                      logger.info(`[ReservationController] ✅ Earnings of ${bookingPrice} ₪ recorded for driver ${driver.userid} on reservation ${reservation.bookingid} (after immediate driver assignment)`);
+                    }
+                  }
+                } catch (earningsError) {
+                  logger.error(`[ReservationController] ⚠️ Error recording earnings after driver assignment for reservation ${reservation.bookingid}:`, earningsError);
+                }
+              }
+              
               // Step 3: Check if we need additional drivers due to capacity (only after distribution)
               // CRITICAL: Only check if trip is full AND there are bookings that exceed capacity
               // Don't create new trips if trip is full but all bookings fit
@@ -687,6 +711,56 @@ export const createReservation = async (req, res, next) => {
       }
     }
 
+
+    // Calculate and record driver earnings when passenger books (100% of booking price)
+    // CRITICAL: This records earnings for EACH booking separately
+    // NOTE: This only records if driver is already assigned. If driver is assigned later,
+    // earnings will be recorded by checkAndRecordReservationEarnings in matchingService
+    if (reservation.tripid && reservation.status === RESERVATION_STATUS.CONFIRMED && paymentRecord && paymentRecord.status === PAYMENT_STATUS.COMPLETED) {
+      try {
+        const currentTrip = await Trip.findById(reservation.tripid);
+        logger.info(`[ReservationController] 💰 Processing earnings for reservation ${reservation.bookingid}: tripid=${reservation.tripid}, trip exists=${!!currentTrip}, has driver=${!!(currentTrip && currentTrip.assigned_driverid)}, amount=${bookingPrice}`);
+        
+        if (currentTrip && currentTrip.assigned_driverid) {
+          const driver = await Driver.findById(currentTrip.assigned_driverid);
+          logger.info(`[ReservationController] 💰 Driver found: ${!!driver}, driverid=${currentTrip.assigned_driverid}, userid=${driver?.userid}, bookingPrice=${bookingPrice}`);
+          
+          if (driver && driver.userid && bookingPrice > 0) {
+            // Record earnings immediately for THIS specific reservation (100% of booking price)
+            // Each reservation has a unique bookingid, so each will create a separate earnings record
+            const earningsResult = await recordDriverEarnings(
+              driver.userid,
+              bookingPrice, // Full amount goes to driver
+              reservation.tripid,
+              reservation.bookingid, // Unique reservation ID - ensures separate earnings record
+              reservation.bookedat || new Date().toISOString() // Booking time
+            );
+            
+            if (earningsResult) {
+              logger.info(`[ReservationController] ✅ SUCCESS: Earnings of ${bookingPrice} ₪ recorded for driver ${driver.userid} (userid: ${driver.userid}) on reservation ${reservation.bookingid} for trip ${reservation.tripid}`);
+            } else {
+              logger.warn(`[ReservationController] ⚠️ Earnings recording returned null for reservation ${reservation.bookingid} - may be duplicate or amount <= 0`);
+            }
+          } else {
+            logger.warn(`[ReservationController] ⚠️ Cannot record earnings: driver=${!!driver}, userid=${driver?.userid}, bookingPrice=${bookingPrice}`);
+          }
+        } else {
+          logger.info(`[ReservationController] ℹ️ Trip ${reservation.tripid} has no driver yet - earnings will be recorded later when driver is assigned for reservation ${reservation.bookingid}`);
+        }
+      } catch (earningsError) {
+        // Log error but don't fail reservation creation
+        logger.error(`[ReservationController] ❌ ERROR recording earnings for reservation ${reservation.bookingid}:`, earningsError);
+        logger.error(`[ReservationController] Earnings error details:`, {
+          message: earningsError.message,
+          stack: earningsError.stack,
+          reservationid: reservation.bookingid,
+          tripid: reservation.tripid,
+          bookingPrice: bookingPrice
+        });
+      }
+    } else {
+      logger.info(`[ReservationController] ⚠️ Cannot record earnings - missing conditions: tripid=${!!reservation?.tripid}, status=${reservation?.status}, paymentStatus=${paymentRecord?.status}, reservationid=${reservation?.bookingid}`);
+    }
 
     const qrCode = await generateQRCode(JSON.stringify({
       bookingid: reservation.bookingid,
@@ -798,7 +872,7 @@ export const cancelReservation = async (req, res, next) => {
     if (refundAmount > 0 && reservation.paymentid) {
       const payment = await Payment.findById(reservation.paymentid);
       if (payment && payment.status === PAYMENT_STATUS.COMPLETED) {
-        const wallets = await Wallet.findByUserId(req.user.userid, 'main');
+        const wallets = await Wallet.findByUserId(req.user.userid, WALLET_TYPE.MAIN);
         if (wallets.length > 0) {
           await Wallet.updateBalance(wallets[0].walletid, refundAmount, 'add');
 

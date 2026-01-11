@@ -901,6 +901,144 @@ class ApiService {
     }
   }
 
+  /// Driver Wallet Methods
+  static Future<Map<String, dynamic>> fetchDriverWallet() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/drivers/wallet'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          ...decoded,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to load wallet',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchDriverTransactions({
+    String? period,
+    String? startDate,
+    String? endDate,
+    String? tripid,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final queryParams = <String, String>{};
+      if (period != null && period.isNotEmpty) queryParams['period'] = period;
+      if (startDate != null && startDate.isNotEmpty) queryParams['startDate'] = startDate;
+      if (endDate != null && endDate.isNotEmpty) queryParams['endDate'] = endDate;
+      if (tripid != null && tripid.isNotEmpty) queryParams['tripid'] = tripid;
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/drivers/wallet/transactions')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          ...decoded,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to load transactions',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchDriverEarningsSummary() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/drivers/wallet/summary'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          ...decoded,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to load earnings summary',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': exception.toString(),
+      };
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> fetchDriverVehicles() async {
     final token = await getToken();
     if (token == null) return [];

@@ -8,7 +8,9 @@ import 'passenger_home.dart';
 import 'package:taxi_palestine_app/utils/server_time_sync.dart';
 
 class PassengerTripsPage extends StatefulWidget {
-  const PassengerTripsPage({super.key});
+  final String? initialLineId;
+  
+  const PassengerTripsPage({super.key, this.initialLineId});
 
   @override
   State<PassengerTripsPage> createState() => _PassengerTripsPageState();
@@ -92,6 +94,10 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     final isArabic = await ApiService.getLanguagePreference();
     setState(() {
       _isArabic = isArabic;
+      // Set initial line ID if provided
+      if (widget.initialLineId != null) {
+        _selectedLineId = widget.initialLineId;
+      }
     });
     await _loadLines();
     await _loadTrips();

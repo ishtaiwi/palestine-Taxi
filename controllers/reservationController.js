@@ -386,6 +386,7 @@ export const createReservation = async (req, res, next) => {
       passengerid,
       paymentid: paymentRecord.paymentid,
       tripid: tripid || null,
+      lineid: line.lineid,
       seatlocation: seatlocation || null,
       bookingprice: bookingPrice,
       dropoffpoint: dropoffpoint || null,

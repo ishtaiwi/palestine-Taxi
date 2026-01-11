@@ -26,6 +26,61 @@ export const updateDriverLocation = async (req, res, next) => {
             });
         }
 
+        // Validate and normalize heading (0-360 degrees)
+        let normalizedHeading = null;
+        if (heading !== undefined && heading !== null) {
+            const headingValue = parseFloat(heading);
+            if (isNaN(headingValue)) {
+                return res.status(400).json({
+                    message: 'Invalid heading value',
+                });
+            }
+            // Normalize heading to 0-360 range
+            normalizedHeading = ((headingValue % 360) + 360) % 360;
+            // Clamp to 0-360 with max 999.99 for database constraint
+            if (normalizedHeading > 999.99) {
+                normalizedHeading = 999.99;
+            }
+        }
+
+        // Validate and normalize speed (in m/s, max 60 m/s = ~216 km/h)
+        let normalizedSpeed = null;
+        if (speed !== undefined && speed !== null) {
+            const speedValue = parseFloat(speed);
+            if (isNaN(speedValue)) {
+                return res.status(400).json({
+                    message: 'Invalid speed value',
+                });
+            }
+            // If speed is > 100, assume it's in km/h and convert to m/s
+            if (speedValue > 100) {
+                normalizedSpeed = Math.min(speedValue / 3.6, 60); // Convert km/h to m/s, max 60 m/s
+            } else {
+                normalizedSpeed = Math.min(Math.max(speedValue, 0), 60); // Clamp to 0-60 m/s
+            }
+            // Ensure it doesn't exceed database constraint
+            if (normalizedSpeed > 9999.99) {
+                normalizedSpeed = 9999.99;
+            }
+        }
+
+        // Validate and normalize accuracy (in meters, max 1000m)
+        let normalizedAccuracy = null;
+        if (accuracy !== undefined && accuracy !== null) {
+            const accuracyValue = parseFloat(accuracy);
+            if (isNaN(accuracyValue)) {
+                return res.status(400).json({
+                    message: 'Invalid accuracy value',
+                });
+            }
+            // Clamp accuracy to reasonable range (0-1000 meters)
+            normalizedAccuracy = Math.min(Math.max(accuracyValue, 0), 1000);
+            // Ensure it doesn't exceed database constraint
+            if (normalizedAccuracy > 9999.99) {
+                normalizedAccuracy = 9999.99;
+            }
+        }
+
         // Get driver's vehicle
         const driver = await Driver.findById(driverid);
         if (!driver) {
@@ -47,9 +102,9 @@ export const updateDriverLocation = async (req, res, next) => {
         const location = await VehicleLocation.upsert(vehicle.vehicleid, driverid, {
             latitude: parseFloat(latitude),
             longitude: parseFloat(longitude),
-            heading: heading ? parseFloat(heading) : null,
-            speed: speed ? parseFloat(speed) : null,
-            accuracy: accuracy ? parseFloat(accuracy) : null,
+            heading: normalizedHeading,
+            speed: normalizedSpeed,
+            accuracy: normalizedAccuracy,
         });
 
         logger.info('Driver location updated', {

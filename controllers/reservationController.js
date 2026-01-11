@@ -2,12 +2,14 @@ import Reservation from '../models/Reservation.js';
 import Trip from '../models/Trip.js';
 import Payment from '../models/Payment.js';
 import Wallet from '../models/Wallet.js';
+import DriverQueue from '../models/DriverQueue.js';
 import { v4 as uuidv4 } from 'uuid';
 import { generateQRCode } from '../utils/qrcode.js';
 import { BOOKING_TYPE, PAYMENT_STATUS, PAYMENT_METHOD, RESERVATION_STATUS, TRIP_STATUS } from '../utils/constants.js';
 import { validateReservationData } from '../utils/validation.js';
-import { distributeInstantBookings } from '../services/matchingService.js';
+import { syncTripStats } from '../services/matchingService.js';
 import { updateModelIncremental } from '../services/rushHourPredictionService.js';
+import { assignVehicleFromQueue } from '../services/tripOpeningService.js';
 import logger from '../utils/logger.js';
 import { canBookInstant } from '../utils/timeUtils.js';
 
@@ -77,7 +79,7 @@ export const createReservation = async (req, res, next) => {
   let seatsUpdated = false;
   let bookingsIncremented = false;
   let trip = null;
-  const { tripid, seatlocation, dropoffpoint, aging, booking_type, scheduled_trip_time } = req.body;
+  let { tripid, seatlocation, dropoffpoint, aging, booking_type, scheduled_trip_time } = req.body;
 
   try {
     const passengerid = req.user.passengerid || req.user.userid;
@@ -96,6 +98,60 @@ export const createReservation = async (req, res, next) => {
       return res.status(400).json({
         message: validation.errors.join(', '),
       });
+    }
+
+    // Check for duplicate reservations - prevent passenger from booking same trip multiple times
+    const existingReservations = await Reservation.findByPassengerId(passengerid);
+    const activeStatuses = [RESERVATION_STATUS.CONFIRMED, RESERVATION_STATUS.CHECKED_IN];
+
+    if (bookingType === BOOKING_TYPE.INSTANT && tripid) {
+      // Check if passenger already has an active reservation for this trip
+      const duplicateReservation = existingReservations.find(
+        r => r.tripid === tripid && activeStatuses.includes(r.status)
+      );
+
+      if (duplicateReservation) {
+        return res.status(400).json({
+          message: req.t('reservation.duplicate_booking') || 'Cannot make reservation: You already have an active reservation for this trip. Please cancel your existing reservation first or wait for it to complete.',
+        });
+      }
+    }
+
+    if (bookingType === BOOKING_TYPE.FUTURE && scheduled_trip_time) {
+      // Normalize scheduled_trip_time for comparison
+      const scheduledTime = new Date(scheduled_trip_time);
+      if (!Number.isNaN(scheduledTime.getTime())) {
+        const scheduledTimeISO = scheduledTime.toISOString();
+
+        // Check if passenger already has an active reservation for this scheduled time
+        const duplicateReservation = existingReservations.find(
+          r => r.booking_type === BOOKING_TYPE.FUTURE &&
+            activeStatuses.includes(r.status) &&
+            r.scheduled_trip_time && (
+              r.scheduled_trip_time === scheduled_trip_time ||
+              (new Date(r.scheduled_trip_time).toISOString() === scheduledTimeISO)
+            )
+        );
+
+        if (duplicateReservation) {
+          return res.status(400).json({
+            message: req.t('reservation.duplicate_booking') || 'Cannot make reservation: You already have an active reservation for this trip time. Please cancel your existing reservation first or wait for it to complete.',
+          });
+        }
+      }
+
+      // Also check if tripid is provided and passenger already has a reservation for that trip
+      if (tripid) {
+        const duplicateTripReservation = existingReservations.find(
+          r => r.tripid === tripid && activeStatuses.includes(r.status)
+        );
+
+        if (duplicateTripReservation) {
+          return res.status(400).json({
+            message: req.t('reservation.duplicate_booking') || 'Cannot make reservation: You already have an active reservation for this trip. Please cancel your existing reservation first or wait for it to complete.',
+          });
+        }
+      }
     }
 
 
@@ -144,6 +200,26 @@ export const createReservation = async (req, res, next) => {
       }
     }
 
+    // CRITICAL RULE: Check driver queue availability for instant bookings
+    // Passengers are not allowed to make an instant booking unless there are drivers available in the queue
+    if (bookingType === BOOKING_TYPE.INSTANT && trip) {
+      // Check if trip already has a driver/vehicle assigned
+      const tripHasDriver = trip.vehicleid && trip.assigned_driverid;
+
+      if (!tripHasDriver) {
+        // Trip has no driver assigned - check if there are drivers in the queue
+        const queueCheck = await DriverQueue.canAcceptInstantBooking(trip.lineid);
+
+        if (!queueCheck.allowed) {
+          return res.status(503).json({
+            message: req.t('reservation.no_drivers_available') || 'Instant booking is currently unavailable. No drivers are available in the queue. Please try again later or book a future trip.',
+            code: 'NO_DRIVERS_AVAILABLE',
+            driversAvailable: 0,
+          });
+        }
+      }
+    }
+
     if (trip) {
       const validStatuses = [TRIP_STATUS.SCHEDULED, TRIP_STATUS.OPEN, TRIP_STATUS.DELAYED];
       if (!validStatuses.includes(trip.status)) {
@@ -174,11 +250,14 @@ export const createReservation = async (req, res, next) => {
         });
       }
 
-      if (trip.availableseats <= 0) {
-        return res.status(400).json({
-          message: req.t('reservation.no_seats') || 'No available seats'
-        });
-      }
+      // REMOVED: Early check for available seats - we'll check after booking creation
+      // This allows us to create a new trip if the current trip is full
+      // The check will happen after booking creation in the full trip handling logic
+      // if (trip.availableseats <= 0) {
+      //   return res.status(400).json({
+      //     message: req.t('reservation.no_seats') || 'No available seats'
+      //   });
+      // }
     }
 
     if (bookingType === BOOKING_TYPE.FUTURE) {
@@ -264,6 +343,7 @@ export const createReservation = async (req, res, next) => {
       method: paymentMethod,
       status: PAYMENT_STATUS.PENDING,
       type: 'reservation',
+      tripid: tripid || null,
     });
 
 
@@ -300,45 +380,444 @@ export const createReservation = async (req, res, next) => {
 
 
     const reservationStatus = RESERVATION_STATUS.CONFIRMED;
+
     const reservationData = {
       bookingid: uuidv4(),
       passengerid,
       paymentid: paymentRecord.paymentid,
       tripid: tripid || null,
+      lineid: line.lineid,
       seatlocation: seatlocation || null,
       bookingprice: bookingPrice,
       dropoffpoint: dropoffpoint || null,
       aging: aging || null,
       status: reservationStatus,
-      driver_status: 'pending',
+      driver_status: 'approved',
       booking_type: bookingType,
       scheduled_trip_time: bookingType === BOOKING_TYPE.FUTURE ? scheduled_trip_time : null,
     };
 
     const reservation = await Reservation.create(reservationData);
 
-
-    if (bookingType === BOOKING_TYPE.INSTANT && tripid) {
-      await Trip.updateAvailableSeats(tripid, trip.availableseats - 1);
-      seatsUpdated = true;
-      await Trip.incrementBookings(tripid);
-      bookingsIncremented = true;
-    }
-
-
-    if (bookingType === BOOKING_TYPE.INSTANT && tripid) {
+    // For future bookings without tripid, try to find an existing trip at the scheduled time
+    if (bookingType === BOOKING_TYPE.FUTURE && !reservation.tripid && scheduled_trip_time && line) {
       try {
+        const { findTripsAtSameTime } = await import('../services/matchingService.js');
+        const tripsAtScheduledTime = await findTripsAtSameTime(scheduled_trip_time, line.lineid);
 
-        const now = new Date();
-        const tripOpeningTime = trip.trip_opening_time ? new Date(trip.trip_opening_time) : null;
+        // Find a trip that has capacity and is in a valid status
+        const Vehicle = (await import('../models/Vehicle.js')).default;
+        const { getAvailableSeats } = await import('../services/matchingService.js');
 
-        if (tripOpeningTime && tripOpeningTime <= now) {
+        let assignedTrip = null;
+        for (const candidateTrip of tripsAtScheduledTime) {
+          // Check if trip is in a valid status
+          const validStatuses = [TRIP_STATUS.SCHEDULED, TRIP_STATUS.OPEN, TRIP_STATUS.DELAYED];
+          if (!validStatuses.includes(candidateTrip.status)) {
+            continue;
+          }
 
-          await distributeInstantBookings(trip.lineid, trip.deptime);
+          // Check if trip has capacity
+          if (candidateTrip.vehicleid) {
+            const vehicle = await Vehicle.findById(candidateTrip.vehicleid);
+            if (vehicle) {
+              const availableSeats = await getAvailableSeats(vehicle, candidateTrip.tripid);
+              if (availableSeats > 0) {
+                assignedTrip = candidateTrip;
+                break;
+              }
+            }
+          } else {
+            // Trip has no vehicle yet, but we can still assign the booking to it
+            // The driver will be assigned later when the trip opens
+            assignedTrip = candidateTrip;
+            break;
+          }
+        }
+
+        if (assignedTrip) {
+          await Reservation.update(reservation.bookingid, {
+            tripid: assignedTrip.tripid,
+          });
+          reservation.tripid = assignedTrip.tripid;
+          tripid = assignedTrip.tripid;
+          // Update trip variable to the assigned trip
+          trip = await Trip.findById(assignedTrip.tripid);
+          logger.info(`[ReservationController] ✅ Assigned future booking ${reservation.bookingid} to existing trip ${assignedTrip.tripid}`);
         }
       } catch (error) {
-        console.error('[ReservationController] Error in matching engine:', error);
+        logger.warn(`[ReservationController] ⚠️ Error finding existing trip for future booking:`, error);
+        // Don't fail the reservation creation if this fails
+      }
+    }
 
+    // Set payment.tripid to link payment to trip (for both instant and future bookings)
+    // This allows payment transfer when driver gets assigned
+    if (reservation.tripid) {
+      try {
+        await Payment.update(paymentRecord.paymentid, {
+          tripid: reservation.tripid,
+        });
+        logger.info(`[ReservationController] ✅ Linked payment ${paymentRecord.paymentid} to trip ${reservation.tripid}`);
+      } catch (error) {
+        logger.warn(`[ReservationController] ⚠️ Failed to set payment.tripid:`, error);
+        // Don't fail the reservation creation if this fails
+      }
+    }
+
+    // Update trip stats for ANY booking that has a tripid assigned
+    // This includes both instant bookings (always have tripid) and future bookings (may have tripid)
+    if (tripid) {
+      // For instant bookings, validate seat availability before syncing
+      // We need to check BEFORE the sync since the reservation is already created
+      let currentTrip = await Trip.findById(tripid);
+      if (!currentTrip) {
+        throw new Error('Trip not found when updating seats');
+      }
+
+      // Count actual reservations for this trip (including the one we just created)
+      const tripReservations = await Reservation.findByTripId(tripid);
+      const activeReservationCount = tripReservations.filter(
+        r => r.status === 'confirmed' || r.status === 'checked_in'
+      ).length;
+
+      // Get vehicle to determine max seats for THIS trip
+      let maxPassengerSeats = 4; // Default fallback
+      if (currentTrip.vehicleid) {
+        const Vehicle = (await import('../models/Vehicle.js')).default;
+        const vehicle = await Vehicle.findById(currentTrip.vehicleid);
+        if (vehicle) {
+          maxPassengerSeats = vehicle.seatnum - 1; // Exclude driver seat
+        }
+      }
+
+      // For instant bookings, check if THIS trip is full
+      // If full, check for other trips at the same time with capacity, or if additional drivers can be assigned
+      // CRITICAL: activeReservationCount includes the booking we just created, so if it's > maxPassengerSeats, the trip is now full
+      if (bookingType === BOOKING_TYPE.INSTANT && activeReservationCount > maxPassengerSeats) {
+        logger.info(`[ReservationController] 🚨 Trip ${tripid} is FULL (${activeReservationCount} bookings > ${maxPassengerSeats} capacity) - new booking ${reservation.bookingid} made it full, checking for other trips or creating new trip`);
+
+        // Check for other trips at the same time with capacity
+        const { findTripsAtSameTime, getAvailableSeats } = await import('../services/matchingService.js');
+        const Vehicle = (await import('../models/Vehicle.js')).default;
+
+        const tripsAtSameTime = await findTripsAtSameTime(currentTrip.deptime, currentTrip.lineid);
+        const otherTripsWithCapacity = tripsAtSameTime.filter(t =>
+          t.tripid !== tripid &&
+          t.vehicleid &&
+          t.assigned_driverid &&
+          (t.status === 'scheduled' || t.status === 'open' || t.status === 'delayed')
+        );
+
+        // Find a trip with available capacity
+        let targetTripForBooking = null;
+        for (const otherTrip of otherTripsWithCapacity) {
+          const vehicle = await Vehicle.findById(otherTrip.vehicleid);
+          if (vehicle) {
+            const availableSeats = await getAvailableSeats(vehicle, otherTrip.tripid);
+            if (availableSeats > 0) {
+              targetTripForBooking = otherTrip;
+              logger.info(`[ReservationController] Found alternative trip ${otherTrip.tripid} with ${availableSeats} available seats`);
+              break;
+            }
+          }
+        }
+
+        // If found alternative trip, reassign booking to it
+        if (targetTripForBooking) {
+          const originalTripId = tripid;
+          await Reservation.update(reservation.bookingid, {
+            tripid: targetTripForBooking.tripid,
+          });
+          logger.info(`[ReservationController] ✅ Reassigned booking ${reservation.bookingid} from full trip ${originalTripId} to alternative trip ${targetTripForBooking.tripid}`);
+
+          // Update payment.tripid to match the new trip
+          try {
+            await Payment.update(paymentRecord.paymentid, {
+              tripid: targetTripForBooking.tripid,
+            });
+            logger.info(`[ReservationController] ✅ Updated payment ${paymentRecord.paymentid} tripid to ${targetTripForBooking.tripid}`);
+          } catch (error) {
+            logger.warn(`[ReservationController] ⚠️ Failed to update payment.tripid after reassignment:`, error);
+          }
+
+          // Update reservation object with new tripid for the rest of the function
+          reservation.tripid = targetTripForBooking.tripid;
+          // Update tripid variable to use the alternative trip for rest of processing
+          tripid = targetTripForBooking.tripid;
+
+          // Refresh currentTrip to the alternative trip
+          currentTrip = await Trip.findById(tripid);
+
+          logger.info(`[ReservationController] 📝 Using alternative trip ${tripid} for rest of booking processing`);
+        } else {
+          // No alternative trip found - check if additional drivers can be assigned
+          logger.info(`[ReservationController] No alternative trips found, checking queue for drivers...`);
+          const queueCheck = await DriverQueue.canAcceptInstantBooking(currentTrip.lineid);
+          logger.info(`[ReservationController] Queue check result: allowed=${queueCheck.allowed}, driversAvailable=${queueCheck.driversAvailable}`);
+
+          if (queueCheck.allowed && queueCheck.driversAvailable > 0) {
+            // Allow booking - immediately create new trip with next driver and assign booking to it
+            logger.info(`[ReservationController] 🚨 Trip ${tripid} is full (${activeReservationCount} bookings > ${maxPassengerSeats} capacity), but ${queueCheck.driversAvailable} driver(s) available in queue - creating new trip and assigning booking ${reservation.bookingid}`);
+
+            // Use the direct function to immediately create a new trip and assign the booking
+            const { createNewTripForFullTripBooking } = await import('../services/matchingService.js');
+            logger.info(`[ReservationController] Calling createNewTripForFullTripBooking with fullTripId=${tripid}, bookingId=${reservation.bookingid}`);
+            const newTrip = await createNewTripForFullTripBooking(tripid, reservation.bookingid);
+
+            if (newTrip) {
+              logger.info(`[ReservationController] ✅ SUCCESS: Created new trip ${newTrip.tripid} and assigned booking ${reservation.bookingid} to it`);
+
+              // IMPORTANT: Sync stats for the ORIGINAL full trip to remove this booking from its count
+              const originalFullTripId = tripid;
+              const { syncTripStats } = await import('../services/matchingService.js');
+              await syncTripStats(originalFullTripId);
+              logger.info(`[ReservationController] ✅ Synced stats for original full trip ${originalFullTripId} (removed booking ${reservation.bookingid} from count)`);
+
+              // Update payment.tripid to match the new trip
+              try {
+                await Payment.update(paymentRecord.paymentid, {
+                  tripid: newTrip.tripid,
+                });
+                logger.info(`[ReservationController] ✅ Updated payment ${paymentRecord.paymentid} tripid to ${newTrip.tripid}`);
+              } catch (error) {
+                logger.warn(`[ReservationController] ⚠️ Failed to update payment.tripid after new trip creation:`, error);
+              }
+
+              // Update reservation and tripid for rest of processing
+              reservation.tripid = newTrip.tripid;
+              tripid = newTrip.tripid;
+              currentTrip = await Trip.findById(tripid);
+
+              // Sync stats for the new trip (booking is already assigned, this just updates the count)
+              await syncTripStats(tripid);
+              logger.info(`[ReservationController] ✅ Synced stats for new trip ${tripid}`);
+
+              // Mark that we've already handled this booking - skip the distribution logic below
+              seatsUpdated = true;
+              bookingsIncremented = true;
+
+              // IMPORTANT: Skip the rest of the distribution logic since booking is already assigned to new trip
+              // The new trip already has a driver assigned, so we don't need to run distribution
+              logger.info(`[ReservationController] ⏭️ Skipping distribution logic - booking already assigned to new trip with driver`);
+            } else {
+              logger.error(`[ReservationController] ❌ FAILED: createNewTripForFullTripBooking returned null for booking ${reservation.bookingid}`);
+              // Failed to create new trip - try the old method as fallback
+              logger.warn(`[ReservationController] ⚠️ Direct trip creation failed, trying fallback method`);
+              const { checkAndAssignAdditionalDrivers } = await import('../services/matchingService.js');
+              const additionalDriversResult = await checkAndAssignAdditionalDrivers(tripid);
+
+              if (additionalDriversResult.assigned > 0 && additionalDriversResult.success) {
+                // Find the newly created trip and reassign booking
+                const { findTripsAtSameTime, getAvailableSeats } = await import('../services/matchingService.js');
+                const Vehicle = (await import('../models/Vehicle.js')).default;
+
+                let targetTripForReassignment = null;
+                for (let attempt = 0; attempt < 3; attempt++) {
+                  const tripsAtSameTime = await findTripsAtSameTime(currentTrip.deptime, currentTrip.lineid);
+                  const tripsWithCapacity = tripsAtSameTime.filter(t =>
+                    t.tripid !== tripid &&
+                    t.vehicleid &&
+                    t.assigned_driverid &&
+                    (t.status === 'scheduled' || t.status === 'open' || t.status === 'delayed')
+                  );
+
+                  for (const otherTrip of tripsWithCapacity) {
+                    const vehicle = await Vehicle.findById(otherTrip.vehicleid);
+                    if (vehicle) {
+                      const availableSeats = await getAvailableSeats(vehicle, otherTrip.tripid);
+                      if (availableSeats > 0) {
+                        targetTripForReassignment = otherTrip;
+                        break;
+                      }
+                    }
+                  }
+
+                  if (targetTripForReassignment) break;
+                  if (attempt < 2) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                  }
+                }
+
+                if (targetTripForReassignment) {
+                  await Reservation.update(reservation.bookingid, {
+                    tripid: targetTripForReassignment.tripid,
+                  });
+
+                  // Update payment.tripid to match the new trip
+                  try {
+                    await Payment.update(paymentRecord.paymentid, {
+                      tripid: targetTripForReassignment.tripid,
+                    });
+                    logger.info(`[ReservationController] ✅ Updated payment ${paymentRecord.paymentid} tripid to ${targetTripForReassignment.tripid}`);
+                  } catch (error) {
+                    logger.warn(`[ReservationController] ⚠️ Failed to update payment.tripid after reassignment:`, error);
+                  }
+
+                  reservation.tripid = targetTripForReassignment.tripid;
+                  tripid = targetTripForReassignment.tripid;
+                  currentTrip = await Trip.findById(tripid);
+                  const { syncTripStats } = await import('../services/matchingService.js');
+                  await syncTripStats(tripid);
+                } else {
+                  logger.error(`[ReservationController] ❌ Could not find trip with capacity for reassignment - rejecting booking`);
+                  await Reservation.delete(reservation.bookingid);
+                  if (walletUsed && walletChargeAmount > 0) {
+                    await Wallet.updateBalance(walletUsed, walletChargeAmount, 'add').catch(() => { });
+                  }
+                  if (paymentRecord) {
+                    await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.FAILED }).catch(() => { });
+                  }
+                  return res.status(400).json({
+                    message: req.t('reservation.no_seats') || 'No available seats - unable to assign to new trip',
+                  });
+                }
+              } else {
+                // No drivers were assigned - reject booking
+                logger.warn(`[ReservationController] ⚠️ Could not assign additional drivers - rejecting booking`);
+                await Reservation.delete(reservation.bookingid);
+                if (walletUsed && walletChargeAmount > 0) {
+                  await Wallet.updateBalance(walletUsed, walletChargeAmount, 'add').catch(() => { });
+                }
+                if (paymentRecord) {
+                  await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.FAILED }).catch(() => { });
+                }
+                return res.status(400).json({
+                  message: req.t('reservation.no_seats') || 'No available seats on this trip and no drivers available in queue',
+                });
+              }
+            }
+          } else {
+            // No capacity anywhere - reject booking
+            logger.warn(`[ReservationController] Trip ${tripid} is full and no alternative trips or drivers available - rejecting booking`);
+            await Reservation.delete(reservation.bookingid);
+            if (walletUsed && walletChargeAmount > 0) {
+              await Wallet.updateBalance(walletUsed, walletChargeAmount, 'add').catch(() => { });
+            }
+            if (paymentRecord) {
+              await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.FAILED }).catch(() => { });
+            }
+            return res.status(400).json({
+              message: req.t('reservation.no_seats') || 'No available seats on this trip or alternative trips',
+            });
+          }
+        }
+      }
+
+      // Sync trip stats based on actual reservation count (ensures accuracy)
+      // This will sync the correct trip (original or alternative if reassigned)
+      const { syncTripStats } = await import('../services/matchingService.js');
+      await syncTripStats(tripid);
+      seatsUpdated = true;
+      bookingsIncremented = true;
+
+      // Ensure payment.tripid is set to the final tripid (in case trip was reassigned)
+      // This is critical for payment transfer to work correctly
+      if (reservation.tripid && reservation.tripid === tripid) {
+        try {
+          // Double-check payment.tripid is set correctly (in case it wasn't set earlier or trip was reassigned)
+          const currentPayment = await Payment.findById(paymentRecord.paymentid);
+          if (currentPayment && currentPayment.tripid !== tripid) {
+            await Payment.update(paymentRecord.paymentid, {
+              tripid: tripid,
+            });
+            logger.info(`[ReservationController] ✅ Updated payment ${paymentRecord.paymentid} tripid to ${tripid} (after trip sync)`);
+          }
+        } catch (error) {
+          logger.warn(`[ReservationController] ⚠️ Failed to verify/update payment.tripid after sync:`, error);
+        }
+      }
+
+      // IMMEDIATE DRIVER ASSIGNMENT: If trip has no driver and there's a driver in queue, assign immediately
+      // BUT: Skip if booking was already moved to a new trip (which already has a driver)
+      const currentTripAfterSync = await Trip.findById(tripid);
+      if (currentTripAfterSync && currentTripAfterSync.lineid) {
+        // If trip already has a driver, transfer payment immediately
+        if (currentTripAfterSync.assigned_driverid && currentTripAfterSync.vehicleid) {
+          logger.info(`[ReservationController] 💰 Trip ${tripid} already has driver ${currentTripAfterSync.assigned_driverid} - transferring payment immediately`);
+          try {
+            // Transfer the specific payment for this reservation
+            const { transferPaymentToDriver } = await import('../services/paymentService.js');
+            const transferResult = await transferPaymentToDriver(paymentRecord.paymentid, currentTripAfterSync.assigned_driverid);
+            if (transferResult.success) {
+              logger.info(`[ReservationController] ✅ Transferred payment ${paymentRecord.paymentid} (${transferResult.amount || paymentRecord.amount}) to driver ${currentTripAfterSync.assigned_driverid} for trip ${tripid}`);
+            } else {
+              logger.warn(`[ReservationController] ⚠️ Payment transfer failed for payment ${paymentRecord.paymentid}: ${transferResult.error}`);
+              // Also try the batch transfer method as fallback
+              const { transferPaymentsForTrip } = await import('../services/paymentService.js');
+              const batchResult = await transferPaymentsForTrip(tripid, currentTripAfterSync.assigned_driverid);
+              if (batchResult.success) {
+                logger.info(`[ReservationController] ✅ Batch transfer succeeded: ${batchResult.transferred} payment(s) transferred`);
+              }
+            }
+          } catch (paymentError) {
+            logger.error(`[ReservationController] ❌ Error transferring payments for trip ${tripid}:`, paymentError);
+            // Don't fail the reservation creation if payment transfer fails
+          }
+        } else {
+          try {
+            // Step 1: Assign first driver if trip has no driver
+            logger.info(`[ReservationController] 🔍 Checking for available driver in queue for trip ${tripid} (immediate assignment)`);
+            const assignmentResult = await assignVehicleFromQueue(tripid, currentTripAfterSync.lineid);
+
+            if (assignmentResult && assignmentResult.success) {
+              logger.info(`[ReservationController] ✅ Driver ${assignmentResult.driverid} immediately assigned to trip ${tripid} after booking creation`);
+
+              // Refresh trip after assignment
+              const tripAfterAssignment = await Trip.findById(tripid);
+
+              // Step 2: Distribute all bookings for this trip (this ensures the booking is assigned to the correct driver)
+              const { distributeAllBookings } = await import('../services/matchingService.js');
+              try {
+                await distributeAllBookings(tripid);
+                logger.info(`[ReservationController] ✅ Distributed bookings for trip ${tripid} after driver assignment`);
+              } catch (distError) {
+                logger.warn(`[ReservationController] ⚠️ Error distributing bookings after driver assignment:`, distError);
+                // Don't fail the reservation creation if distribution fails
+              }
+
+              // Step 3: Check if we need additional drivers due to capacity (only after distribution)
+              // CRITICAL: Only check if trip is full AND there are bookings that exceed capacity
+              // Don't create new trips if trip is full but all bookings fit
+              const refreshedTripAfterDist = await Trip.findById(tripid);
+              if (refreshedTripAfterDist && refreshedTripAfterDist.vehicleid && refreshedTripAfterDist.assigned_driverid) {
+                const Vehicle = (await import('../models/Vehicle.js')).default;
+                const { getAvailableSeats } = await import('../services/matchingService.js');
+                const vehicle = await Vehicle.findById(refreshedTripAfterDist.vehicleid);
+
+                if (vehicle) {
+                  const availableSeats = await getAvailableSeats(vehicle, tripid);
+
+                  // Only check for additional drivers if trip is actually full (no available seats)
+                  // AND there are bookings that exceed capacity (this booking just made it full)
+                  if (availableSeats <= 0) {
+                    logger.info(`[ReservationController] Trip ${tripid} is full after new booking - checking if additional drivers needed`);
+                    const { checkAndAssignAdditionalDrivers } = await import('../services/matchingService.js');
+                    const additionalDriversResult = await checkAndAssignAdditionalDrivers(tripid);
+
+                    if (additionalDriversResult.assigned > 0) {
+                      logger.info(`[ReservationController] ✅ Assigned ${additionalDriversResult.assigned} additional drivers to trip ${tripid} due to capacity`);
+
+                      // Redistribute bookings across all drivers if additional drivers were assigned
+                      try {
+                        await distributeAllBookings(tripid);
+                        logger.info(`[ReservationController] ✅ Redistributed bookings after additional driver assignment`);
+                      } catch (distError) {
+                        logger.warn(`[ReservationController] ⚠️ Error redistributing bookings after additional driver assignment:`, distError);
+                      }
+                    }
+                  }
+                }
+              }
+            } else {
+              logger.info(`[ReservationController] ℹ️ No driver available in queue for immediate assignment to trip ${tripid}`);
+            }
+          } catch (assignError) {
+            logger.error(`[ReservationController] ❌ Error assigning driver immediately after booking:`, assignError);
+            // Don't fail the reservation creation if driver assignment fails
+            // The driver will be assigned later when trip opens or driver joins queue
+          }
+        }
       }
     }
 
@@ -370,22 +849,10 @@ export const createReservation = async (req, res, next) => {
     if (paymentRecord) {
       await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.FAILED }).catch(() => { });
     }
-    if (seatsUpdated) {
-      await Trip.findById(req.body.tripid)
-        .then((currentTrip) => {
-          if (!currentTrip || typeof currentTrip.availableseats !== 'number') return null;
-          return Trip.updateAvailableSeats(req.body.tripid, currentTrip.availableseats + 1);
-        })
-        .catch(() => { });
-    }
-    if (bookingsIncremented) {
-      await Trip.findById(req.body.tripid)
-        .then((currentTrip) => {
-          if (!currentTrip || typeof currentTrip.totalbookings !== 'number') return null;
-          const updatedCount = Math.max((currentTrip.totalbookings || 1) - 1, 0);
-          return Trip.update(tripid, { totalbookings: updatedCount });
-        })
-        .catch(() => { });
+    // If stats were updated and there was an error, re-sync to correct state
+    // The reservation might have been deleted already, so syncTripStats will recalculate correctly
+    if ((seatsUpdated || bookingsIncremented) && req.body.tripid) {
+      await syncTripStats(req.body.tripid).catch(() => { });
     }
     next(error);
   }
@@ -473,7 +940,7 @@ export const cancelReservation = async (req, res, next) => {
           await Payment.create({
             paymentid: uuidv4(),
             amount: refundAmount,
-            method: 'refund',
+            method: PAYMENT_METHOD.WALLET,
             status: PAYMENT_STATUS.REFUNDED,
             type: 'refund',
             fromwalletid: wallets[0].walletid,
@@ -487,8 +954,9 @@ export const cancelReservation = async (req, res, next) => {
     await Reservation.update(bookingid, { status: RESERVATION_STATUS.CANCELLED });
 
 
-    if (reservation.tripid && trip && (reservation.status === RESERVATION_STATUS.CONFIRMED || reservation.status === RESERVATION_STATUS.CHECKED_IN)) {
-      await Trip.updateAvailableSeats(reservation.tripid, trip.availableseats + 1);
+    // Sync trip stats after cancellation - this will recalculate based on actual active reservations
+    if (reservation.tripid && (reservation.status === RESERVATION_STATUS.CONFIRMED || reservation.status === RESERVATION_STATUS.CHECKED_IN)) {
+      await syncTripStats(reservation.tripid);
     }
 
     res.json({

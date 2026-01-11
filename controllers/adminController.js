@@ -605,14 +605,12 @@ export const getBookingTimeSeries = async (req, res, next) => {
         total: items.length,
         confirmed: items.filter((r) => r.status === RESERVATION_STATUS.CONFIRMED).length,
         cancelled: items.filter((r) => r.status === RESERVATION_STATUS.CANCELLED).length,
-        pending: items.filter((r) => r.status === RESERVATION_STATUS.PENDING).length,
       };
     });
 
     const byStatus = {
       confirmed: reservations.filter((r) => r.status === RESERVATION_STATUS.CONFIRMED).length,
       cancelled: reservations.filter((r) => r.status === RESERVATION_STATUS.CANCELLED).length,
-      pending: reservations.filter((r) => r.status === RESERVATION_STATUS.PENDING).length,
     };
 
     const byLine = {};

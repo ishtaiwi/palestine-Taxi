@@ -5,7 +5,7 @@ import Vehicle from '../models/Vehicle.js';
 import { v4 as uuidv4 } from 'uuid';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
 import logger from '../utils/logger.js';
-import { parseUtcDate, getUtcNow } from '../utils/timeUtils.js';
+import { parseUtcDate, getUtcNow, getOpeningWindowMinutes } from '../utils/timeUtils.js';
 import {
     getRushHourPredictions,
     getTopDemandLines,
@@ -62,43 +62,48 @@ export async function applyRecommendation(recommendation) {
 
     const { actionType, actionPayload, lineid, templateId } = recommendation;
 
-    // Handle insert_buffer_trip by creating trip directly
+    
     if (actionType === 'insert_buffer_trip') {
         if (!actionPayload?.deptime) {
             throw new Error('insert_buffer_trip requires deptime in payload');
         }
 
-        // Calculate trip opening time (45 minutes before departure) - parse as UTC
+        
         const deptime = parseUtcDate(actionPayload.deptime);
         if (!deptime) {
             throw new Error('Invalid deptime format');
         }
-        const openingTime = new Date(deptime.getTime() - 45 * 60 * 1000);
 
-        // Get default vehicle for seat count calculation (optional)
-        // Vehicle will be assigned from driver queue at trip opening time
-        const vehicles = await Vehicle.findAll({ lineid, status: 'active' });
-        const defaultSeats = vehicles && vehicles.length > 0 ? vehicles[0].seatnum : 5;
-
-        // Get departure settings from template if templateId is provided, otherwise default to false
+        
         let autoDepartureEnabled = false;
         let scheduledDepartureEnforced = false;
+        let intervalMinutes = 60; 
         if (templateId) {
             try {
                 const template = await ScheduleTemplate.findById(templateId);
                 if (template) {
                     autoDepartureEnabled = template.auto_departure_enabled ?? false;
                     scheduledDepartureEnforced = template.scheduled_departure_enforced ?? false;
+                    intervalMinutes = template.interval_minutes || 60;
                 }
             } catch (error) {
                 logger.warn('Could not fetch template for departure settings, using defaults', { templateId, error: error.message });
             }
         }
 
+        
+        const openingWindowMinutes = getOpeningWindowMinutes(intervalMinutes);
+        const openingTime = new Date(deptime.getTime() - openingWindowMinutes * 60 * 1000);
+
+        
+        
+        const vehicles = await Vehicle.findAll({ lineid, status: 'active' });
+        const defaultSeats = vehicles && vehicles.length > 0 ? vehicles[0].seatnum : 5;
+
         const tripData = {
             tripid: uuidv4(),
             lineid,
-            vehicleid: null, // Will be assigned from driver queue at opening time
+            vehicleid: null, 
             deptime: deptime.toISOString(),
             status: 'scheduled',
             availableseats: calculateAvailablePassengerSeats(defaultSeats, 0, 0),
@@ -124,7 +129,7 @@ export async function applyRecommendation(recommendation) {
         };
     }
 
-    // Handle other action types (update template)
+    
     if (!templateId || !actionPayload) {
         throw new Error('Recommendation is missing template context or action payload');
     }
@@ -146,14 +151,14 @@ async function buildLineRecommendations(lineid, predictionData, utilizationMap, 
     const recommendations = [];
 
     for (const prediction of predictionData.predictions) {
-        // Check available seats in scheduled trips for this time slot
+        
         const totalAvailableSeats = await getTotalAvailableSeatsForTimeSlot(
             lineid,
             prediction.date,
             prediction.hour,
         );
 
-        // Only show recommendation if expected bookings exceed available seats
+        
         if (prediction.expectedBookings <= totalAvailableSeats) {
             continue;
         }
@@ -216,20 +221,20 @@ function buildUtilizationMap(buckets = []) {
 
 async function getTotalAvailableSeatsForTimeSlot(lineid, date, hour) {
     try {
-        // Create date range for the specific hour
+        
         const targetDate = new Date(`${date}T${String(hour).padStart(2, '0')}:00:00Z`);
         const startTime = new Date(targetDate);
         startTime.setMinutes(0, 0, 0);
         const endTime = new Date(targetDate);
         endTime.setMinutes(59, 59, 999);
 
-        // Find all scheduled trips for this line in this time slot
+        
         const trips = await Trip.findAll({
             lineid,
             date: date,
         });
 
-        // Filter trips that match the hour and sum available seats
+        
         let totalAvailable = 0;
         for (const trip of trips || []) {
             const tripDeptime = parseUtcDate(trip.deptime);

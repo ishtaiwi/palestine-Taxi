@@ -523,9 +523,10 @@ class _BookingByStatusChartState extends State<BookingByStatusChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
+    final statusColors = {
+      'confirmed': Colors.green,
+      'cancelled': Colors.red,
+    };
 
         return Column(
           children: [

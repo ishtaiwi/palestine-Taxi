@@ -3,7 +3,7 @@ import { createDailyTrips } from '../services/dailyTripService.js';
 import logger from '../utils/logger.js';
 
 export function startDailyTripCreationJob() {
-  const cronExpression = '43 12 * * *';
+  const cronExpression = '23 10 * * *';
 
   logger.info('Starting daily trip creation job', {
     schedule: 'Every day at 11:00 PM',
@@ -12,7 +12,7 @@ export function startDailyTripCreationJob() {
 
   cron.schedule(cronExpression, async () => {
     try {
-      logger.info('Daily trip creation job triggered');
+      logger.info('Daily trip creation job triggere d');
       const result = await createDailyTrips();
 
       if (result.success) {

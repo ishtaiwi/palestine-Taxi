@@ -622,7 +622,6 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     switch (status.toLowerCase()) {
       case 'confirmed':
         return Colors.green;
-      case 'pending':
       case 'pending_payment':
         return Colors.orange;
       case 'checked_in':
@@ -640,8 +639,6 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     switch (status.toLowerCase()) {
       case 'confirmed':
         return Icons.check_circle;
-      case 'pending':
-        return Icons.hourglass_empty;
       case 'checked_in':
         return Icons.done_all;
       case 'cancelled':
@@ -657,7 +654,6 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     switch (status.toLowerCase()) {
       case 'confirmed':
         return t('confirmed');
-      case 'pending':
       case 'pending_payment':
         return t('pending');
       case 'checked_in':
@@ -836,9 +832,6 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                       SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                       _buildStatusChip(
                           'confirmed', t('confirmed'), textPrimary, cardColor, isSmallScreen),
-                      SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-                      _buildStatusChip(
-                          'pending', t('pending'), textPrimary, cardColor, isSmallScreen),
                       SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                       _buildStatusChip('checked_in', t('checked_in'),
                           textPrimary, cardColor, isSmallScreen),

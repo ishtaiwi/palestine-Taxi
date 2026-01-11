@@ -207,6 +207,8 @@ class Trip {
 
   static async findTripsNeedingOpening(openingWindowMinutes = 45) {
     const now = getUtcNow();
+    
+    
     const openingTime = new Date(now.getTime() + openingWindowMinutes * 60 * 1000);
 
     const { data, error } = await supabase
@@ -219,6 +221,8 @@ class Trip {
     if (error) throw error;
 
     const nowISO = now.toISOString();
+    
+    
     const tripsToOpen = (data || []).filter(trip => {
       if (!trip.trip_opening_time) {
         return true;

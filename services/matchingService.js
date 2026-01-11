@@ -461,22 +461,8 @@ export const createNewTripForFullTripBooking = async (fullTripId, bookingId) => 
       tripid: newTrip.tripid,
     });
     logger.info(`[MatchingService] ✅ Assigned booking ${bookingId} to new trip ${newTrip.tripid}`);
-<<<<<<< HEAD
-    
-    // Record earnings for this booking now that it's assigned to a trip with driver
-    try {
-      const { checkAndRecordReservationEarnings } = await import('./driverEarningsService.js');
-      await checkAndRecordReservationEarnings(bookingId, newTrip.tripid);
-    } catch (earningsError) {
-      logger.warn(`[MatchingService] ⚠️ Error recording earnings for booking ${bookingId}:`, earningsError);
-      // Don't fail trip creation if earnings recording fails
-    }
-    
-    
-=======
 
 
->>>>>>> 70a69e1ea925493ae5e75298dfea38a9348d7f10
     await syncTripStats(newTrip.tripid);
     logger.info(`[MatchingService] ✅ Synced trip stats for ${newTrip.tripid}`);
 
@@ -608,31 +594,6 @@ const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWa
 
       await syncTripStats(unassignedTripAtTime.tripid);
 
-<<<<<<< HEAD
-      // Record earnings for all existing reservations now that driver is assigned
-      try {
-        const { checkAndRecordReservationEarnings } = await import('./driverEarningsService.js');
-        logger.info(`[MatchingService] 📝 Recording earnings for ${activeReservations.length} existing reservation(s) on trip ${unassignedTripAtTime.tripid}`);
-        
-        for (const reservation of activeReservations) {
-          try {
-            await checkAndRecordReservationEarnings(reservation.bookingid, unassignedTripAtTime.tripid);
-          } catch (earningsError) {
-            logger.warn(`[MatchingService] ⚠️ Error recording earnings for reservation ${reservation.bookingid}:`, earningsError);
-            // Continue with other reservations even if one fails
-          }
-        }
-        
-        logger.info(`[MatchingService] ✅ Earnings recording completed for trip ${unassignedTripAtTime.tripid}`);
-      } catch (earningsError) {
-        logger.error(`[MatchingService] ⚠️ Error recording earnings for trip ${unassignedTripAtTime.tripid}:`, earningsError);
-        // Don't fail driver assignment if earnings recording fails
-      }
-
-      
-=======
-
->>>>>>> 70a69e1ea925493ae5e75298dfea38a9348d7f10
       return await Trip.findById(unassignedTripAtTime.tripid);
     }
 
@@ -779,18 +740,6 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
             await Reservation.update(booking.bookingid, {
               tripid: targetTrip.tripid,
             });
-<<<<<<< HEAD
-            
-            // Record earnings for this booking now that it's assigned to a trip with driver
-            try {
-              const { checkAndRecordReservationEarnings } = await import('./driverEarningsService.js');
-              await checkAndRecordReservationEarnings(booking.bookingid, targetTrip.tripid);
-            } catch (earningsError) {
-              logger.warn(`[MatchingService] ⚠️ Error recording earnings for booking ${booking.bookingid}:`, earningsError);
-              // Don't fail distribution if earnings recording fails
-            }
-            
-=======
 
             // Update payment.tripid for this booking
             if (booking.paymentid) {
@@ -802,7 +751,6 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
               }
             }
 
->>>>>>> 70a69e1ea925493ae5e75298dfea38a9348d7f10
             distributedCount++;
           }
 

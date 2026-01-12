@@ -2941,6 +2941,36 @@ class ApiService {
     }
   }
 
+  static Future<List<Map<String, dynamic>>> getPendingRatings() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return [];
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/ratings/pending'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is List) {
+          return decoded
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+        }
+        return [];
+      }
+      return [];
+    } catch (exception) {
+      return [];
+    }
+  }
+
   static Future<Map<String, dynamic>> getTripRatings(String tripid) async {
     try {
       final response = await http.get(

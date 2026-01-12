@@ -6,6 +6,7 @@ import {
   getTripRatings,
   getMyRatings,
   deleteRating,
+  getPendingRatings,
 } from '../controllers/ratingController.js';
 import { authenticate } from '../middleware/auth.js';
 import { requirePassenger } from '../middleware/authorization.js';
@@ -22,6 +23,7 @@ router.use(authenticate);
 // Passenger routes
 router.post('/', requirePassenger, validateRating, submitRating);
 router.get('/my-ratings', requirePassenger, getMyRatings);
+router.get('/pending', requirePassenger, getPendingRatings);
 router.get('/booking/:bookingid', requirePassenger, getRatingByBookingId);
 router.put('/:ratingid', requirePassenger, validateRatingUpdate, updateRating);
 router.delete('/:ratingid', requirePassenger, deleteRating);

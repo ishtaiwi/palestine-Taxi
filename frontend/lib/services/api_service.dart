@@ -901,6 +901,32 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getDriverStatistics() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/drivers/statistics'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else {
+        throw Exception('Failed to load driver statistics');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> fetchDriverVehicles() async {
     final token = await getToken();
     if (token == null) return [];
@@ -1113,6 +1139,27 @@ class ApiService {
       throw Exception('Failed to fetch trip');
     } catch (exception) {
       throw Exception('Failed to fetch trip: ${exception.toString()}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> checkLineBookingAvailability(String lineId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/trips/line/$lineId/booking-availability'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return decoded is Map<String, dynamic> 
+            ? decoded 
+            : {'driversInQueue': 0, 'instantBookingAvailable': false};
+      }
+      return {'driversInQueue': 0, 'instantBookingAvailable': false};
+    } catch (exception) {
+      return {'driversInQueue': 0, 'instantBookingAvailable': false};
     }
   }
 

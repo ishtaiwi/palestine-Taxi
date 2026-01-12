@@ -9,6 +9,7 @@ import {
   getDriverTrips,
   getDriverTripReservations,
   updateDriverReservationStatus,
+  getDriverStatistics,
 } from '../controllers/driverController.js';
 
 const router = express.Router();
@@ -22,6 +23,7 @@ router.post('/queue/leave', leaveDriverQueue);
 router.get('/trips', getDriverTrips);
 router.get('/trips/:tripid/reservations', getDriverTripReservations);
 router.patch('/trips/:tripid/reservations/:bookingid', updateDriverReservationStatus);
+router.get('/statistics', getDriverStatistics);
 
 export default router;
 

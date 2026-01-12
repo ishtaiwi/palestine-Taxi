@@ -6,6 +6,7 @@ import Trip from '../models/Trip.js';
 import Reservation from '../models/Reservation.js';
 import Payment from '../models/Payment.js';
 import Wallet from '../models/Wallet.js';
+import Rating from '../models/Rating.js';
 import { v4 as uuidv4 } from 'uuid';
 import { RESERVATION_STATUS, PAYMENT_STATUS, PAYMENT_METHOD } from '../utils/constants.js';
 import { checkAndAssignWaitingTrips } from '../services/tripOpeningService.js';
@@ -426,6 +427,93 @@ export const updateDriverReservationStatus = async (req, res, next) => {
         message: req.t('driver.trip_forbidden') || 'Driver not authorized for this trip',
       });
     }
+    next(error);
+  }
+};
+
+export const getDriverStatistics = async (req, res, next) => {
+  try {
+    const driverRecord = await Driver.findById(req.user.driverid);
+    if (!driverRecord) {
+      return res.status(404).json({
+        message: req.t('driver.not_found') || 'Driver not found',
+      });
+    }
+
+    // Get today's date range (UTC)
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    const todayStartISO = todayStart.toISOString();
+    const todayEndISO = todayEnd.toISOString();
+
+    // Get vehicles for this driver
+    const vehicles = await Vehicle.findByDriverId(driverRecord.driverid);
+    const vehicleIds = vehicles.map((vehicle) => vehicle.vehicleid).filter(Boolean);
+
+    // Get all trips for this driver (similar to getDriverTrips)
+    const tripsByVehicle = vehicleIds.length > 0
+      ? await Trip.findByVehicleIds(vehicleIds)
+      : [];
+    const tripsByDriver = await Trip.findAssignedTrips(driverRecord.driverid);
+
+    // Combine and deduplicate trips
+    const allTrips = [...tripsByVehicle, ...tripsByDriver];
+    const uniqueTrips = Array.from(
+      new Map(allTrips.map(trip => [trip.tripid, trip])).values()
+    );
+
+    // Filter for today's trips
+    const todayTrips = uniqueTrips.filter(trip => {
+      if (!trip.deptime) return false;
+      const tripDate = new Date(trip.deptime);
+      return tripDate >= todayStart && tripDate <= todayEnd;
+    });
+
+    const todayTripsCount = todayTrips.length;
+
+    // Get passenger count (confirmed/checked_in reservations for today's trips)
+    const todayTripIds = todayTrips.map(trip => trip.tripid);
+    let totalPassengers = 0;
+
+    if (todayTripIds.length > 0) {
+      // Get reservations for today's trips
+      const allReservations = await Reservation.findAll({});
+      const todayReservations = allReservations.filter(res => 
+        todayTripIds.includes(res.tripid) &&
+        (res.status === RESERVATION_STATUS.CONFIRMED || res.status === RESERVATION_STATUS.CHECKED_IN)
+      );
+      totalPassengers = todayReservations.length;
+    }
+
+    // Get driver rating (use driver.rating field, or calculate from trip_rating if null/0)
+    let driverRating = driverRecord.rating || 0;
+    
+    // If driver rating is null or 0, calculate from trip_rating
+    if (!driverRating || driverRating === 0) {
+      // Get ratings for all trips
+      let totalRating = 0;
+      let ratingCount = 0;
+      
+      for (const trip of uniqueTrips) {
+        const tripRating = await Rating.getAverageRating(trip.tripid);
+        if (tripRating.count > 0) {
+          totalRating += tripRating.average * tripRating.count;
+          ratingCount += tripRating.count;
+        }
+      }
+
+      if (ratingCount > 0) {
+        driverRating = Math.round((totalRating / ratingCount) * 10) / 10;
+      }
+    }
+
+    res.json({
+      todayTrips: todayTripsCount,
+      passengers: totalPassengers,
+      rating: driverRating || 0,
+    });
+  } catch (error) {
     next(error);
   }
 };

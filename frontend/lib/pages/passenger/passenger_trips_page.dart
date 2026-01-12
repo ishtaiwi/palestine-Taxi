@@ -8,7 +8,9 @@ import 'passenger_home.dart';
 import 'package:taxi_palestine_app/utils/server_time_sync.dart';
 
 class PassengerTripsPage extends StatefulWidget {
-  const PassengerTripsPage({super.key});
+  final String? initialLineId;
+
+  const PassengerTripsPage({super.key, this.initialLineId});
 
   @override
   State<PassengerTripsPage> createState() => _PassengerTripsPageState();
@@ -24,6 +26,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
   bool _isLineDropdownOpen = false;
   String? _selectedLineId;
   DateTime? _selectedDate;
+  Map<String, int> _lineQueueCounts = {}; // Map of lineId -> drivers in queue count
 
   final TextEditingController _lineSearchController = TextEditingController();
   String _lineSearchQuery = '';
@@ -49,6 +52,8 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'loading': 'جاري التحميل...',
       'tripNotOpenedYet': 'الحجز متاح فقط في الوقت المحدد',
       'tripOpensAt': 'الحجز متاح من الساعة',
+      'driversInQueue': 'سائق',
+      'noDriversInQueue': 'لا يوجد سائق',
     },
     'en': {
       'title': 'Available Trips',
@@ -70,14 +75,26 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'loading': 'Loading...',
       'tripNotOpenedYet': 'Booking is only available at the specified time',
       'tripOpensAt': 'Booking opens at',
+      'driversInQueue': 'driver',
+      'noDriversInQueue': 'No driver',
     },
   };
 
-  String t(String key) => _texts[_isArabic ? 'ar' : 'en']![key]!;
+  String t(String key) {
+    final lang = _isArabic ? 'ar' : 'en';
+    final texts = _texts[lang];
+    if (texts == null || !texts.containsKey(key)) {
+      return key; // Return key as fallback
+    }
+    return texts[key]!;
+  }
 
   @override
   void initState() {
     super.initState();
+    if (widget.initialLineId != null) {
+      _selectedLineId = widget.initialLineId;
+    }
     _initialize();
   }
 
@@ -126,9 +143,31 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
         lineid: _selectedLineId,
         date: _selectedDate?.toIso8601String().split('T')[0],
       );
+      
+      // Extract unique line IDs and fetch queue counts
+      final Set<String> uniqueLineIds = {};
+      for (final trip in trips) {
+        final line = trip['line'] as Map<String, dynamic>?;
+        if (line != null && line['lineid'] != null) {
+          uniqueLineIds.add(line['lineid'].toString());
+        }
+      }
+      
+      // Fetch queue counts for all unique lines
+      final Map<String, int> queueCounts = {};
+      for (final lineId in uniqueLineIds) {
+        try {
+          final availability = await ApiService.checkLineBookingAvailability(lineId);
+          queueCounts[lineId] = availability['driversInQueue'] as int? ?? 0;
+        } catch (e) {
+          queueCounts[lineId] = 0;
+        }
+      }
+      
       if (mounted) {
         setState(() {
           _trips = trips;
+          _lineQueueCounts = queueCounts;
           _isLoading = false;
         });
       }
@@ -1029,42 +1068,95 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                 ],
               ),
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: canBookFuture
-                      ? Colors.green.withAlpha(51)
-                      : Colors.red.withAlpha(51),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: canBookFuture
-                        ? Colors.green.withAlpha(102)
-                        : Colors.red.withAlpha(102),
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      canBookFuture ? Icons.check_circle : Icons.cancel,
-                      color: canBookFuture ? Colors.green : Colors.red,
-                      size: 18,
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      canBookFuture ? t('available') : t('notAvailable'),
-                      style: TextStyle(
-                        color: canBookFuture ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                    decoration: BoxDecoration(
+                      color: canBookFuture
+                          ? Colors.green.withAlpha(51)
+                          : Colors.red.withAlpha(51),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: canBookFuture
+                            ? Colors.green.withAlpha(102)
+                            : Colors.red.withAlpha(102),
+                        width: 1.5,
                       ),
                     ),
-                  ],
-                ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          canBookFuture ? Icons.check_circle : Icons.cancel,
+                          color: canBookFuture ? Colors.green : Colors.red,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          canBookFuture ? t('available') : t('notAvailable'),
+                          style: TextStyle(
+                            color: canBookFuture ? Colors.green : Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Builder(
+                    builder: (context) {
+                      final lineId = line['lineid']?.toString() ?? '';
+                      final driversInQueue = _lineQueueCounts[lineId] ?? 0;
+                      final hasDrivers = driversInQueue > 0;
+                      
+                      return Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 10 : 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: hasDrivers
+                              ? Colors.blue.withAlpha(51)
+                              : Colors.grey.withAlpha(51),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: hasDrivers
+                                ? Colors.blue.withAlpha(102)
+                                : Colors.grey.withAlpha(102),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.people_rounded,
+                              color: hasDrivers ? Colors.blue : Colors.grey,
+                              size: isSmallScreen ? 16 : 18,
+                            ),
+                            SizedBox(width: isSmallScreen ? 4 : 6),
+                            Text(
+                              hasDrivers 
+                                  ? '$driversInQueue ${t('driversInQueue')}'
+                                  : t('noDriversInQueue'),
+                              style: TextStyle(
+                                color: hasDrivers ? Colors.blue : Colors.grey,
+                                fontWeight: FontWeight.w600,
+                                fontSize: isSmallScreen ? 10 : 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
               SizedBox(height: isSmallScreen ? 12.0 : 18.0),
               Row(

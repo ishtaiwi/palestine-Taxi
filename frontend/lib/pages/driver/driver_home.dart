@@ -35,6 +35,12 @@ class _DriverHomePageState extends State<DriverHomePage>
   final ImagePicker _imagePicker = ImagePicker();
   bool _isTracking = false;
   final LocationService _locationService = LocationService.instance;
+  
+  // Statistics
+  int _todayTrips = 0;
+  int _passengers = 0;
+  double _rating = 0.0;
+  bool _isLoadingStats = true;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -109,6 +115,7 @@ class _DriverHomePageState extends State<DriverHomePage>
     WidgetsBinding.instance.addObserver(this);
     _loadUserData();
     _loadProfileImage();
+    _loadStatistics();
   }
 
   @override
@@ -139,6 +146,34 @@ class _DriverHomePageState extends State<DriverHomePage>
     // Auto-start location tracking for drivers
     if (userData != null && userData['role'] == 'DRIVER') {
       await _checkAndStartTracking();
+    }
+  }
+
+  Future<void> _loadStatistics() async {
+    try {
+      setState(() {
+        _isLoadingStats = true;
+      });
+      
+      final statistics = await ApiService.getDriverStatistics();
+      
+      if (mounted) {
+        setState(() {
+          _todayTrips = statistics['todayTrips'] ?? 0;
+          _passengers = statistics['passengers'] ?? 0;
+          _rating = (statistics['rating'] ?? 0.0).toDouble();
+          _isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _todayTrips = 0;
+          _passengers = 0;
+          _rating = 0.0;
+          _isLoadingStats = false;
+        });
+      }
     }
   }
 
@@ -1200,39 +1235,48 @@ class _DriverHomePageState extends State<DriverHomePage>
                                 ),
                               ],
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                _buildStatItem(
-                                  t('todayTrips'),
-                                  '0',
-                                  Colors.white,
-                                  Icons.local_taxi_rounded,
-                                ),
-                                Container(
-                                  width: 1,
-                                  height: 60,
-                                  color: Colors.white.withAlpha(77),
-                                ),
-                                _buildStatItem(
-                                  t('passengers'),
-                                  '0',
-                                  Colors.white,
-                                  Icons.people_rounded,
-                                ),
-                                Container(
-                                  width: 1,
-                                  height: 60,
-                                  color: Colors.white.withAlpha(77),
-                                ),
-                                _buildStatItem(
-                                  t('rating'),
-                                  '4.5',
-                                  Colors.white,
-                                  Icons.star_rounded,
-                                ),
-                              ],
-                            ),
+                            child: _isLoadingStats
+                                ? const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(24.0),
+                                      child: CircularProgressIndicator(
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                    children: [
+                                      _buildStatItem(
+                                        t('todayTrips'),
+                                        '$_todayTrips',
+                                        Colors.white,
+                                        Icons.local_taxi_rounded,
+                                      ),
+                                      Container(
+                                        width: 1,
+                                        height: 60,
+                                        color: Colors.white.withAlpha(77),
+                                      ),
+                                      _buildStatItem(
+                                        t('passengers'),
+                                        '$_passengers',
+                                        Colors.white,
+                                        Icons.people_rounded,
+                                      ),
+                                      Container(
+                                        width: 1,
+                                        height: 60,
+                                        color: Colors.white.withAlpha(77),
+                                      ),
+                                      _buildStatItem(
+                                        t('rating'),
+                                        _rating.toStringAsFixed(1),
+                                        Colors.white,
+                                        Icons.star_rounded,
+                                      ),
+                                    ],
+                                  ),
                           ),
                           const SizedBox(height: 28),
 

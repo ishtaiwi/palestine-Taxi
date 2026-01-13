@@ -54,6 +54,9 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'tripOpensAt': 'الحجز متاح من الساعة',
       'driversInQueue': 'سائق',
       'noDriversInQueue': 'لا يوجد سائق',
+      'tripHasDriver': 'الرحلة لديها سائق',
+      'tripNoDriver': 'لا يوجد سائق للرحلة',
+      'driversInQueueLabel': 'سائق في الانتظار',
     },
     'en': {
       'title': 'Available Trips',
@@ -77,6 +80,9 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'tripOpensAt': 'Booking opens at',
       'driversInQueue': 'driver',
       'noDriversInQueue': 'No driver',
+      'tripHasDriver': 'Trip has driver',
+      'tripNoDriver': 'No driver assigned',
+      'driversInQueueLabel': 'drivers in queue',
     },
   };
 
@@ -866,6 +872,11 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     // Use backend-computed flags instead of calculating locally
     // Backend handles all timezone logic and returns boolean flags
     final canBookInstantBackend = trip['canBookInstant'] as bool? ?? false;
+    
+    // Check if trip has an assigned driver
+    final vehicleid = trip['vehicleid'];
+    final assignedDriverid = trip['assigned_driverid'];
+    final hasAssignedDriver = vehicleid != null || assignedDriverid != null;
 
     // Parse UTC times for display only (convert to device local timezone)
     // Supabase returns timestamps like "2025-12-23 21:00:00+00" - normalize to ISO format
@@ -1109,53 +1120,90 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                       ],
                     ),
                   ),
-                  Builder(
-                    builder: (context) {
-                      final lineId = line['lineid']?.toString() ?? '';
-                      final driversInQueue = _lineQueueCounts[lineId] ?? 0;
-                      final hasDrivers = driversInQueue > 0;
-                      
-                      return Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isSmallScreen ? 10 : 12,
-                          vertical: 8,
+                  // Show if trip has assigned driver (only for open trips)
+                  if (canBookInstant && hasAssignedDriver)
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isSmallScreen ? 10 : 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withAlpha(51),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.green.withAlpha(102),
+                          width: 1.5,
                         ),
-                        decoration: BoxDecoration(
-                          color: hasDrivers
-                              ? Colors.blue.withAlpha(51)
-                              : Colors.grey.withAlpha(51),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: hasDrivers
-                                ? Colors.blue.withAlpha(102)
-                                : Colors.grey.withAlpha(102),
-                            width: 1.5,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.drive_eta_rounded,
+                            color: Colors.green,
+                            size: isSmallScreen ? 16 : 18,
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.people_rounded,
-                              color: hasDrivers ? Colors.blue : Colors.grey,
-                              size: isSmallScreen ? 16 : 18,
+                          SizedBox(width: isSmallScreen ? 4 : 6),
+                          Text(
+                            t('tripHasDriver'),
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.w600,
+                              fontSize: isSmallScreen ? 10 : 12,
                             ),
-                            SizedBox(width: isSmallScreen ? 4 : 6),
-                            Text(
-                              hasDrivers 
-                                  ? '$driversInQueue ${t('driversInQueue')}'
-                                  : t('noDriversInQueue'),
-                              style: TextStyle(
+                          ),
+                        ],
+                      ),
+                    ),
+                  // Show drivers in queue (only for open trips)
+                  if (canBookInstant)
+                    Builder(
+                      builder: (context) {
+                        final lineId = line['lineid']?.toString() ?? '';
+                        final driversInQueue = _lineQueueCounts[lineId] ?? 0;
+                        final hasDrivers = driversInQueue > 0;
+                        
+                        return Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isSmallScreen ? 10 : 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: hasDrivers
+                                ? Colors.blue.withAlpha(51)
+                                : Colors.grey.withAlpha(51),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: hasDrivers
+                                  ? Colors.blue.withAlpha(102)
+                                  : Colors.grey.withAlpha(102),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.people_rounded,
                                 color: hasDrivers ? Colors.blue : Colors.grey,
-                                fontWeight: FontWeight.w600,
-                                fontSize: isSmallScreen ? 10 : 12,
+                                size: isSmallScreen ? 16 : 18,
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                              SizedBox(width: isSmallScreen ? 4 : 6),
+                              Text(
+                                hasDrivers 
+                                    ? '$driversInQueue ${t('driversInQueueLabel')}'
+                                    : t('noDriversInQueue'),
+                                style: TextStyle(
+                                  color: hasDrivers ? Colors.blue : Colors.grey,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: isSmallScreen ? 10 : 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                 ],
               ),
               SizedBox(height: isSmallScreen ? 12.0 : 18.0),

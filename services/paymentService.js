@@ -79,6 +79,40 @@ export const transferPaymentToDriver = async (paymentid, driverid) => {
     });
     logger.info(`[PaymentService] ✅ Updated payment ${paymentid} with towalletid ${driverWallet.walletid}`);
 
+    // Send notification to driver about payment received
+    try {
+      const { sendNotification, NOTIFICATION_TYPES } = await import('./notificationService.js');
+      const Reservation = (await import('../models/Reservation.js')).default;
+      const Passenger = (await import('../models/Passenger.js')).default;
+      
+      // Get reservation and passenger info
+      const reservation = payment.tripid ? 
+        (await Reservation.findByTripId(payment.tripid)).find(r => r.paymentid === paymentid) : null;
+      
+      if (reservation) {
+        const passenger = await Passenger.findById(reservation.passengerid);
+        const passengerName = passenger?.user?.fullname || 'Passenger';
+        const amount = transferAmount.toFixed(2);
+        
+        // Get driver's language preference (defaults to 'ar' if not set)
+        const { getUserLanguage } = await import('../utils/lineHelpers.js');
+        const driverLanguage = await getUserLanguage(driver.userid);
+
+        await sendNotification(
+          driver.userid,
+          NOTIFICATION_TYPES.PAYMENT_RECEIVED,
+          {
+            amount,
+            passengerName,
+            paymentid: paymentid,
+          },
+          driverLanguage
+        );
+      }
+    } catch (notifError) {
+      logger.warn(`[PaymentService] Failed to send payment notification for payment ${paymentid}:`, notifError);
+    }
+
     return {
       success: true,
       payment: await Payment.findById(paymentid),

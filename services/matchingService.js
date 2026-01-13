@@ -469,6 +469,86 @@ export const createNewTripForFullTripBooking = async (fullTripId, bookingId) => 
     const finalTrip = await Trip.findById(newTrip.tripid);
     logger.info(`[MatchingService] ✅ Created new trip ${newTrip.tripid} with driver ${driverid} for booking ${bookingId}`);
 
+    // Send notifications
+    try {
+      const { sendNotification, NOTIFICATION_TYPES } = await import('./notificationService.js');
+      const Driver = (await import('../models/Driver.js')).default;
+      const Line = (await import('../models/Line.js')).default;
+      const Passenger = (await import('../models/Passenger.js')).default;
+      
+      // Get driver, line, and passenger info
+      const driver = await Driver.findById(driverid);
+      const line = await Line.findById(finalTrip.lineid);
+      const reservation = await Reservation.findById(bookingId);
+      const passenger = reservation ? await Passenger.findById(reservation.passengerid) : null;
+      
+      const driverName = driver?.user?.fullname || 'Driver';
+      const vehicle = await Vehicle.findById(vehicle.vehicleid);
+      const plateNumber = vehicle?.plateno || 'N/A';
+      const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+
+      // Notify driver
+      if (driver?.userid) {
+        const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid);
+        const { DateTime } = await import('luxon');
+        const deptime = DateTime.fromISO(new Date(finalTrip.deptime).toISOString())
+          .setLocale(driverLanguage === 'en' ? 'en' : 'ar')
+          .toLocaleString({ 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: driverLanguage === 'en'
+          });
+
+        await sendNotification(
+          driver.userid,
+          NOTIFICATION_TYPES.TRIP_ASSIGNED,
+          {
+            from: driverFromName,
+            to: driverToName,
+            time: deptime,
+            tripid: finalTrip.tripid,
+          },
+          driverLanguage,
+          { line, trip: finalTrip } // Pass raw data for separate Arabic/English formatting
+        );
+      }
+
+      // Notify passenger
+      if (passenger?.userid) {
+        const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid);
+        const { DateTime } = await import('luxon');
+        const deptime = DateTime.fromISO(new Date(finalTrip.deptime).toISOString())
+          .setLocale(passengerLanguage === 'en' ? 'en' : 'ar')
+          .toLocaleString({ 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: passengerLanguage === 'en'
+          });
+
+        await sendNotification(
+          passenger.userid,
+          NOTIFICATION_TYPES.DRIVER_ASSIGNED,
+          {
+            driverName,
+            plateNumber,
+            from: passengerFromName,
+            to: passengerToName,
+            time: deptime,
+          },
+          passengerLanguage,
+          { line, trip: finalTrip } // Pass raw data for separate Arabic/English formatting
+        );
+      }
+    } catch (notifError) {
+      logger.warn(`[MatchingService] Failed to send notifications for new trip ${newTrip.tripid}:`, notifError);
+    }
+
     return finalTrip;
   } catch (error) {
     logger.error(`[MatchingService] ❌ Error creating new trip for full trip booking:`, error);

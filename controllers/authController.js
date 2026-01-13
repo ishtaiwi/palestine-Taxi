@@ -791,6 +791,42 @@ export const updateProfile = async (req, res, next) => {
 };
 
 
+export const updateLanguagePreference = async (req, res, next) => {
+  try {
+    const { language } = req.body;
+    
+    // Validate language value
+    if (!language || (language !== 'ar' && language !== 'en')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid language. Must be "ar" or "en"',
+      });
+    }
+
+    // Update user's language preference
+    const user = await User.update(req.user.userid, { language_preference: language });
+    
+    // Remove password from response
+    if (user && user.password) {
+      delete user.password;
+    }
+
+    logger.info('Language preference updated', {
+      userid: req.user.userid,
+      language,
+    });
+
+    res.json({
+      success: true,
+      message: 'Language preference updated successfully',
+      user,
+      language_preference: language,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;

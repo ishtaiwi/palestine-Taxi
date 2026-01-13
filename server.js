@@ -25,6 +25,7 @@ import driverRoutes from './routes/driverRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
 import locationRoutes from './routes/locationRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 
 
@@ -35,6 +36,7 @@ import { startNoShowCheckJob } from './jobs/noShowCheckJob.js';
 import { startDailyTripCreationJob } from './jobs/dailyTripCreationJob.js';
 import { startPredictionUpdateJob } from './jobs/predictionUpdateJob.js';
 import { initializeModel } from './services/rushHourPredictionService.js';
+import { initializeFirebase } from './config/firebase.js';
 
 const app = express();
 
@@ -142,6 +144,7 @@ app.use('/api/schedules', scheduleRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/time', timeRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
@@ -159,10 +162,19 @@ app.listen(PORT, async () => {
   logger.info(`API Base URL: http://localhost:${PORT}/api`);
 
 
-  logger.info('Testing database connection...');
-  const dbTest = await testConnection();
-  if (dbTest.connected) {
-    logger.info('✅ Database connection verified');
+    logger.info('Testing database connection...');
+    const dbTest = await testConnection();
+    if (dbTest.connected) {
+      logger.info('✅ Database connection verified');
+
+      // Initialize Firebase
+      logger.info('Initializing Firebase...');
+      const firebaseInitialized = initializeFirebase();
+      if (firebaseInitialized) {
+        logger.info('✅ Firebase initialized successfully');
+      } else {
+        logger.warn('⚠️ Firebase initialization failed or not configured');
+      }
 
 
     logger.info('Starting background jobs...');

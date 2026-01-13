@@ -5,6 +5,7 @@ import DriverQueue from '../models/DriverQueue.js';
 import { markNoShowForTrip } from './noShowService.js';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
 import { getUtcNow, parseUtcDate } from '../utils/timeUtils.js';
+import { TRIP_STATUS } from '../utils/constants.js';
 
 /**
  * Check if trip should depart early (vehicle is full)
@@ -142,6 +143,67 @@ export const departTrip = async (tripid) => {
       }
     }
 
+    // Send notifications to passengers and driver
+    try {
+      const { sendNotification, sendBulkNotifications, NOTIFICATION_TYPES } = await import('./notificationService.js');
+      const Driver = (await import('../models/Driver.js')).default;
+      const Line = (await import('../models/Line.js')).default;
+      const Passenger = (await import('../models/Passenger.js')).default;
+      
+      const line = await Line.findById(updatedTrip.lineid);
+      const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+
+      // Notify driver
+      if (updatedTrip.assigned_driverid) {
+        const driver = await Driver.findById(updatedTrip.assigned_driverid);
+        if (driver?.userid) {
+          const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid);
+          await sendNotification(
+            driver.userid,
+            NOTIFICATION_TYPES.TRIP_DEPARTED,
+            {
+              from: driverFromName,
+              to: driverToName,
+              tripid: tripid,
+            },
+            driverLanguage
+          );
+        }
+      }
+
+      // Notify all passengers (send individually to use per-user language)
+      const reservations = await Reservation.findByTripId(tripid);
+      const activeReservations = reservations.filter(
+        r => r.status === 'confirmed' || r.status === 'checked_in'
+      );
+
+      if (activeReservations.length > 0) {
+        for (const reservation of activeReservations) {
+          const passenger = await Passenger.findById(reservation.passengerid);
+          if (passenger?.userid) {
+            try {
+              const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid);
+              await sendNotification(
+                passenger.userid,
+                NOTIFICATION_TYPES.TRIP_DEPARTED,
+                {
+                  from: passengerFromName,
+                  to: passengerToName,
+                  tripid: tripid,
+                },
+                passengerLanguage,
+                { line, trip: updatedTrip } // Pass raw data for separate Arabic/English formatting
+              );
+            } catch (notifError) {
+              logger.warn(`[DepartureService] Failed to send notification to passenger ${passenger.userid}:`, notifError);
+            }
+          }
+        }
+      }
+    } catch (notifError) {
+      console.error(`[DepartureService] Failed to send departure notifications for trip ${tripid}:`, notifError);
+    }
+
     return {
       success: true,
       trip: updatedTrip,
@@ -149,6 +211,108 @@ export const departTrip = async (tripid) => {
   } catch (error) {
     console.error(`[DepartureService] ❌ Error departing trip ${tripid}:`, error);
     throw error;
+  }
+};
+
+/**
+ * Send departure reminder notifications (15 minutes before departure)
+ * @returns {Promise<object>} - Reminder results
+ */
+export const sendDepartureReminders = async () => {
+  try {
+    const now = getUtcNow();
+    const reminderTime = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutes from now
+
+    // Find trips departing in approximately 15 minutes
+    const allTrips = await Trip.findAll({ status: TRIP_STATUS.OPEN });
+    const tripsNeedingReminder = allTrips.filter(trip => {
+      if (!trip.deptime) return false;
+      const deptime = parseUtcDate(trip.deptime);
+      if (!deptime) return false;
+      
+      // Check if departure is within 15-16 minutes (1 minute window)
+      const diffMinutes = (deptime.getTime() - now.getTime()) / (1000 * 60);
+      return diffMinutes >= 14 && diffMinutes <= 16;
+    });
+
+    if (tripsNeedingReminder.length === 0) {
+      return { success: true, reminded: 0 };
+    }
+
+    const { sendNotification, sendBulkNotifications, NOTIFICATION_TYPES } = await import('./notificationService.js');
+    const Driver = (await import('../models/Driver.js')).default;
+    const Line = (await import('../models/Line.js')).default;
+    const Passenger = (await import('../models/Passenger.js')).default;
+    const Reservation = (await import('../models/Reservation.js')).default;
+
+    let remindedCount = 0;
+
+    for (const trip of tripsNeedingReminder) {
+      try {
+        const line = await Line.findById(trip.lineid);
+        const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+
+        // Notify driver
+        if (trip.assigned_driverid) {
+          const driver = await Driver.findById(trip.assigned_driverid);
+          if (driver?.userid) {
+            const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid);
+            await sendNotification(
+              driver.userid,
+              NOTIFICATION_TYPES.TRIP_DEPARTURE_SOON,
+              {
+                from: driverFromName,
+                to: driverToName,
+                minutes: '15',
+                tripid: trip.tripid,
+              },
+              driverLanguage,
+              { line, trip } // Pass raw data for separate Arabic/English formatting
+            );
+          }
+        }
+
+        // Notify passengers (send individually to use per-user language)
+        const reservations = await Reservation.findByTripId(trip.tripid);
+        const activeReservations = reservations.filter(
+          r => r.status === 'confirmed' || r.status === 'checked_in'
+        );
+
+        if (activeReservations.length > 0) {
+          for (const reservation of activeReservations) {
+            const passenger = await Passenger.findById(reservation.passengerid);
+            if (passenger?.userid) {
+              try {
+                const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid);
+                await sendNotification(
+                  passenger.userid,
+                  NOTIFICATION_TYPES.TRIP_DEPARTURE_SOON,
+                  {
+                    from: passengerFromName,
+                    to: passengerToName,
+                    minutes: '15',
+                    tripid: trip.tripid,
+                  },
+                  passengerLanguage,
+                  { line, trip } // Pass raw data for separate Arabic/English formatting
+                );
+              } catch (notifError) {
+                logger.warn(`[DepartureService] Failed to send departure reminder to passenger ${passenger.userid}:`, notifError);
+              }
+            }
+          }
+        }
+
+        remindedCount++;
+      } catch (error) {
+        console.error(`[DepartureService] Error sending reminder for trip ${trip.tripid}:`, error);
+      }
+    }
+
+    return { success: true, reminded: remindedCount };
+  } catch (error) {
+    console.error('[DepartureService] Error in sendDepartureReminders:', error);
+    return { success: false, error: error.message };
   }
 };
 

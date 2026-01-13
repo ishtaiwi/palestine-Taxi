@@ -11,11 +11,12 @@ import {
 } from '../controllers/reservationController.js';
 import { authenticate } from '../middleware/auth.js';
 import { requirePassenger, requireDriver, requireAdmin } from '../middleware/authorization.js';
+import { userDataLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
 
-router.get('/my-reservations', authenticate, requirePassenger, getPassengerReservations);
+router.get('/my-reservations', userDataLimiter, authenticate, requirePassenger, getPassengerReservations);
 router.get('/:bookingid/qrcode', authenticate, requirePassenger, getReservationQRCode);
 router.post('/', authenticate, requirePassenger, createReservation);
 router.put('/:bookingid/cancel', authenticate, requirePassenger, cancelReservation);

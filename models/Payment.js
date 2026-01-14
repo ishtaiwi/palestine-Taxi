@@ -31,7 +31,15 @@ class Payment {
       .select(`
         *,
         trip:tripid(
-          deptime
+          deptime,
+          assigned_driverid,
+          vehicle:vehicleid(
+            driver:driverid(
+              user!driver_userid_fkey(
+                fullname
+              )
+            )
+          )
         )
       `)
       .or(`fromwalletid.eq.${walletid},towalletid.eq.${walletid}`)
@@ -43,7 +51,7 @@ class Payment {
     }
     if (!payments || payments.length === 0) return [];
 
-    // Enrich payments with reservation and passenger information
+    // Enrich payments with reservation, passenger, and driver information
     const enrichedPayments = await Promise.all(
       payments.map(async (payment) => {
         const enriched = { ...payment };
@@ -54,8 +62,116 @@ class Payment {
             const deptime = new Date(payment.trip.deptime);
             enriched.trip_time = deptime.toTimeString().slice(0, 5); // HH:MM format
             enriched.trip_date = deptime.toISOString().split('T')[0]; // YYYY-MM-DD format
+            enriched.trip_datetime = deptime.toISOString(); // Full datetime for formatting
           } catch (dateError) {
             logger.warn(`[Payment] Error parsing trip deptime for payment ${payment.paymentid}:`, dateError);
+          }
+        }
+
+        // Get driver name for payments (type='reservation') - money goes to driver
+        if (payment.type === 'reservation' && payment.trip) {
+          try {
+            // Try to get driver from vehicle first
+            if (payment.trip.vehicle?.driver?.user?.fullname) {
+              enriched.driver_name = payment.trip.vehicle.driver.user.fullname;
+            } else if (payment.trip.assigned_driverid) {
+              // Fallback: get driver directly if assigned_driverid exists
+              const { data: driver, error: driverError } = await supabase
+                .from('driver')
+                .select(`
+                  userid,
+                  user:userid!driver_userid_fkey(
+                    fullname
+                  )
+                `)
+                .eq('driverid', payment.trip.assigned_driverid)
+                .single();
+
+              if (!driverError && driver?.user?.fullname) {
+                enriched.driver_name = driver.user.fullname;
+              }
+            }
+          } catch (driverError) {
+            logger.warn(`[Payment] Error fetching driver for payment ${payment.paymentid}:`, driverError);
+          }
+        }
+
+        // Get driver name for refunds - refund comes from driver's wallet
+        if (payment.type === 'refund' && payment.fromwalletid) {
+          try {
+            // Get driver from the fromwalletid (driver's wallet)
+            // First get the wallet to find the userid
+            const { data: driverWallet, error: walletError } = await supabase
+              .from('wallet')
+              .select('userid')
+              .eq('walletid', payment.fromwalletid)
+              .single();
+
+            if (!walletError && driverWallet?.userid) {
+              // Now get the driver associated with this user
+              const { data: driver, error: driverError } = await supabase
+                .from('driver')
+                .select(`
+                  userid,
+                  user:userid!driver_userid_fkey(
+                    fullname
+                  )
+                `)
+                .eq('userid', driverWallet.userid)
+                .maybeSingle();
+
+              if (!driverError && driver?.user?.fullname) {
+                enriched.driver_name = driver.user.fullname;
+              } else if (!driverError && driverWallet.userid) {
+                // Fallback: if no driver found, get user name directly
+                const { data: user, error: userError } = await supabase
+                  .from('user')
+                  .select('fullname')
+                  .eq('userid', driverWallet.userid)
+                  .single();
+
+                if (!userError && user?.fullname) {
+                  enriched.driver_name = user.fullname;
+                }
+              }
+            }
+          } catch (refundDriverError) {
+            logger.warn(`[Payment] Error fetching driver for refund payment ${payment.paymentid}:`, refundDriverError);
+          }
+        }
+
+        // Get trip information for refunds to show which trip was cancelled
+        // Also try to get driver from trip if not found from wallet
+        if (payment.type === 'refund' && payment.tripid) {
+          try {
+            // Trip info is already included in the initial query, but ensure we have it
+            if (payment.trip && payment.trip.deptime) {
+              // Trip info already extracted above
+              enriched.cancelled_trip_id = payment.tripid;
+              
+              // If we don't have driver_name yet, try to get it from the trip
+              if (!enriched.driver_name && payment.trip.vehicle?.driver?.user?.fullname) {
+                enriched.driver_name = payment.trip.vehicle.driver.user.fullname;
+              } else if (!enriched.driver_name && payment.trip.assigned_driverid) {
+                // Fallback: get driver directly if assigned_driverid exists
+                const { data: driver, error: driverError } = await supabase
+                  .from('driver')
+                  .select(`
+                    userid,
+                    user:userid!driver_userid_fkey(
+                      fullname
+                    )
+                  `)
+                  .eq('driverid', payment.trip.assigned_driverid)
+                  .single();
+
+                if (!driverError && driver?.user?.fullname) {
+                  enriched.driver_name = driver.user.fullname;
+                }
+              }
+            }
+          } catch (tripError) {
+            logger.warn(`[Payment] Error fetching trip for refund payment ${payment.paymentid}:`, tripError);
           }
         }
 
@@ -66,6 +182,7 @@ class Payment {
               .from('reservation')
               .select(`
                 passengerid,
+                bookingid,
                 passenger:passengerid(
                   userid,
                   user:userid(
@@ -80,6 +197,7 @@ class Payment {
               logger.warn(`[Payment] Error fetching reservation for payment ${payment.paymentid}:`, reservationError);
             } else if (reservations && reservations.length > 0 && reservations[0].passenger) {
               enriched.passenger_name = reservations[0].passenger.user?.fullname || null;
+              enriched.bookingid = reservations[0].bookingid || null;
             }
           } catch (reservationError) {
             // Silently fail if reservation lookup fails

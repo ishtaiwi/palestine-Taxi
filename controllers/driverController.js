@@ -382,6 +382,8 @@ export const updateDriverReservationStatus = async (req, res, next) => {
                 fromwalletid: driverWalletId || null, // Driver wallet if payment was transferred, null if not
                 towalletid: wallets[0].walletid, // Passenger wallet (refund destination)
                 tripid: reservation.tripid || null,
+                time: new Date().toISOString(), // Explicitly set refund time
+                external_reference: 'cancelled_by_driver', // Track that driver cancelled/rejected the reservation
               });
             }
           }

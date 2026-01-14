@@ -183,7 +183,27 @@ export const updateSchedule = async (req, res, next) => {
       });
     }
     
+    // Get the old schedule before updating
+    const oldSchedule = await ScheduleTemplate.findById(templateid);
     const schedule = await ScheduleTemplate.update(templateid, updates);
+    
+    // If interval_minutes changed, adjust future reservations
+    if (updates.interval_minutes && oldSchedule.interval_minutes !== updates.interval_minutes) {
+      try {
+        const { adjustReservationsForScheduleChange } = await import('../services/matchingService.js');
+        await adjustReservationsForScheduleChange(
+          schedule.lineid,
+          oldSchedule.interval_minutes,
+          updates.interval_minutes,
+          schedule.start_hour,
+          schedule.end_hour
+        );
+        logger.info(`[ScheduleController] ✅ Adjusted future reservations for schedule change on line ${schedule.lineid}`);
+      } catch (error) {
+        logger.error(`[ScheduleController] ⚠️ Error adjusting reservations for schedule change:`, error);
+        // Don't fail the update, just log the error
+      }
+    }
     
     res.json({
       message: req.t('schedule.updated') || 'Schedule template updated successfully',

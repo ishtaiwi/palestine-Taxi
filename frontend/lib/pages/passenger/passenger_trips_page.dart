@@ -5,6 +5,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/passenger_bottom_nav_bar.dart';
 import 'passenger_book_trip_page.dart';
 import 'passenger_home.dart';
+import 'passenger_future_reservation_page.dart';
 import 'package:taxi_palestine_app/utils/server_time_sync.dart';
 
 class PassengerTripsPage extends StatefulWidget {
@@ -25,7 +26,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
   List<Map<String, dynamic>> _lines = [];
   bool _isLineDropdownOpen = false;
   String? _selectedLineId;
-  DateTime? _selectedDate;
 
   final TextEditingController _lineSearchController = TextEditingController();
   String _lineSearchQuery = '';
@@ -138,7 +138,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     try {
       final trips = await ApiService.fetchUpcomingTrips(
         lineid: _selectedLineId,
-        date: _selectedDate?.toIso8601String().split('T')[0],
       );
       
       if (mounted) {
@@ -157,27 +156,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     }
   }
 
-  Future<void> _selectDate() async {
-    final now = TimeSyncService.now();
-    ;
-    final firstDate = now;
-    final lastDate = now.add(const Duration(days: 30));
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? now,
-      firstDate: firstDate,
-      lastDate: lastDate,
-      locale: _isArabic ? const Locale('ar') : const Locale('en'),
-    );
-
-    if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-      });
-      await _loadTrips();
-    }
-  }
 
   String _getLineNameById(String lineId) {
     try {
@@ -689,47 +667,33 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    InkWell(
-                      onTap: _selectDate,
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: _isDarkMode
-                              ? const Color(0xFF1E3A5F).withAlpha(77)
-                              : Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _isDarkMode
-                                ? const Color(0xFF2C5F8D)
-                                : Colors.grey.shade300,
+                    FilledButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PassengerFutureReservationPage(),
                           ),
+                        ).then((result) {
+                          if (result == true) {
+                            _loadTrips();
+                          }
+                        });
+                      },
+                      icon: Icon(Icons.calendar_today, size: isSmallScreen ? 18.0 : 20.0),
+                      label: Text(
+                        _isArabic ? 'حجز مستقبلي' : 'Future Reservation',
+                        style: TextStyle(fontSize: isSmallScreen ? 14.0 : 16.0),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFF57C00),
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 16.0 : 20.0,
+                          vertical: isSmallScreen ? 12.0 : 16.0,
                         ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_today, color: textPrimary),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                _selectedDate == null
-                                    ? t('filterByDate')
-                                    : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
-                                style: TextStyle(
-                                    color: textPrimary,
-                                    fontWeight: FontWeight.w500),
-                              ),
-                            ),
-                            if (_selectedDate != null)
-                              IconButton(
-                                icon: const Icon(Icons.clear, size: 20),
-                                color: textPrimary,
-                                onPressed: () {
-                                  setState(() {
-                                    _selectedDate = null;
-                                  });
-                                  _loadTrips();
-                                },
-                              ),
-                          ],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),

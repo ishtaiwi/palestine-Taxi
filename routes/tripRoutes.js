@@ -10,6 +10,7 @@ import {
   getTripSeatMap,
   checkInstantBookingAvailability,
   checkLineBookingAvailability,
+  getAvailableTripTimes,
 } from '../controllers/tripController.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireAdmin, requireDriver } from '../middleware/authorization.js';
@@ -22,6 +23,7 @@ router.get('/upcoming', getUpcomingTrips);
 
 
 router.get('/line/:lineid/booking-availability', checkLineBookingAvailability);
+router.get('/available-times', getAvailableTripTimes);
 
 router.get('/:tripid', getTripById);
 router.get('/:tripid/seatmap', getTripSeatMap);

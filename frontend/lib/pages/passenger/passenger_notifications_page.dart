@@ -227,7 +227,32 @@ class _PassengerNotificationsPageState
       _markAsRead(notification.notificationid);
     }
 
-    // Navigate based on notification type/data
+    // Show full notification message in a dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            notification.getTitle(_isArabic),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Text(
+              notification.getBody(_isArabic),
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(_isArabic ? 'إغلاق' : 'Close'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // Navigate based on notification type/data (optional)
     final data = notification.data;
     if (data != null) {
       if (data['action'] == 'view_reservation' && data['bookingid'] != null) {

@@ -2,6 +2,7 @@ import Payment from '../models/Payment.js';
 import Wallet from '../models/Wallet.js';
 import Driver from '../models/Driver.js';
 import Reservation from '../models/Reservation.js';
+import Trip from '../models/Trip.js';
 import { PAYMENT_STATUS } from '../utils/constants.js';
 import logger from '../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';

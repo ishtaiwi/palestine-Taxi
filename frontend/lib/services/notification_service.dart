@@ -51,6 +51,13 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     
     // Show notification if notification payload exists
     if (message.notification != null) {
+      // Include title and body in payload for notification tap handling
+      final payloadData = {
+        ...message.data,
+        'title': message.notification!.title ?? '',
+        'body': message.notification!.body ?? '',
+      };
+      
       await localNotifications.show(
         message.hashCode,
         message.notification!.title,
@@ -71,7 +78,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
             presentSound: true,
           ),
         ),
-        payload: jsonEncode(message.data),
+        payload: jsonEncode(payloadData),
       );
     }
   }
@@ -151,13 +158,23 @@ class NotificationService {
       // Handle notification tap when app is opened from terminated state
       _firebaseMessaging!.getInitialMessage().then((message) {
         if (message != null) {
-          _handleNotificationTap(message.data);
+          final data = {
+            ...message.data,
+            'title': message.notification?.title ?? '',
+            'body': message.notification?.body ?? '',
+          };
+          _handleNotificationTap(data);
         }
       });
 
       // Handle notification tap when app is in background
       FirebaseMessaging.onMessageOpenedApp.listen((message) {
-        _handleNotificationTap(message.data);
+        final data = {
+          ...message.data,
+          'title': message.notification?.title ?? '',
+          'body': message.notification?.body ?? '',
+        };
+        _handleNotificationTap(data);
       });
 
       _initialized = true;
@@ -225,6 +242,13 @@ class NotificationService {
     final android = message.notification?.android;
 
     if (notification != null) {
+      // Include title and body in payload for notification tap handling
+      final payloadData = {
+        ...message.data,
+        'title': notification.title ?? '',
+        'body': notification.body ?? '',
+      };
+      
       await _localNotifications.show(
         message.hashCode,
         notification.title,
@@ -244,7 +268,7 @@ class NotificationService {
             presentSound: true,
           ),
         ),
-        payload: jsonEncode(message.data),
+        payload: jsonEncode(payloadData),
       );
     }
   }

@@ -406,6 +406,78 @@ export const updateDriverReservationStatus = async (req, res, next) => {
       }
     }
 
+    // Send notification to passenger when driver rejects/cancels reservation
+    if (action === 'reject') {
+      try {
+        const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notificationService.js');
+        const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+        const Passenger = (await import('../models/Passenger.js')).default;
+        
+        // Get passenger information
+        const passenger = await Passenger.findById(reservation.passengerid);
+        if (passenger?.userid) {
+          // Get trip and line information
+          let line = null;
+          let trip = null;
+          
+          if (reservation.tripid) {
+            trip = await Trip.findById(reservation.tripid);
+            if (trip?.lineid) {
+              line = await Line.findById(trip.lineid);
+            }
+          } else if (reservation.lineid) {
+            line = await Line.findById(reservation.lineid);
+          }
+          
+          // Get line names for passenger's language
+          const { fromName, toName, language } = await getLineNamesForNotification(line, passenger.userid, req);
+          
+          // Format time if trip exists
+          let deptime = '';
+          if (trip?.deptime) {
+            const { DateTime } = await import('luxon');
+            const date = DateTime.fromISO(new Date(trip.deptime).toISOString());
+            
+            if (language === 'en') {
+              deptime = date.setLocale('en').toLocaleString({ 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true
+              });
+            } else {
+              deptime = date.setLocale('ar').toLocaleString({ 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit'
+              });
+            }
+          }
+          
+          // Send notification to passenger
+          await sendNotification(
+            passenger.userid,
+            NOTIFICATION_TYPES.RESERVATION_CANCELLED,
+            {
+              from: fromName,
+              to: toName,
+              bookingid: reservation.bookingid,
+              ...(deptime && { time: deptime }),
+            },
+            language,
+            { line, trip } // Pass raw data for separate Arabic/English formatting
+          );
+        }
+      } catch (notifError) {
+        logger.warn('[DriverController] Failed to send cancellation notification to passenger:', notifError);
+        // Don't fail the rejection if notification fails
+      }
+    }
+
     // Prepare response message
     let message;
     if (action === 'approve') {

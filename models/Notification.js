@@ -124,6 +124,49 @@ class Notification {
     if (error) throw error;
     return data || [];
   }
+
+  /**
+   * Find notifications by trip ID (checks data.tripid field)
+   * @param {string} tripid - Trip ID
+   * @param {string} type - Optional notification type filter
+   * @returns {Promise<Array>} - Array of notifications
+   */
+  static async findByTripId(tripid, type = null) {
+    try {
+      // Get all notifications and filter by tripid in data field
+      // Note: Supabase doesn't easily support JSON field filtering, so we fetch and filter
+      let query = supabase
+        .from('notifications')
+        .select('*');
+      
+      if (type) {
+        query = query.eq('type', type);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      // Filter notifications where data.tripid matches
+      const filtered = (data || []).filter(notif => {
+        if (!notif.data) return false;
+        // Handle both string JSON and object
+        let dataObj = notif.data;
+        if (typeof dataObj === 'string') {
+          try {
+            dataObj = JSON.parse(dataObj);
+          } catch (e) {
+            return false;
+          }
+        }
+        return dataObj.tripid === tripid;
+      });
+      
+      return filtered;
+    } catch (error) {
+      console.error('[Notification] Error finding notifications by tripid:', error);
+      return [];
+    }
+  }
 }
 
 export default Notification;

@@ -6,6 +6,7 @@ import { markNoShowForTrip } from './noShowService.js';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
 import { getUtcNow, parseUtcDate } from '../utils/timeUtils.js';
 import { TRIP_STATUS } from '../utils/constants.js';
+import logger from '../utils/logger.js';
 
 /**
  * Check if trip should depart early (vehicle is full)
@@ -166,7 +167,8 @@ export const departTrip = async (tripid) => {
               to: driverToName,
               tripid: tripid,
             },
-            driverLanguage
+            driverLanguage,
+            { line, trip: updatedTrip } // Pass raw data for separate Arabic/English formatting
           );
         }
       }
@@ -215,31 +217,77 @@ export const departTrip = async (tripid) => {
 };
 
 /**
- * Send departure reminder notifications (15 minutes before departure)
+ * Check if a departure reminder was already sent for a trip
+ * @param {string} tripid - Trip ID
+ * @param {string} minutes - Minutes before departure ('15' or '5')
+ * @returns {Promise<boolean>} - True if reminder was already sent
+ */
+const wasReminderSent = async (tripid, minutes) => {
+  try {
+    const Notification = (await import('../models/Notification.js')).default;
+    const { NOTIFICATION_TYPES } = await import('../utils/notificationTemplates.js');
+    
+    // Check if a TRIP_DEPARTURE_SOON notification was already sent for this trip with this minutes value
+    const notifications = await Notification.findByTripId(tripid, NOTIFICATION_TYPES.TRIP_DEPARTURE_SOON);
+    if (!notifications || notifications.length === 0) {
+      return false;
+    }
+    
+    // Check if any notification matches the minutes value
+    const matchingNotification = notifications.find(notif => {
+      // Check if the notification data contains the minutes value
+      if (notif.data) {
+        let dataObj = notif.data;
+        // Handle both string JSON and object
+        if (typeof dataObj === 'string') {
+          try {
+            dataObj = JSON.parse(dataObj);
+          } catch (e) {
+            return false;
+          }
+        }
+        // Check if minutes match (handle both string and number)
+        const notifMinutes = dataObj.minutes;
+        return notifMinutes === minutes || notifMinutes === String(minutes) || String(notifMinutes) === String(minutes);
+      }
+      return false;
+    });
+    
+    return !!matchingNotification;
+  } catch (error) {
+    console.error(`[DepartureService] Error checking if reminder was sent:`, error);
+    return false; // If we can't check, assume not sent to allow sending
+  }
+};
+
+/**
+ * Send departure reminder notifications for a specific time window
+ * @param {number} minutesBefore - Minutes before departure (15 or 5)
  * @returns {Promise<object>} - Reminder results
  */
-export const sendDepartureReminders = async () => {
+const sendDepartureReminderForMinutes = async (minutesBefore) => {
   try {
     const now = getUtcNow();
-    const reminderTime = new Date(now.getTime() + 15 * 60 * 1000); // 15 minutes from now
-
-    // Find trips departing in approximately 15 minutes
+    
+    // Find trips departing in approximately the specified minutes
     const allTrips = await Trip.findAll({ status: TRIP_STATUS.OPEN });
     const tripsNeedingReminder = allTrips.filter(trip => {
       if (!trip.deptime) return false;
       const deptime = parseUtcDate(trip.deptime);
       if (!deptime) return false;
       
-      // Check if departure is within 15-16 minutes (1 minute window)
+      // Check if departure is within the time window (1 minute window)
       const diffMinutes = (deptime.getTime() - now.getTime()) / (1000 * 60);
-      return diffMinutes >= 14 && diffMinutes <= 16;
+      const lowerBound = minutesBefore - 1;
+      const upperBound = minutesBefore + 1;
+      return diffMinutes >= lowerBound && diffMinutes <= upperBound;
     });
 
     if (tripsNeedingReminder.length === 0) {
       return { success: true, reminded: 0 };
     }
 
-    const { sendNotification, sendBulkNotifications, NOTIFICATION_TYPES } = await import('./notificationService.js');
+    const { sendNotification, NOTIFICATION_TYPES } = await import('./notificationService.js');
     const Driver = (await import('../models/Driver.js')).default;
     const Line = (await import('../models/Line.js')).default;
     const Passenger = (await import('../models/Passenger.js')).default;
@@ -249,6 +297,13 @@ export const sendDepartureReminders = async () => {
 
     for (const trip of tripsNeedingReminder) {
       try {
+        // Check if reminder was already sent for this trip at this time window
+        const alreadySent = await wasReminderSent(trip.tripid, String(minutesBefore));
+        if (alreadySent) {
+          console.log(`[DepartureService] ⏭️ Skipping ${minutesBefore}-min reminder for trip ${trip.tripid} - already sent`);
+          continue;
+        }
+
         const line = await Line.findById(trip.lineid);
         const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
 
@@ -263,7 +318,7 @@ export const sendDepartureReminders = async () => {
               {
                 from: driverFromName,
                 to: driverToName,
-                minutes: '15',
+                minutes: String(minutesBefore),
                 tripid: trip.tripid,
               },
               driverLanguage,
@@ -290,26 +345,51 @@ export const sendDepartureReminders = async () => {
                   {
                     from: passengerFromName,
                     to: passengerToName,
-                    minutes: '15',
+                    minutes: String(minutesBefore),
                     tripid: trip.tripid,
                   },
                   passengerLanguage,
                   { line, trip } // Pass raw data for separate Arabic/English formatting
                 );
               } catch (notifError) {
-                logger.warn(`[DepartureService] Failed to send departure reminder to passenger ${passenger.userid}:`, notifError);
+                console.error(`[DepartureService] Failed to send departure reminder to passenger ${passenger.userid}:`, notifError);
               }
             }
           }
         }
 
         remindedCount++;
+        console.log(`[DepartureService] ✅ Sent ${minutesBefore}-min reminder for trip ${trip.tripid}`);
       } catch (error) {
         console.error(`[DepartureService] Error sending reminder for trip ${trip.tripid}:`, error);
       }
     }
 
     return { success: true, reminded: remindedCount };
+  } catch (error) {
+    console.error(`[DepartureService] Error in sendDepartureReminderForMinutes (${minutesBefore} min):`, error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * Send departure reminder notifications (15 minutes and 5 minutes before departure)
+ * @returns {Promise<object>} - Reminder results
+ */
+export const sendDepartureReminders = async () => {
+  try {
+    // Send 15-minute reminders
+    const result15 = await sendDepartureReminderForMinutes(15);
+    
+    // Send 5-minute reminders
+    const result5 = await sendDepartureReminderForMinutes(5);
+    
+    return {
+      success: true,
+      reminded15: result15.reminded || 0,
+      reminded5: result5.reminded || 0,
+      reminded: (result15.reminded || 0) + (result5.reminded || 0),
+    };
   } catch (error) {
     console.error('[DepartureService] Error in sendDepartureReminders:', error);
     return { success: false, error: error.message };

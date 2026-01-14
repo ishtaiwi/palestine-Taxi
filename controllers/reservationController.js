@@ -337,6 +337,7 @@ export const createReservation = async (req, res, next) => {
     }
 
 
+    // Set payment time to current time (will be stored in database timezone, converted to local on frontend)
     paymentRecord = await Payment.create({
       paymentid: uuidv4(),
       amount: bookingPrice,
@@ -344,6 +345,7 @@ export const createReservation = async (req, res, next) => {
       status: PAYMENT_STATUS.PENDING,
       type: 'reservation',
       tripid: tripid || null,
+      time: new Date().toISOString(), // Explicitly set reservation time
     });
 
 
@@ -1012,6 +1014,9 @@ export const cancelReservation = async (req, res, next) => {
             type: 'refund',
             fromwalletid: wallets[0].walletid,
             towalletid: wallets[0].walletid,
+            tripid: reservation.tripid || null, // Include tripid to track which trip was cancelled
+            time: new Date().toISOString(), // Explicitly set refund time
+            external_reference: 'cancelled_by_passenger', // Track that passenger cancelled the reservation
           });
         }
       }

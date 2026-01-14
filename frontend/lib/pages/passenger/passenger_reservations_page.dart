@@ -1104,9 +1104,24 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
 
     DateTime? departureTime;
     try {
-      departureTime = DateTime.parse(deptime);
+      if (deptime.isNotEmpty) {
+        // Normalize Supabase timestamp format to ISO 8601
+        String normalized = deptime.toString();
+        // Replace space with T
+        normalized = normalized.replaceFirst(' ', 'T');
+        // Replace +00 or +00:00 with Z (UTC indicator)
+        normalized = normalized.replaceFirst(RegExp(r'\+00:?00?$'), 'Z');
+        // If no timezone, assume UTC
+        if (!normalized.contains('Z') &&
+            !normalized.contains('+') &&
+            !normalized.contains('-')) {
+          normalized += 'Z';
+        }
+        departureTime = DateTime.parse(normalized).toLocal();
+      }
     } catch (e) {
-      // Ignore
+      // Ignore parse errors
+      debugPrint('Error parsing deptime: $deptime, error: $e');
     }
 
     final canCancel =
@@ -1345,18 +1360,6 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                     ),
                   ],
                 ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.event_seat, color: textPrimary, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${t('seat')}: $seat',
-                    style: TextStyle(
-                        color: textPrimary, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
               // Rating button (if trip is completed)
               if (canRate) ...[
                 const SizedBox(height: 16),

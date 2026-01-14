@@ -952,13 +952,49 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                     iconBgColor = Colors.green.withOpacity(0.1);
                                   } else if (type == 'reservation' || (type == 'payment' && isOutgoing)) {
                                     typeLabel = _isArabic ? 'حجز رحلة' : 'Trip Booking';
-                                    typeDescription = _isArabic ? 'دفع مقابل حجز رحلة' : 'Payment for trip reservation';
+                                    // Build description with driver name (trip time shown separately below)
+                                    String description = _isArabic ? 'دفع مقابل حجز رحلة' : 'Payment for trip reservation';
+                                    if (transaction['driver_name'] != null) {
+                                      description += _isArabic
+                                        ? ' - السائق: ${transaction['driver_name']}'
+                                        : ' - Driver: ${transaction['driver_name']}';
+                                    }
+                                    typeDescription = description;
                                     typeIcon = Icons.arrow_upward_rounded;
                                     iconColor = Colors.red;
                                     iconBgColor = Colors.red.withOpacity(0.1);
                                   } else if (type == 'refund') {
                                     typeLabel = t('refund');
-                                    typeDescription = _isArabic ? 'استرداد مبلغ من حجز ملغي' : 'Refund from cancelled booking';
+                                    // Check who cancelled: passenger or driver
+                                    final cancelledBy = transaction['external_reference']?.toString();
+                                    String description;
+                                    
+                                    if (cancelledBy == 'cancelled_by_passenger') {
+                                      // Passenger cancelled the reservation themselves
+                                      description = _isArabic 
+                                        ? 'استرداد مبلغ - تم الإلغاء من قبلك'
+                                        : 'Refund - Cancelled by you';
+                                    } else if (cancelledBy == 'cancelled_by_driver') {
+                                      // Driver cancelled/rejected the reservation
+                                      description = _isArabic 
+                                        ? 'استرداد مبلغ - تم الإلغاء من قبل السائق'
+                                        : 'Refund - Cancelled by driver';
+                                      if (transaction['driver_name'] != null) {
+                                        description += _isArabic
+                                          ? ' (${transaction['driver_name']})'
+                                          : ' (${transaction['driver_name']})';
+                                      }
+                                    } else {
+                                      // Legacy refunds or unknown cancellation source
+                                      description = _isArabic ? 'استرداد مبلغ من حجز ملغي' : 'Refund from cancelled booking';
+                                      if (transaction['driver_name'] != null) {
+                                        description += _isArabic
+                                          ? ' - من السائق: ${transaction['driver_name']}'
+                                          : ' - From driver: ${transaction['driver_name']}';
+                                      }
+                                    }
+                                    
+                                    typeDescription = description;
                                     typeIcon = Icons.refresh;
                                     iconColor = Colors.green;
                                     iconBgColor = Colors.green.withOpacity(0.1);
@@ -971,14 +1007,122 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                   }
 
                                   
-                                  String dateStr = '';
+                                  // Helper function to normalize and parse date strings from Supabase
+                                  DateTime? _parseDateToLocal(String? dateString) {
+                                    if (dateString == null || dateString.isEmpty) return null;
+                                    try {
+                                      // Normalize to ISO 8601 and strip any offset so we always treat as UTC
+                                      // Then convert to local time for display.
+                                      String normalized = dateString.toString();
+                                      normalized = normalized.replaceFirst(' ', 'T');
+                                      // Remove any timezone offset (+HH:MM or -HH:MM) and replace with Z (UTC)
+                                      normalized = normalized.replaceFirst(RegExp(r'([+-]\d{2}):?(\d{2})$'), 'Z');
+                                      if (!normalized.contains('Z')) {
+                                        normalized += 'Z';
+                                      }
+                                      return DateTime.parse(normalized).toLocal();
+                                    } catch (_) {
+                                      return null;
+                                    }
+                                  }
+
+                                  // Format transaction date/time (convert to local time - reservation time)
+                                  String transactionDateStr = '';
+                                  String transactionTimeStr = '';
+                                  DateTime? transactionDateTime;
                                   try {
                                     if (time.isNotEmpty) {
-                                      final dt = DateTime.parse(time);
-                                      dateStr = '${dt.day}/${dt.month}/${dt.year}';
+                                      // Normalize and parse to local timezone (reservation date/time)
+                                      DateTime? parsedDateTime = _parseDateToLocal(time);
+                                      if (parsedDateTime == null) {
+                                        // Fallback: try direct parse and convert to local
+                                        try {
+                                          parsedDateTime = DateTime.parse(time).toLocal();
+                                        } catch (e) {
+                                          // If all parsing fails, try to parse as UTC and convert
+                                          try {
+                                            String normalized = time.toString();
+                                            if (!normalized.contains('Z') && !normalized.contains('+') && !normalized.contains('-')) {
+                                              normalized += 'Z';
+                                            }
+                                            parsedDateTime = DateTime.parse(normalized).toLocal();
+                                          } catch (_) {
+                                            // Last resort: use current time (shouldn't happen)
+                                            parsedDateTime = DateTime.now();
+                                          }
+                                        }
+                                      }
+                                      
+                                      // Format the local time
+                                      transactionDateTime = parsedDateTime;
+                                      transactionDateStr = '${transactionDateTime.day}/${transactionDateTime.month}/${transactionDateTime.year}';
+                                      transactionTimeStr = '${transactionDateTime.hour.toString().padLeft(2, '0')}:${transactionDateTime.minute.toString().padLeft(2, '0')}';
                                     }
-                                  } catch (_) {
-                                    dateStr = time;
+                                  } catch (e) {
+                                    // If all else fails, try one more time with current time
+                                    try {
+                                      final now = DateTime.now();
+                                      transactionDateTime = now;
+                                      transactionDateStr = '${now.day}/${now.month}/${now.year}';
+                                      transactionTimeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+                                    } catch (_) {
+                                      transactionDateStr = time; // Last resort: show raw time
+                                    }
+                                  }
+
+                                  // Format trip date/time if available (convert to local time)
+                                  String? tripDateStr;
+                                  String? tripTimeStr;
+                                  DateTime? tripDateTime;
+                                  bool showTripInfo = false;
+                                  
+                                  if (transaction['trip_datetime'] != null) {
+                                    try {
+                                      // Normalize and parse to local timezone (like laptop time)
+                                      tripDateTime = _parseDateToLocal(transaction['trip_datetime']);
+                                      if (tripDateTime == null) {
+                                        // Fallback: try direct parse
+                                        tripDateTime = DateTime.parse(transaction['trip_datetime']).toLocal();
+                                      }
+                                      
+                                      final tripDateOnly = tripDateTime.toIso8601String().split('T')[0];
+                                      final transactionDateOnly = transactionDateTime != null 
+                                        ? transactionDateTime.toIso8601String().split('T')[0]
+                                        : null;
+                                      
+                                      // Only show trip date if it's different from transaction date
+                                      if (tripDateOnly != transactionDateOnly && transactionDateOnly != null) {
+                                        tripDateStr = '${tripDateTime.day}/${tripDateTime.month}/${tripDateTime.year}';
+                                        showTripInfo = true;
+                                      }
+                                      
+                                      // Always show trip time if available (it's useful information for payments/refunds)
+                                      // Format trip time from trip_datetime in local timezone
+                                      tripTimeStr = '${tripDateTime.hour.toString().padLeft(2, '0')}:${tripDateTime.minute.toString().padLeft(2, '0')}';
+                                      showTripInfo = true;
+                                    } catch (_) {
+                                      // If parsing fails, use the trip_time directly if available
+                                      if (transaction['trip_time'] != null) {
+                                        tripTimeStr = transaction['trip_time'].toString();
+                                        showTripInfo = true;
+                                      }
+                                    }
+                                  } else if (transaction['trip_time'] != null) {
+                                    // Fallback: use trip_time if trip_datetime is not available
+                                    // Try to parse and convert to local time if it's a full datetime string
+                                    try {
+                                      final parsedTime = _parseDateToLocal(transaction['trip_time']);
+                                      if (parsedTime != null) {
+                                        tripTimeStr = '${parsedTime.hour.toString().padLeft(2, '0')}:${parsedTime.minute.toString().padLeft(2, '0')}';
+                                      } else {
+                                        // If it's just a time string (HH:MM), use it directly
+                                        tripTimeStr = transaction['trip_time'].toString();
+                                      }
+                                    } catch (_) {
+                                      // If it's just a time string (HH:MM), use it directly
+                                      tripTimeStr = transaction['trip_time'].toString();
+                                    }
+                                    showTripInfo = true;
                                   }
 
                                   return Container(
@@ -1029,16 +1173,67 @@ class _PassengerWalletPageState extends State<PassengerWalletPage> {
                                                     color: textSecondary,
                                                     fontSize: 12,
                                                   ),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
                                                 ),
                                               ],
                                               const SizedBox(height: 4),
-                                              Text(
-                                                dateStr,
-                                                style: TextStyle(
-                                                  color: textSecondary,
-                                                  fontSize: 12,
-                                                ),
+                                              // Transaction date/time
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.access_time,
+                                                    size: 12,
+                                                    color: textSecondary,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    transactionDateStr.isNotEmpty && transactionTimeStr.isNotEmpty
+                                                      ? '$transactionDateStr $transactionTimeStr'
+                                                      : (transactionDateStr.isNotEmpty 
+                                                          ? transactionDateStr 
+                                                          : (transactionTimeStr.isNotEmpty 
+                                                              ? transactionTimeStr 
+                                                              : time)), // Fallback to raw time only if all parsing failed
+                                                    style: TextStyle(
+                                                      color: textSecondary,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
+                                              // Trip date/time (only if different or has trip time)
+                                              if (showTripInfo && (tripDateStr != null || tripTimeStr != null)) ...[
+                                                const SizedBox(height: 2),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.calendar_today,
+                                                      size: 12,
+                                                      color: textSecondary.withOpacity(0.7),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      _isArabic
+                                                        ? (tripDateStr != null && tripTimeStr != null
+                                                            ? 'رحلة: $tripDateStr $tripTimeStr'
+                                                            : tripTimeStr != null
+                                                                ? 'وقت الرحلة: $tripTimeStr'
+                                                                : 'رحلة: $tripDateStr')
+                                                        : (tripDateStr != null && tripTimeStr != null
+                                                            ? 'Trip: $tripDateStr $tripTimeStr'
+                                                            : tripTimeStr != null
+                                                                ? 'Trip time: $tripTimeStr'
+                                                                : 'Trip: $tripDateStr'),
+                                                      style: TextStyle(
+                                                        color: textSecondary.withOpacity(0.7),
+                                                        fontSize: 11,
+                                                        fontStyle: FontStyle.italic,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
                                             ],
                                           ),
                                         ),

@@ -1214,6 +1214,36 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getAvailableTripTimes({
+    required String lineId,
+    required String date,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'lineid': lineId,
+        'date': date,
+      };
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/trips/available-times')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return decoded is Map<String, dynamic> ? decoded : {};
+      }
+      throw Exception('Failed to get available trip times');
+    } catch (exception) {
+      throw Exception('Failed to get available trip times: ${exception.toString()}');
+    }
+  }
+
   static Future<Map<String, dynamic>> createReservation({
     String? tripid,
     String? lineid,

@@ -3,11 +3,12 @@ import Line from '../models/Line.js';
 import Vehicle from '../models/Vehicle.js';
 import Reservation from '../models/Reservation.js';
 import DriverQueue from '../models/DriverQueue.js';
+import ScheduleTemplate from '../models/ScheduleTemplate.js';
 import { buildSeatRows, normalizeSeatId } from '../utils/seatLayout.js';
 import { calculateAvailablePassengerSeats, getTotalPassengerSeats } from '../utils/seatCalculation.js';
 import { v4 as uuidv4 } from 'uuid';
 import { TRIP_STATUS } from '../utils/constants.js';
-import { getUtcNow, parseUtcDate, canBookInstant } from '../utils/timeUtils.js';
+import { getUtcNow, parseUtcDate, canBookInstant, getServerTimezoneOffset } from '../utils/timeUtils.js';
 import logger from '../utils/logger.js';
 
 
@@ -528,3 +529,145 @@ function generateSeatMap(layout, totalSeats, reservations, brokenSeats = []) {
   return seatMap;
 }
 
+/**
+ * Get available trips for a line on a specific date
+ * Returns actual trips if they exist, otherwise generates them based on schedule
+ */
+export const getAvailableTripTimes = async (req, res, next) => {
+  try {
+    const { lineid, date } = req.query;
+
+    if (!lineid || !date) {
+      return res.status(400).json({
+        message: req.t('trip.lineid_and_date_required') || 'lineid and date are required',
+      });
+    }
+
+    // Get schedule for the line
+    const schedules = await ScheduleTemplate.findByLineId(lineid);
+    if (!schedules || schedules.length === 0) {
+      return res.status(404).json({
+        message: req.t('schedule.not_found') || 'No schedule found for this line',
+      });
+    }
+
+    const schedule = schedules[0]; // Get first active schedule
+    const { start_hour, end_hour, interval_minutes } = schedule;
+
+    // Parse the date
+    const targetDate = new Date(date);
+    if (isNaN(targetDate.getTime())) {
+      return res.status(400).json({
+        message: req.t('trip.invalid_date') || 'Invalid date format',
+      });
+    }
+
+    // First, try to get existing trips for this line and date
+    const existingTrips = await Trip.findAll({
+      lineid,
+      date,
+      status: 'scheduled',
+    });
+
+    // Also get open trips
+    const openTrips = await Trip.findAll({
+      lineid,
+      date,
+      status: 'open',
+    });
+
+    const allTrips = [...existingTrips, ...openTrips];
+    const now = getUtcNow();
+
+    // Filter to only future trips and sort by deptime
+    const futureTrips = allTrips
+      .filter(trip => {
+        const deptime = parseUtcDate(trip.deptime);
+        return deptime && deptime.getTime() > now.getTime();
+      })
+      .sort((a, b) => {
+        const timeA = parseUtcDate(a.deptime)?.getTime() || 0;
+        const timeB = parseUtcDate(b.deptime)?.getTime() || 0;
+        return timeA - timeB;
+      });
+
+    // If we have trips, return them
+    if (futureTrips.length > 0) {
+      const tripsData = futureTrips.map(trip => {
+        const deptime = parseUtcDate(trip.deptime);
+        const localTime = deptime ? new Date(deptime.getTime()) : null;
+        
+        return {
+          tripid: trip.tripid,
+          deptime: trip.deptime,
+          time: trip.deptime,
+          hour: localTime ? localTime.getHours() : null,
+          minute: localTime ? localTime.getMinutes() : null,
+          status: trip.status,
+          availableseats: trip.availableseats || 0,
+          totalbookings: trip.totalbookings || 0,
+          interval_minutes: interval_minutes,
+        };
+      });
+
+      return res.json({
+        lineid,
+        date,
+        schedule: {
+          start_hour,
+          end_hour,
+          interval_minutes,
+        },
+        trips: tripsData,
+      });
+    }
+
+    // If no trips exist, generate trip times based on schedule
+    const timezoneOffset = await getServerTimezoneOffset();
+    const tripTimes = [];
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const day = String(targetDate.getDate()).padStart(2, '0');
+    const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+    const offsetHours = String(Math.abs(timezoneOffset)).padStart(2, '0');
+
+    let currentMinutes = start_hour * 60;
+    const endMinutes = end_hour * 60;
+
+    while (currentMinutes <= endMinutes) {
+      const hours = Math.floor(currentMinutes / 60);
+      const mins = currentMinutes % 60;
+      const localTimeString = `${year}-${month}-${day}T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00${offsetSign}${offsetHours}:00`;
+      const utcTime = parseUtcDate(localTimeString);
+      
+      if (utcTime && utcTime.getTime() > now.getTime()) {
+        tripTimes.push({
+          tripid: null, // No trip ID yet, will be created when booking
+          deptime: utcTime.toISOString(),
+          time: utcTime.toISOString(),
+          hour: hours,
+          minute: mins,
+          status: 'scheduled',
+          availableseats: 0,
+          totalbookings: 0,
+          interval_minutes: interval_minutes,
+        });
+      }
+
+      currentMinutes += interval_minutes;
+    }
+
+    res.json({
+      lineid,
+      date,
+      schedule: {
+        start_hour,
+        end_hour,
+        interval_minutes,
+      },
+      trips: tripTimes,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

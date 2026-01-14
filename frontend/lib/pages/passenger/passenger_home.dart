@@ -105,8 +105,43 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     try {
       await NotificationService().initialize();
       NotificationService().setOnNotificationTap((data) {
-        // Handle notification tap navigation
-        // You can add navigation logic here based on data['action']
+        // Show notification dialog when push notification is tapped
+        final isArabic = _isArabic;
+        final title = data['title'] as String? ?? (isArabic ? 'إشعار' : 'Notification');
+        final body = data['body'] as String? ?? (isArabic ? 'إشعار جديد' : 'New notification');
+        
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              content: SingleChildScrollView(
+                child: Text(
+                  body,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(isArabic ? 'إغلاق' : 'Close'),
+                ),
+              ],
+            );
+          },
+        );
+        
+        // Handle notification tap navigation based on data['action']
+        if (data['action'] == 'view_reservation' && data['bookingid'] != null) {
+          // Navigate to reservation details
+          // Navigator.push(...);
+        } else if (data['action'] == 'view_trip' && data['tripid'] != null) {
+          // Navigate to trip details
+          // Navigator.push(...);
+        }
       });
     } catch (e) {
       print('Error initializing notifications: $e');

@@ -26,7 +26,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
   bool _isLineDropdownOpen = false;
   String? _selectedLineId;
   DateTime? _selectedDate;
-  Map<String, int> _lineQueueCounts = {}; // Map of lineId -> drivers in queue count
 
   final TextEditingController _lineSearchController = TextEditingController();
   String _lineSearchQuery = '';
@@ -52,11 +51,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'loading': 'جاري التحميل...',
       'tripNotOpenedYet': 'الحجز متاح فقط في الوقت المحدد',
       'tripOpensAt': 'الحجز متاح من الساعة',
-      'driversInQueue': 'سائق',
-      'noDriversInQueue': 'لا يوجد سائق',
       'tripHasDriver': 'الرحلة لديها سائق',
-      'tripNoDriver': 'لا يوجد سائق للرحلة',
-      'driversInQueueLabel': 'سائق في الانتظار',
     },
     'en': {
       'title': 'Available Trips',
@@ -78,11 +73,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'loading': 'Loading...',
       'tripNotOpenedYet': 'Booking is only available at the specified time',
       'tripOpensAt': 'Booking opens at',
-      'driversInQueue': 'driver',
-      'noDriversInQueue': 'No driver',
       'tripHasDriver': 'Trip has driver',
-      'tripNoDriver': 'No driver assigned',
-      'driversInQueueLabel': 'drivers in queue',
     },
   };
 
@@ -150,30 +141,9 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
         date: _selectedDate?.toIso8601String().split('T')[0],
       );
       
-      // Extract unique line IDs and fetch queue counts
-      final Set<String> uniqueLineIds = {};
-      for (final trip in trips) {
-        final line = trip['line'] as Map<String, dynamic>?;
-        if (line != null && line['lineid'] != null) {
-          uniqueLineIds.add(line['lineid'].toString());
-        }
-      }
-      
-      // Fetch queue counts for all unique lines
-      final Map<String, int> queueCounts = {};
-      for (final lineId in uniqueLineIds) {
-        try {
-          final availability = await ApiService.checkLineBookingAvailability(lineId);
-          queueCounts[lineId] = availability['driversInQueue'] as int? ?? 0;
-        } catch (e) {
-          queueCounts[lineId] = 0;
-        }
-      }
-      
       if (mounted) {
         setState(() {
           _trips = trips;
-          _lineQueueCounts = queueCounts;
           _isLoading = false;
         });
       }
@@ -1154,55 +1124,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                           ),
                         ],
                       ),
-                    ),
-                  // Show drivers in queue (only for open trips)
-                  if (canBookInstant)
-                    Builder(
-                      builder: (context) {
-                        final lineId = line['lineid']?.toString() ?? '';
-                        final driversInQueue = _lineQueueCounts[lineId] ?? 0;
-                        final hasDrivers = driversInQueue > 0;
-                        
-                        return Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isSmallScreen ? 10 : 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: hasDrivers
-                                ? Colors.blue.withAlpha(51)
-                                : Colors.grey.withAlpha(51),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: hasDrivers
-                                  ? Colors.blue.withAlpha(102)
-                                  : Colors.grey.withAlpha(102),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.people_rounded,
-                                color: hasDrivers ? Colors.blue : Colors.grey,
-                                size: isSmallScreen ? 16 : 18,
-                              ),
-                              SizedBox(width: isSmallScreen ? 4 : 6),
-                              Text(
-                                hasDrivers 
-                                    ? '$driversInQueue ${t('driversInQueueLabel')}'
-                                    : t('noDriversInQueue'),
-                                style: TextStyle(
-                                  color: hasDrivers ? Colors.blue : Colors.grey,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: isSmallScreen ? 10 : 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
                     ),
                 ],
               ),

@@ -645,7 +645,7 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> fetchDriverQueue() async {
+  static Future<Map<String, dynamic>> fetchDriverQueue({String? direction}) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -655,8 +655,16 @@ class ApiService {
         };
       }
 
+      final queryParams = <String, String>{};
+      if (direction != null && direction.isNotEmpty) {
+        queryParams['direction'] = direction;
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
       final response = await http.get(
-        Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue'),
+        uri,
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Accept': 'application/json; charset=utf-8',
@@ -685,7 +693,10 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> joinDriverQueue() async {
+  static Future<Map<String, dynamic>> joinDriverQueue({
+    String? direction,
+    String? stationid,
+  }) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -695,6 +706,14 @@ class ApiService {
         };
       }
 
+      final body = <String, dynamic>{};
+      if (direction != null && direction.isNotEmpty) {
+        body['direction'] = direction;
+      }
+      if (stationid != null && stationid.isNotEmpty) {
+        body['stationid'] = stationid;
+      }
+
       final response = await http.post(
         Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue/join'),
         headers: {
@@ -702,6 +721,7 @@ class ApiService {
           'Accept': 'application/json; charset=utf-8',
           'Authorization': 'Bearer $token',
         },
+        body: utf8.encode(jsonEncode(body)),
       ).timeout(AppConfig.requestTimeout);
 
       final responseData = jsonDecode(utf8.decode(response.bodyBytes));
@@ -768,6 +788,7 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> fetchDriverTrips({
     bool upcomingOnly = true,
     String? status,
+    String? direction,
   }) async {
     final token = await getToken();
     if (token == null) {
@@ -777,6 +798,7 @@ class ApiService {
     final queryParams = <String, String>{
       if (upcomingOnly) 'upcoming': 'true',
       if (status != null && status.isNotEmpty) 'status': status,
+      if (direction != null && direction.isNotEmpty) 'direction': direction,
     };
 
     final uri = Uri.parse('${AppConfig.apiBaseUrl}/drivers/trips')
@@ -1070,11 +1092,13 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> fetchUpcomingTrips({
     String? lineid,
     String? date,
+    String? direction,
   }) async {
     try {
       final queryParams = <String, String>{};
       if (lineid != null && lineid.isNotEmpty) queryParams['lineid'] = lineid;
       if (date != null && date.isNotEmpty) queryParams['date'] = date;
+      if (direction != null && direction.isNotEmpty) queryParams['direction'] = direction;
 
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/trips/upcoming').replace(
           queryParameters: queryParams.isNotEmpty ? queryParams : null);
@@ -2177,6 +2201,8 @@ class ApiService {
     int? estduration,
     double? distance,
     bool active = true,
+    String? mainStationId,
+    String? returnStationId,
   }) async {
     try {
       final token = await getToken();
@@ -2205,6 +2231,8 @@ class ApiService {
 
       if (estduration != null) body['estduration'] = estduration;
       if (distance != null) body['distance'] = distance;
+      if (mainStationId != null && mainStationId.isNotEmpty) body['main_stationid'] = mainStationId;
+      if (returnStationId != null && returnStationId.isNotEmpty) body['return_stationid'] = returnStationId;
 
       final response = await http
           .post(
@@ -2240,6 +2268,8 @@ class ApiService {
     int? estduration,
     double? distance,
     bool? active,
+    String? mainStationId,
+    String? returnStationId,
   }) async {
     try {
       final token = await getToken();
@@ -2263,6 +2293,20 @@ class ApiService {
       if (estduration != null) body['estduration'] = estduration;
       if (distance != null) body['distance'] = distance;
       if (active != null) body['active'] = active;
+      if (mainStationId != null) {
+        if (mainStationId.isEmpty) {
+          body['main_stationid'] = null;
+        } else {
+          body['main_stationid'] = mainStationId;
+        }
+      }
+      if (returnStationId != null) {
+        if (returnStationId.isEmpty) {
+          body['return_stationid'] = null;
+        } else {
+          body['return_stationid'] = returnStationId;
+        }
+      }
 
       final response = await http
           .put(
@@ -3753,6 +3797,97 @@ class ApiService {
         'message': decoded is Map && decoded['message'] is String
             ? decoded['message']
             : 'Failed to update timezone configuration',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Get queue location validation configuration (Admin only)
+  static Future<Map<String, dynamic>> getQueueLocationValidationConfig() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/config/queue-location-validation'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'enabled': decoded['enabled'] ?? false,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to get queue location validation configuration',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Update queue location validation configuration (Admin only)
+  static Future<Map<String, dynamic>> updateQueueLocationValidationConfig(
+      bool enabled) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.put(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/config/queue-location-validation'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: utf8.encode(jsonEncode({
+          'enabled': enabled,
+        })),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'message': decoded['message'] ??
+              'Queue location validation configuration updated successfully',
+          'enabled': decoded['enabled'] ?? enabled,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to update queue location validation configuration',
       };
     } catch (exception) {
       return {

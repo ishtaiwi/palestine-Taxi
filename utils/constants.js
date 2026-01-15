@@ -100,3 +100,15 @@ export const QUEUE_STATUS = {
   LEFT: 'left',
 };
 
+export const TRIP_DIRECTION = {
+  GOING: 'going',
+  RETURN: 'return',
+};
+
+export const QUEUE_DIRECTION = {
+  GOING: 'going',
+  RETURNING: 'returning',
+};
+
+export const CONFIG_KEY_QUEUE_LOCATION_VALIDATION = 'queue_location_validation_enabled';
+

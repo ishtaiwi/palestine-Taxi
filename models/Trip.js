@@ -1,5 +1,6 @@
 import supabase from '../config/dbcon.js';
 import { getUtcNow, parseUtcDate, addTimeFlagsToTrip, addTimeFlagsToTrips } from '../utils/timeUtils.js';
+import { TRIP_STATUS } from '../utils/constants.js';
 
 class Trip {
   static async create(tripData) {
@@ -35,6 +36,10 @@ class Trip {
 
     if (filters.status) {
       query = query.eq('status', filters.status);
+    }
+
+    if (filters.direction) {
+      query = query.eq('direction', filters.direction);
     }
 
     if (filters.date) {
@@ -104,6 +109,14 @@ class Trip {
 
     if (filters.status) {
       query = query.eq('status', filters.status);
+    }
+
+    if (filters.direction) {
+      query = query.eq('direction', filters.direction);
+    }
+
+    if (filters.direction) {
+      query = query.eq('direction', filters.direction);
     }
 
     const { data, error } = await query.order('deptime', { ascending: true });
@@ -345,6 +358,34 @@ class Trip {
       ...bucket,
       avgUtilization: bucket.totalCapacity > 0 ? bucket.totalBooked / bucket.totalCapacity : 0,
     }));
+  }
+
+  /**
+   * Find trips by line and direction
+   * @param {string} lineid - Line ID
+   * @param {string} direction - 'going' or 'return'
+   * @param {Object} filters - Additional filters
+   * @returns {Promise<Array>} - Array of trips
+   */
+  static async findByLineAndDirection(lineid, direction, filters = {}) {
+    const allFilters = { ...filters, lineid, direction };
+    return await this.findAll(allFilters);
+  }
+
+  /**
+   * Find returning trips for a going trip
+   * @param {string} goingTripid - Going trip ID
+   * @returns {Promise<Array>} - Array of returning trips
+   */
+  static async findReturningTripsForGoingTrip(goingTripid) {
+    const goingTrip = await this.findById(goingTripid);
+    if (!goingTrip) {
+      return [];
+    }
+
+    return await this.findByLineAndDirection(goingTrip.lineid, 'return', {
+      status: TRIP_STATUS.SCHEDULED,
+    });
   }
 }
 

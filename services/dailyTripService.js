@@ -173,6 +173,12 @@ async function createTripsForDate(template, targetDate) {
 
 
 
+        // Determine origin_stationid based on direction (default to 'going')
+        let origin_stationid = null;
+        if (line.main_stationid) {
+          origin_stationid = line.main_stationid; // Default to going direction
+        }
+
         const tripData = {
           tripid: uuidv4(),
           lineid,
@@ -186,6 +192,8 @@ async function createTripsForDate(template, targetDate) {
           early_departure_allowed: true,
           scheduled_departure_enforced: template.scheduled_departure_enforced ?? false,
           templateid: templateid,
+          direction: 'going', // Default to going for scheduled trips
+          origin_stationid: origin_stationid,
         };
 
         const trip = await Trip.create(tripData);

@@ -24,6 +24,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
   bool _isLineDropdownOpen = false;
   String? _selectedLineId;
   DateTime? _selectedDate;
+  String? _selectedDirection; // null = all, 'going' = going, 'return' = return
 
   final TextEditingController _lineSearchController = TextEditingController();
   String _lineSearchQuery = '';
@@ -49,6 +50,11 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'loading': 'جاري التحميل...',
       'tripNotOpenedYet': 'الحجز متاح فقط في الوقت المحدد',
       'tripOpensAt': 'الحجز متاح من الساعة',
+      'direction': 'الاتجاه',
+      'allDirections': 'جميع الاتجاهات',
+      'going': 'ذهاب',
+      'return': 'عودة',
+      'filterByDirection': 'فلترة حسب الاتجاه',
     },
     'en': {
       'title': 'Available Trips',
@@ -70,6 +76,11 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       'loading': 'Loading...',
       'tripNotOpenedYet': 'Booking is only available at the specified time',
       'tripOpensAt': 'Booking opens at',
+      'direction': 'Direction',
+      'allDirections': 'All Directions',
+      'going': 'Going',
+      'return': 'Return',
+      'filterByDirection': 'Filter by Direction',
     },
   };
 
@@ -125,6 +136,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       final trips = await ApiService.fetchUpcomingTrips(
         lineid: _selectedLineId,
         date: _selectedDate?.toIso8601String().split('T')[0],
+        direction: _selectedDirection,
       );
       if (mounted) {
         setState(() {
@@ -718,6 +730,8 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    _buildDirectionFilter(textPrimary),
                   ],
                 ),
               ),
@@ -945,6 +959,36 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                                 ),
                               ),
                             ),
+                            if (trip['direction'] != null)
+                              Container(
+                                margin: EdgeInsets.only(left: isSmallScreen ? 6.0 : 8.0),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isSmallScreen ? 6.0 : 8.0,
+                                  vertical: isSmallScreen ? 3.0 : 4.0,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: (trip['direction'] == 'going'
+                                      ? Colors.blue
+                                      : Colors.purple).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
+                                  border: Border.all(
+                                    color: trip['direction'] == 'going'
+                                        ? Colors.blue
+                                        : Colors.purple,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  trip['direction'] == 'going' ? t('going') : t('return'),
+                                  style: TextStyle(
+                                    color: trip['direction'] == 'going'
+                                        ? Colors.blue
+                                        : Colors.purple,
+                                    fontSize: isSmallScreen ? 9.0 : 10.0,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -1170,6 +1214,51 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDirectionFilter(Color textPrimary) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _isDarkMode
+            ? const Color(0xFF1E3A5F).withAlpha(77)
+            : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _isDarkMode
+              ? const Color(0xFF2C5F8D)
+              : Colors.grey.shade300,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.swap_horiz, color: textPrimary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _selectedDirection == null
+                  ? t('filterByDirection')
+                  : (_selectedDirection == 'going' ? t('going') : t('return')),
+              style: TextStyle(
+                color: textPrimary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          if (_selectedDirection != null)
+            IconButton(
+              icon: const Icon(Icons.clear, size: 20),
+              color: textPrimary,
+              onPressed: () {
+                setState(() {
+                  _selectedDirection = null;
+                });
+                _loadTrips();
+              },
+            ),
+        ],
       ),
     );
   }

@@ -69,14 +69,20 @@ export const assignVehicleFromQueue = async (tripid, lineid) => {
 
     logger.info(`[TripOpeningService] ✅ Trip ${tripid} has ${activeReservations.length} reservation(s) and ${futureBookingsCount} future booking(s) - proceeding with driver assignment`);
 
+    // Get trip direction to filter queue
+    const tripDirection = currentTrip?.direction || 'going';
+    
+    // Map trip direction to queue direction
+    const { mapTripDirectionToQueueDirection } = await import('../utils/tripDirectionUtils.js');
+    const queueDirection = mapTripDirectionToQueueDirection(tripDirection);
 
-    const queue = await DriverQueue.getActiveByLine(lineid);
+    const queue = await DriverQueue.getActiveByLine(lineid, queueDirection);
     if (!queue || queue.length === 0) {
-      logger.info(`[TripOpeningService] ⚠️ No drivers available in queue for line ${lineid}`);
+      logger.info(`[TripOpeningService] ⚠️ No drivers available in ${queueDirection} queue for line ${lineid}`);
       return null;
     }
 
-    logger.info(`[TripOpeningService] 📋 Found ${queue.length} driver(s) in queue: ${queue.map((d, i) => `[${i + 1}] driver ${d.driverid}`).join(', ')}`);
+    logger.info(`[TripOpeningService] 📋 Found ${queue.length} driver(s) in ${queueDirection} queue: ${queue.map((d, i) => `[${i + 1}] driver ${d.driverid}`).join(', ')}`);
 
 
     const tripDeptime = parseUtcDate(currentTrip.deptime);

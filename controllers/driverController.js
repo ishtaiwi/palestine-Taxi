@@ -20,6 +20,8 @@ const buildQueueResponse = (queue = [], driverid) => {
     lineid: entry.lineid,
     status: entry.status,
     joinedAt: entry.joined_at,
+    direction: entry.direction,
+    stationid: entry.stationid,
     driver: entry.driver,
   }));
 
@@ -74,11 +76,26 @@ export const getDriverQueue = async (req, res, next) => {
       });
     }
 
-    const queue = await DriverQueue.getActiveByLine(driverRecord.lineid);
+    // Get current queue entry to determine direction
+    const currentEntry = await DriverQueue.findActiveByDriver(driverRecord.driverid);
+    const direction = currentEntry?.direction || null;
+
+    // Get queue for current direction if driver is in queue, otherwise get both
+    let queue = [];
+    if (direction) {
+      queue = await DriverQueue.getActiveByLine(driverRecord.lineid, direction);
+    } else {
+      // If not in queue, return both directions for display
+      const goingQueue = await DriverQueue.getActiveByLine(driverRecord.lineid, 'going');
+      const returningQueue = await DriverQueue.getActiveByLine(driverRecord.lineid, 'returning');
+      queue = [...goingQueue, ...returningQueue];
+    }
+
     const response = buildQueueResponse(queue, driverRecord.driverid);
 
     res.json({
       line: line,
+      currentDirection: direction,
       ...response,
     });
   } catch (error) {
@@ -96,9 +113,58 @@ export const joinDriverQueue = async (req, res, next) => {
       });
     }
 
+    // Get direction from request body (default to 'going')
+    const direction = req.body.direction || 'going';
+    
+    // Validate direction
+    if (direction !== 'going' && direction !== 'returning') {
+      return res.status(400).json({
+        message: req.t('driver.invalid_direction') || 'Invalid direction. Must be "going" or "returning"',
+      });
+    }
+
+    // Check if location validation is enabled
+    const AppConfig = (await import('../models/AppConfig.js')).default;
+    const locationValidationEnabled = await AppConfig.getQueueLocationValidationEnabled();
+
+    // Validate location if enabled
+    if (locationValidationEnabled) {
+      const { validateQueueJoinLocation } = await import('../services/locationValidationService.js');
+      const locationValidation = await validateQueueJoinLocation(
+        driverRecord.driverid,
+        driverRecord.lineid,
+        direction
+      );
+
+      if (!locationValidation.valid) {
+        return res.status(400).json({
+          message: locationValidation.error || 'Location validation failed',
+          locationValidation: {
+            valid: false,
+            station: locationValidation.station,
+            distance: locationValidation.distance,
+            driverLocation: locationValidation.driverLocation,
+          },
+        });
+      }
+    }
+
+    // Get line to determine station
+    const Line = (await import('../models/Line.js')).default;
+    const line = await Line.findById(driverRecord.lineid);
+    
+    // Determine stationid based on direction
+    let stationid = null;
+    if (direction === 'going') {
+      stationid = line?.main_stationid || null;
+    } else if (direction === 'returning') {
+      stationid = line?.return_stationid || null;
+    }
+
+    // Check if driver is already in a queue (will be automatically removed by join method)
     const existing = await DriverQueue.findActiveByDriver(driverRecord.driverid);
-    if (existing) {
-      const queue = await DriverQueue.getActiveByLine(existing.lineid);
+    if (existing && existing.direction === direction && existing.lineid === driverRecord.lineid) {
+      const queue = await DriverQueue.getActiveByLine(driverRecord.lineid, direction);
       const response = buildQueueResponse(queue, driverRecord.driverid);
       return res.status(200).json({
         message: req.t('driver.queue_exists') || 'Driver already in queue',
@@ -106,8 +172,9 @@ export const joinDriverQueue = async (req, res, next) => {
       });
     }
 
-    const entry = await DriverQueue.join(driverRecord.driverid, driverRecord.lineid);
-    const queue = await DriverQueue.getActiveByLine(driverRecord.lineid);
+    // Join queue with direction and station
+    const entry = await DriverQueue.join(driverRecord.driverid, driverRecord.lineid, direction, stationid);
+    const queue = await DriverQueue.getActiveByLine(driverRecord.lineid, direction);
     const response = buildQueueResponse(queue, driverRecord.driverid);
 
     // Check for waiting trips and assign vehicle (event-driven assignment)

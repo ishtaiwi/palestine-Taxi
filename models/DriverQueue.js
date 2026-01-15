@@ -5,8 +5,8 @@ import { v4 as uuidv4 } from 'uuid';
 const ACTIVE_STATUS = 'waiting';
 
 class DriverQueue {
-  static async getActiveByLine(lineid) {
-    const { data, error } = await supabase
+  static async getActiveByLine(lineid, direction = null) {
+    let query = supabase
       .from('driver_queue')
       .select(`
         queueid,
@@ -14,6 +14,8 @@ class DriverQueue {
         lineid,
         status,
         joined_at,
+        direction,
+        stationid,
         driver (
           driverid,
           licenseid,
@@ -27,8 +29,13 @@ class DriverQueue {
         )
       `)
       .eq('lineid', lineid)
-      .eq('status', ACTIVE_STATUS)
-      .order('joined_at', { ascending: true });
+      .eq('status', ACTIVE_STATUS);
+
+    if (direction) {
+      query = query.eq('direction', direction);
+    }
+
+    const { data, error } = await query.order('joined_at', { ascending: true });
 
     if (error) throw error;
     return data || [];
@@ -42,7 +49,9 @@ class DriverQueue {
         driverid,
         lineid,
         status,
-        joined_at
+        joined_at,
+        direction,
+        stationid
       `)
       .eq('driverid', driverid)
       .eq('status', ACTIVE_STATUS)
@@ -52,23 +61,33 @@ class DriverQueue {
     return data;
   }
 
-  static async join(driverid, lineid) {
+  static async join(driverid, lineid, direction = 'going', stationid = null) {
+    // First, remove driver from any existing queue
+    await this.leaveAllQueues(driverid);
+
+    const queueData = {
+      queueid: uuidv4(),
+      driverid,
+      lineid,
+      status: ACTIVE_STATUS,
+      direction,
+    };
+
+    if (stationid) {
+      queueData.stationid = stationid;
+    }
+
     const { data, error } = await supabase
       .from('driver_queue')
-      .insert([
-        {
-          queueid: uuidv4(),
-          driverid,
-          lineid,
-          status: ACTIVE_STATUS,
-        },
-      ])
+      .insert([queueData])
       .select(`
         queueid,
         driverid,
         lineid,
         status,
         joined_at,
+        direction,
+        stationid,
         driver (
           driverid,
           licenseid,
@@ -85,6 +104,35 @@ class DriverQueue {
 
     if (error) throw error;
     return data;
+  }
+
+  /**
+   * Leave all queues for a driver
+   * @param {string} driverid - Driver ID
+   * @returns {Promise<boolean>} - Success status
+   */
+  static async leaveAllQueues(driverid) {
+    const { error } = await supabase
+      .from('driver_queue')
+      .update({
+        status: 'left',
+        left_at: new Date().toISOString(),
+      })
+      .eq('driverid', driverid)
+      .eq('status', ACTIVE_STATUS);
+
+    if (error) throw error;
+    return true;
+  }
+
+  /**
+   * Get active queue by line and direction
+   * @param {string} lineid - Line ID
+   * @param {string} direction - 'going' or 'returning'
+   * @returns {Promise<Array>} - Array of queue entries
+   */
+  static async getActiveByLineAndDirection(lineid, direction) {
+    return await this.getActiveByLine(lineid, direction);
   }
 
   static async leaveActiveByDriver(driverid) {
@@ -126,7 +174,7 @@ class DriverQueue {
       return null;
     }
 
-    const queue = await this.getActiveByLine(queueEntry.lineid);
+    const queue = await this.getActiveByLine(queueEntry.lineid, queueEntry.direction);
     const position = queue.findIndex(entry => entry.driverid === driverid);
 
     return position >= 0 ? position + 1 : null;
@@ -137,8 +185,8 @@ class DriverQueue {
    * @param {string} lineid - The line ID to check
    * @returns {Promise<boolean>} - True if at least one driver is available
    */
-  static async hasAvailableDrivers(lineid) {
-    const queue = await this.getActiveByLine(lineid);
+  static async hasAvailableDrivers(lineid, direction = null) {
+    const queue = await this.getActiveByLine(lineid, direction);
     return queue && queue.length > 0;
   }
 
@@ -147,8 +195,8 @@ class DriverQueue {
    * @param {string} lineid - The line ID to check
    * @returns {Promise<number>} - Number of drivers in queue
    */
-  static async getQueueCount(lineid) {
-    const queue = await this.getActiveByLine(lineid);
+  static async getQueueCount(lineid, direction = null) {
+    const queue = await this.getActiveByLine(lineid, direction);
     return queue ? queue.length : 0;
   }
 
@@ -158,8 +206,8 @@ class DriverQueue {
    * @param {string} lineid - The line ID to check
    * @returns {Promise<{allowed: boolean, driversAvailable: number, message?: string}>}
    */
-  static async canAcceptInstantBooking(lineid) {
-    const queue = await this.getActiveByLine(lineid);
+  static async canAcceptInstantBooking(lineid, direction = null) {
+    const queue = await this.getActiveByLine(lineid, direction);
     const driversAvailable = queue ? queue.length : 0;
 
     if (driversAvailable === 0) {

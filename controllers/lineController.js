@@ -49,7 +49,7 @@ export const getLineById = async (req, res, next) => {
 
 export const createLine = async (req, res, next) => {
   try {
-    const { name_ar, name_en, linename, baseprice, additionalprice, estduration, distance, active } = req.body;
+    const { name_ar, name_en, linename, baseprice, additionalprice, estduration, distance, active, main_stationid, return_stationid } = req.body;
     
     
     const finalNameAr = name_ar || linename || '';
@@ -71,6 +71,8 @@ export const createLine = async (req, res, next) => {
       estduration,
       distance,
       active: active !== undefined ? active : true,
+      main_stationid: main_stationid || null,
+      return_stationid: return_stationid || null,
     };
     
     const line = await Line.create(lineData);

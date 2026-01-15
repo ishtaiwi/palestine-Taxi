@@ -799,15 +799,53 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              _isArabic
-                  ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '---')
-                  : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '---'),
-              style: TextStyle(
-                color: textPrimaryColor,
-                fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _isArabic
+                        ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '---')
+                        : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '---'),
+                    style: TextStyle(
+                      color: textPrimaryColor,
+                      fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (trip['direction'] != null)
+                  Container(
+                    margin: EdgeInsets.only(left: isSmallScreen ? 6.0 : 8.0),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 6.0 : 8.0,
+                      vertical: isSmallScreen ? 3.0 : 4.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: (trip['direction'] == 'going'
+                          ? Colors.blue
+                          : Colors.purple).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
+                      border: Border.all(
+                        color: trip['direction'] == 'going'
+                            ? Colors.blue
+                            : Colors.purple,
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      trip['direction'] == 'going'
+                          ? (_isArabic ? 'ذهاب' : 'Going')
+                          : (_isArabic ? 'عودة' : 'Return'),
+                      style: TextStyle(
+                        color: trip['direction'] == 'going'
+                            ? Colors.blue
+                            : Colors.purple,
+                        fontSize: isSmallScreen ? 9.0 : 10.0,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             SizedBox(height: isSmallScreen ? 2.0 : 4.0),
             Text(

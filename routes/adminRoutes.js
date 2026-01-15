@@ -21,6 +21,8 @@ import {
   getLinePerformance,
   getTimezoneConfig,
   updateTimezoneConfig,
+  getQueueLocationValidationConfig,
+  updateQueueLocationValidationConfig,
   getPendingDrivers,
   getAllDriversWithApprovalStatus,
   approveDriver,
@@ -81,6 +83,8 @@ router.delete('/lines/:lineid/path', deleteLinePath);
 
 router.get('/config/timezone', getTimezoneConfig);
 router.put('/config/timezone', updateTimezoneConfig);
+router.get('/config/queue-location-validation', getQueueLocationValidationConfig);
+router.put('/config/queue-location-validation', updateQueueLocationValidationConfig);
 
 router.get('/drivers/pending', getPendingDrivers);
 router.get('/drivers', getAllDriversWithApprovalStatus);

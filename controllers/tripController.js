@@ -59,12 +59,13 @@ export const getAllTrips = async (req, res, next) => {
 
 export const getUpcomingTrips = async (req, res, next) => {
   try {
-    const { lineid, status, date } = req.query;
+    const { lineid, status, date, direction } = req.query;
     const filters = {};
 
     if (lineid) filters.lineid = lineid;
     if (status) filters.status = status;
     if (date) filters.date = date;
+    if (direction) filters.direction = direction;
 
     const allTrips = await Trip.findUpcoming(filters);
 
@@ -129,7 +130,7 @@ export const getTripById = async (req, res, next) => {
 
 export const createTrip = async (req, res, next) => {
   try {
-    const { lineid, vehicleid, deptime, availableseats } = req.body;
+    const { lineid, vehicleid, deptime, availableseats, direction } = req.body;
 
 
     const line = await Line.findById(lineid);
@@ -137,6 +138,22 @@ export const createTrip = async (req, res, next) => {
       return res.status(404).json({
         message: req.t('line.not_found') || 'Line not found'
       });
+    }
+
+    // Validate direction
+    const tripDirection = direction || 'going';
+    if (tripDirection !== 'going' && tripDirection !== 'return') {
+      return res.status(400).json({
+        message: req.t('trip.invalid_direction') || 'Invalid direction. Must be "going" or "return"',
+      });
+    }
+
+    // Determine origin_stationid based on direction
+    let origin_stationid = null;
+    if (tripDirection === 'going') {
+      origin_stationid = line.main_stationid || null;
+    } else if (tripDirection === 'return') {
+      origin_stationid = line.return_stationid || null;
     }
 
     // Vehicle is optional - if provided, validate it; otherwise will be assigned from queue
@@ -180,6 +197,8 @@ export const createTrip = async (req, res, next) => {
       trip_opening_time: openingTime.toISOString(),
       auto_departure_enabled: true,
       early_departure_allowed: true,
+      direction: tripDirection,
+      origin_stationid: origin_stationid,
       scheduled_departure_enforced: true,
     };
 
@@ -218,7 +237,36 @@ export const updateTrip = async (req, res, next) => {
     const { tripid } = req.params;
     const updates = req.body;
 
+    // If status is being updated to completed, check for returning trip creation
+    if (updates.status === TRIP_STATUS.COMPLETED) {
+      const currentTrip = await Trip.findById(tripid);
+      if (currentTrip && currentTrip.direction === 'going') {
+        // Set arrivaltime if not provided
+        if (!updates.arrivaltime) {
+          updates.arrivaltime = getUtcNow().toISOString();
+        }
+      }
+    }
+
     const trip = await Trip.update(tripid, updates);
+
+    // If status was updated to completed and it's a going trip, create returning trip
+    if (updates.status === TRIP_STATUS.COMPLETED) {
+      const updatedTrip = await Trip.findById(tripid);
+      if (updatedTrip && updatedTrip.direction === 'going') {
+        try {
+          const { processTripCompletion } = await import('../services/tripCompletionService.js');
+          const returnTrip = await processTripCompletion(tripid);
+          if (returnTrip) {
+            console.log(`[TripController] ✅ Created returning trip ${returnTrip.tripid} for going trip ${tripid}`);
+          }
+        } catch (error) {
+          console.error(`[TripController] ⚠️ Error creating returning trip:`, error);
+          // Don't fail the trip update if returning trip creation fails
+        }
+      }
+    }
+
     res.json({
       message: req.t('trip.updated') || 'Trip updated successfully',
       trip,
@@ -272,10 +320,27 @@ export const endTrip = async (req, res, next) => {
   try {
     const { tripid } = req.params;
 
+    // Get trip before updating to check direction
+    const currentTrip = await Trip.findById(tripid);
+
     const trip = await Trip.update(tripid, {
       status: TRIP_STATUS.COMPLETED,
       arrivaltime: getUtcNow().toISOString(),
     });
+
+    // If this is a going trip, create returning trip
+    if (currentTrip && currentTrip.direction === 'going') {
+      try {
+        const { processTripCompletion } = await import('../services/tripCompletionService.js');
+        const returnTrip = await processTripCompletion(tripid);
+        if (returnTrip) {
+          console.log(`[TripController] ✅ Created returning trip ${returnTrip.tripid} for going trip ${tripid}`);
+        }
+      } catch (error) {
+        console.error(`[TripController] ⚠️ Error creating returning trip:`, error);
+        // Don't fail the trip end if returning trip creation fails
+      }
+    }
 
     res.json({
       message: req.t('trip.ended') || 'Trip ended successfully',

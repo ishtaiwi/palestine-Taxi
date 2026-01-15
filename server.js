@@ -9,7 +9,7 @@ import logger from './utils/logger.js';
 import { testConnection, getConnectionStatus } from './config/dbcon.js';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './docs/swagger.js';
-import { generalLimiter } from './middleware/rateLimit.js';
+import { generalLimiter, adminLimiter } from './middleware/rateLimit.js';
 import timeRoutes from './routes/timeRoute.js';
 import stripeRoutes from './routes/stripeRoutes.js';
 
@@ -61,7 +61,17 @@ app.use((req, res, next) => {
 });
 
 
-app.use('/api/', generalLimiter);
+// Apply more lenient rate limiting for admin routes first
+app.use('/api/admin', adminLimiter);
+
+// Apply general rate limiting to all API routes (admin routes already have their own limiter)
+app.use('/api/', (req, res, next) => {
+  // Skip general limiter for admin routes (they have their own)
+  if (req.path.startsWith('/admin')) {
+    return next();
+  }
+  generalLimiter(req, res, next);
+});
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

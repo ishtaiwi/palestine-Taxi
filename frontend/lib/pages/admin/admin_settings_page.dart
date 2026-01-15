@@ -16,6 +16,8 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
   int _timezoneOffset = 2;
   String _timezoneName = 'UTC+2';
   String _description = 'Palestine Standard Time';
+  bool _queueLocationValidationEnabled = false;
+  bool _isSavingLocationValidation = false;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -31,6 +33,11 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       'error': 'حدث خطأ',
       'loading': 'جاري التحميل...',
       'note': 'ملاحظة: سيتم استخدام هذه المنطقة الزمنية عند إنشاء الرحلات من الجداول.',
+      'queueLocationValidation': 'التحقق من موقع الدور',
+      'queueLocationValidationDescription': 'تفعيل التحقق من موقع السائق عند الانضمام للدور',
+      'queueLocationValidationEnabled': 'مفعل',
+      'queueLocationValidationDisabled': 'معطل',
+      'queueLocationValidationNote': 'عند التفعيل، يجب أن يكون السائق في محطة البداية للانضمام للدور',
     },
     'en': {
       'title': 'Settings',
@@ -45,6 +52,11 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       'error': 'Error',
       'loading': 'Loading...',
       'note': 'Note: This timezone will be used when creating trips from schedules.',
+      'queueLocationValidation': 'Queue Location Validation',
+      'queueLocationValidationDescription': 'Enable location validation when drivers join queue',
+      'queueLocationValidationEnabled': 'Enabled',
+      'queueLocationValidationDisabled': 'Disabled',
+      'queueLocationValidationNote': 'When enabled, drivers must be at the starting station to join the queue',
     },
   };
 
@@ -84,6 +96,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     super.initState();
     _loadLanguagePreference();
     _loadTimezoneConfig();
+    _loadQueueLocationValidationConfig();
   }
 
   Future<void> _loadLanguagePreference() async {
@@ -138,6 +151,41 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     } finally {
       setState(() {
         _isSaving = false;
+      });
+    }
+  }
+
+  Future<void> _loadQueueLocationValidationConfig() async {
+    try {
+      final result = await ApiService.getQueueLocationValidationConfig();
+      if (result['success'] == true) {
+        setState(() {
+          _queueLocationValidationEnabled = result['enabled'] ?? false;
+        });
+      }
+    } catch (e) {
+      // Silently fail, use default
+    }
+  }
+
+  Future<void> _saveQueueLocationValidationConfig() async {
+    setState(() {
+      _isSavingLocationValidation = true;
+    });
+
+    try {
+      final result = await ApiService.updateQueueLocationValidationConfig(
+          _queueLocationValidationEnabled);
+      if (result['success'] == true) {
+        _showSnackBar(t('success'));
+      } else {
+        _showSnackBar(result['message'] ?? t('error'), isError: true);
+      }
+    } catch (e) {
+      _showSnackBar('${t('error')}: $e', isError: true);
+    } finally {
+      setState(() {
+        _isSavingLocationValidation = false;
       });
     }
   }
@@ -435,6 +483,134 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                                         color: _isDarkMode
                                             ? Colors.blueAccent
                                             : Colors.blue.shade700,
+                                        fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 12.5 : 13.0),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: isSmallScreen ? 16.0 : 24.0),
+                      // Queue Location Validation Card
+                      Container(
+                        padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
+                        decoration: BoxDecoration(
+                          color: _isDarkMode
+                              ? const Color(0xFF1C2541)
+                              : const Color(0xFFFAFBFC),
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
+                          border: Border.all(
+                            color: _isDarkMode
+                                ? const Color(0xFF2C3E50)
+                                : Colors.grey.shade200,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on,
+                                  color: _isDarkMode
+                                      ? Colors.white70
+                                      : const Color(0xFF546E7A),
+                                  size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
+                                ),
+                                SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+                                Expanded(
+                                  child: Text(
+                                    t('queueLocationValidation'),
+                                    style: TextStyle(
+                                      color: _isDarkMode
+                                          ? Colors.white
+                                          : const Color(0xFF1E3A5F),
+                                      fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                            Text(
+                              t('queueLocationValidationDescription'),
+                              style: TextStyle(
+                                color: _isDarkMode
+                                    ? const Color(0xFFB0BEC5)
+                                    : const Color(0xFF546E7A),
+                                fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0),
+                              ),
+                            ),
+                            SizedBox(height: isSmallScreen ? 16.0 : 20.0),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _queueLocationValidationEnabled
+                                        ? t('queueLocationValidationEnabled')
+                                        : t('queueLocationValidationDisabled'),
+                                    style: TextStyle(
+                                      color: _isDarkMode
+                                          ? Colors.white
+                                          : const Color(0xFF1E3A5F),
+                                      fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                Switch(
+                                  value: _queueLocationValidationEnabled,
+                                  onChanged: _isSavingLocationValidation
+                                      ? null
+                                      : (value) {
+                                          setState(() {
+                                            _queueLocationValidationEnabled = value;
+                                          });
+                                          _saveQueueLocationValidationConfig();
+                                        },
+                                  activeColor: Colors.green,
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                            // Note
+                            Container(
+                              padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
+                              decoration: BoxDecoration(
+                                color: _isDarkMode
+                                    ? Colors.orange.withOpacity(0.1)
+                                    : Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
+                                border: Border.all(
+                                  color: _isDarkMode
+                                      ? Colors.orange.withOpacity(0.3)
+                                      : Colors.orange.shade200,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    color: _isDarkMode
+                                        ? Colors.orangeAccent
+                                        : Colors.orange.shade700,
+                                    size: isSmallScreen ? 18.0 : 20.0,
+                                  ),
+                                  SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+                                  Expanded(
+                                    child: Text(
+                                      t('queueLocationValidationNote'),
+                                      style: TextStyle(
+                                        color: _isDarkMode
+                                            ? Colors.orangeAccent
+                                            : Colors.orange.shade700,
                                         fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 12.5 : 13.0),
                                       ),
                                     ),

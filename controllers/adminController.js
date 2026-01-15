@@ -1225,6 +1225,46 @@ export const updateTimezoneConfig = async (req, res, next) => {
   }
 };
 
+export const getQueueLocationValidationConfig = async (req, res, next) => {
+  try {
+    const enabled = await AppConfig.getQueueLocationValidationEnabled();
+
+    res.json({
+      success: true,
+      enabled: enabled,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateQueueLocationValidationConfig = async (req, res, next) => {
+  try {
+    // Accept both 'enabled' and 'queue_location_validation_enabled' for backward compatibility
+    const { enabled, queue_location_validation_enabled } = req.body;
+    const value = enabled !== undefined ? enabled : queue_location_validation_enabled;
+
+    if (value === undefined || value === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'enabled is required',
+      });
+    }
+
+    const enabledBool = value === true || value === 'true' || value === 1;
+
+    await AppConfig.setQueueLocationValidationEnabled(enabledBool);
+
+    res.json({
+      success: true,
+      message: 'Queue location validation configuration updated successfully',
+      enabled: enabledBool,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getPendingDrivers = async (req, res, next) => {
   try {
     const pendingDrivers = await Driver.findPendingDrivers();

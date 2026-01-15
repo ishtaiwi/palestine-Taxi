@@ -10,7 +10,7 @@ class AppConfig {
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://192.168.1.11:3000';
+      return 'http://192.168.1.8:3000';
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       return 'http://localhost:3000';
     }

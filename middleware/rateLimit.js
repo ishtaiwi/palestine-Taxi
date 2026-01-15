@@ -5,7 +5,7 @@ import logger from '../utils/logger.js';
 const isProduction = appConfig.nodeEnv === 'production';
 
 const baseLimiterConfig = {
-  windowMs: 15 * 60 * 1000, 
+  windowMs: 15 * 60 * 1000,
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
@@ -27,13 +27,19 @@ export const generalLimiter = rateLimit({
 
 export const authLimiter = rateLimit({
   ...baseLimiterConfig,
-  windowMs: 10 * 60 * 1000, 
+  windowMs: 10 * 60 * 1000,
   max: isProduction ? 5 : 15,
 });
 
 export const passwordResetLimiter = rateLimit({
   ...baseLimiterConfig,
-  windowMs: 60 * 60 * 1000, 
+  windowMs: 60 * 60 * 1000,
   max: isProduction ? 3 : 10,
+});
+
+export const adminLimiter = rateLimit({
+  ...baseLimiterConfig,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isProduction ? 1000 : 2000, // Much higher limit for admin endpoints
 });
 

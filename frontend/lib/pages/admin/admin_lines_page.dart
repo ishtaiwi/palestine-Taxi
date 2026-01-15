@@ -30,6 +30,9 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
   final _distanceController = TextEditingController();
   bool _active = true;
   String? _editingLineId;
+  List<Map<String, dynamic>> _stations = [];
+  String? _selectedMainStationId;
+  String? _selectedReturnStationId;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -63,6 +66,10 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'min': 'دقيقة',
       'km': 'كم',
       'editRoute': 'تعديل المسار',
+      'mainStation': 'محطة الذهاب',
+      'returnStation': 'محطة العودة',
+      'selectStation': 'اختر المحطة',
+      'noStation': 'لا توجد محطة',
     },
     'en': {
       'title': 'Lines Management',
@@ -95,6 +102,10 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'min': 'min',
       'km': 'km',
       'editRoute': 'Edit Route',
+      'mainStation': 'Going Station',
+      'returnStation': 'Return Station',
+      'selectStation': 'Select Station',
+      'noStation': 'No Station',
     },
   };
 
@@ -163,6 +174,25 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     }
   }
 
+  Future<void> _loadStations() async {
+    try {
+      final result = await ApiService.getAllBaseStations();
+      if (result['success'] == true) {
+        final stationsList = result['stations'];
+        if (stationsList is List) {
+          setState(() {
+            _stations = stationsList
+                .whereType<Map<String, dynamic>>()
+                .map((station) => Map<String, dynamic>.from(station))
+                .toList();
+          });
+        }
+      }
+    } catch (e) {
+      // Silently fail, stations will just be empty
+    }
+  }
+
   void _applyFilter() {
     _filteredLines = _lines.where((line) {
       final nameAr = (line['name_ar'] ?? '').toString().toLowerCase();
@@ -214,6 +244,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
               estduration: int.tryParse(_durationController.text),
               distance: double.tryParse(_distanceController.text),
               active: _active,
+              mainStationId: _selectedMainStationId,
+              returnStationId: _selectedReturnStationId,
             )
           : await ApiService.createLine(
               nameAr: nameAr.isNotEmpty ? nameAr : null,
@@ -224,6 +256,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
               estduration: int.tryParse(_durationController.text),
               distance: double.tryParse(_distanceController.text),
               active: _active,
+              mainStationId: _selectedMainStationId,
+              returnStationId: _selectedReturnStationId,
             );
 
       
@@ -264,11 +298,14 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     }
   }
 
-  void _openFormDialog(BuildContext context, {Map<String, dynamic>? line}) {
+  Future<void> _openFormDialog(BuildContext context, {Map<String, dynamic>? line}) async {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
     
+    // Load stations when opening the form
+    await _loadStations();
+
     if (line != null) {
       _editingLineId = line['lineid'];
       _nameArController.text = line['name_ar'] ?? line['linename'] ?? '';
@@ -279,6 +316,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       _durationController.text = (line['estduration'] ?? '').toString();
       _distanceController.text = (line['distance'] ?? '').toString();
       _active = line['active'] ?? true;
+      _selectedMainStationId = line['main_stationid']?.toString();
+      _selectedReturnStationId = line['return_stationid']?.toString();
     } else {
       _editingLineId = null;
       _nameArController.clear();
@@ -288,6 +327,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       _durationController.clear();
       _distanceController.clear();
       _active = true;
+      _selectedMainStationId = null;
+      _selectedReturnStationId = null;
     }
 
     showDialog(
@@ -389,6 +430,30 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                         ),
                       ),
                     ],
+                  ),
+                  SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                  _buildStationDropdown(
+                    label: t('mainStation'),
+                    value: _selectedMainStationId,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedMainStationId = value;
+                      });
+                    },
+                    isSmallScreen: isSmallScreen,
+                    isMediumScreen: isMediumScreen,
+                  ),
+                  SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                  _buildStationDropdown(
+                    label: t('returnStation'),
+                    value: _selectedReturnStationId,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedReturnStationId = value;
+                      });
+                    },
+                    isSmallScreen: isSmallScreen,
+                    isMediumScreen: isMediumScreen,
                   ),
                   SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                   StatefulBuilder(
@@ -1000,6 +1065,76 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStationDropdown({
+    required String label,
+    required String? value,
+    required Function(String?) onChanged,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(
+          color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+          fontWeight: FontWeight.w500,
+          fontSize: isSmallScreen ? 13.0 : 14.0,
+        ),
+        prefixIcon: Icon(
+          Icons.location_on_rounded,
+          color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+          size: isSmallScreen ? 20.0 : 24.0,
+        ),
+        filled: true,
+        fillColor: AppTheme.isDarkMode
+            ? Colors.white.withOpacity(0.05)
+            : Colors.grey.shade50,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+          borderSide: BorderSide(
+            color: AppTheme.isDarkMode ? Colors.white10 : Colors.grey.shade200,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+          borderSide: BorderSide(
+            color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+            width: 2,
+          ),
+        ),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 16.0 : 20.0,
+          vertical: isSmallScreen ? 12.0 : 16.0,
+        ),
+      ),
+      style: TextStyle(
+        color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+        fontWeight: FontWeight.w500,
+        fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
+      ),
+      items: [
+        DropdownMenuItem<String>(
+          value: null,
+          child: Text(t('noStation')),
+        ),
+        ..._stations.map((station) {
+          final stationName = station['name']?.toString() ?? '';
+          final stationId = station['stationid']?.toString() ?? '';
+          return DropdownMenuItem<String>(
+            value: stationId,
+            child: Text(stationName),
+          );
+        }),
+      ],
+      onChanged: onChanged,
     );
   }
 }

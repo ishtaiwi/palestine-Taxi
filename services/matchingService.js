@@ -12,17 +12,17 @@ import logger from '../utils/logger.js';
 import { assignVehicleFromQueue } from './tripOpeningService.js';
 
 /**
- * Get the next driver from the queue for a specific line
+ * Get the next driver from the queue for a specific line and direction
  * @param {string} lineid - The line ID
+ * @param {string} direction - The direction ('going' or 'returning')
  * @returns {Promise<object|null>} - The next driver in queue or null
  */
-export const getNextDriverFromQueue = async (lineid) => {
+export const getNextDriverFromQueue = async (lineid, direction = null) => {
   try {
-    const queue = await DriverQueue.getActiveByLine(lineid);
+    const queue = await DriverQueue.getActiveByLine(lineid, direction);
     if (!queue || queue.length === 0) {
       return null;
     }
-
 
     return queue[0];
   } catch (error) {
@@ -250,7 +250,9 @@ export const checkAndAssignAdditionalDrivers = async (tripid) => {
         }
 
 
-        const newTrip = await findOrAssignExistingTrip(driverid, trip.lineid, trip.deptime, true);
+        // Get direction from trip
+        const tripDirection = trip.direction || 'going';
+        const newTrip = await findOrAssignExistingTrip(driverid, trip.lineid, trip.deptime, true, tripDirection);
 
         if (newTrip) {
 
@@ -523,9 +525,10 @@ export const getAvailableSeats = async (vehicle, tripid = null) => {
  * @param {string} lineid - The line ID
  * @param {string} deptime - The departure time
  * @param {boolean} hasBookingsWaiting - Whether there are bookings waiting to be assigned (required to create new trip)
+ * @param {string} direction - The trip direction ('going' or 'return')
  * @returns {Promise<object|null>} - The trip object or null if no suitable trip found
  */
-const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWaiting = false) => {
+const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWaiting = false, direction = 'going') => {
   try {
 
     const vehicles = await Vehicle.findByDriverId(driverid);
@@ -552,15 +555,16 @@ const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWa
     }
 
 
-    const allTrips = await Trip.findAll({ lineid, status: 'scheduled' });
-    const openTrips = await Trip.findAll({ lineid, status: 'open' });
+    const allTrips = await Trip.findAll({ lineid, status: 'scheduled', direction });
+    const openTrips = await Trip.findAll({ lineid, status: 'open', direction });
     const candidateTrips = [...allTrips, ...openTrips];
 
     const unassignedTripAtTime = candidateTrips.find(t => {
       const tripDeptime = parseUtcDate(t.deptime);
       const timeMatches = tripDeptime && deptimeUtc && tripDeptime.getTime() === deptimeUtc.getTime();
       const noDriver = !t.vehicleid || !t.assigned_driverid;
-      return timeMatches && noDriver;
+      const directionMatches = !t.direction || t.direction === direction;
+      return timeMatches && noDriver && directionMatches;
     });
 
     if (unassignedTripAtTime) {
@@ -641,6 +645,18 @@ const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWa
     const openingTime = new Date(deptimeUtc.getTime() - 45 * 60 * 1000);
     const maxPassengerSeats = calculateAvailablePassengerSeats(vehicle.seatnum, 0, 0);
 
+    // Get line to determine origin_stationid
+    const Line = (await import('../models/Line.js')).default;
+    const line = await Line.findById(lineid);
+    
+    // Set origin_stationid based on direction
+    let origin_stationid = null;
+    if (direction === 'going') {
+      origin_stationid = line?.main_stationid || null;
+    } else if (direction === 'return') {
+      origin_stationid = line?.return_stationid || null;
+    }
+
     const newTripData = {
       tripid: uuidv4(),
       lineid,
@@ -653,6 +669,8 @@ const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWa
       auto_departure_enabled: true,
       early_departure_allowed: true,
       scheduled_departure_enforced: true,
+      direction: direction,
+      origin_stationid: origin_stationid,
     };
 
     const newTrip = await Trip.create(newTripData);
@@ -957,18 +975,25 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
 
     // Continue with creating new trips for remaining bookings
     while (remainingBookings.length > 0) {
-      const driverQueueEntry = await getNextDriverFromQueue(lineid);
+      // For future bookings, we need to determine direction from bookings or use default 'going'
+      // For now, we'll get drivers from 'going' queue by default
+      // TODO: Determine direction from booking context if needed
+      const queueDirection = 'going'; // Default for future bookings
+      const driverQueueEntry = await getNextDriverFromQueue(lineid, queueDirection);
 
       if (!driverQueueEntry) {
-        logger.warn(`[MatchingService] ⚠️ No more drivers available in queue`);
+        logger.warn(`[MatchingService] ⚠️ No more drivers available in ${queueDirection} queue`);
         break;
       }
 
       const driverid = driverQueueEntry.driverid;
+      const queueEntryDirection = driverQueueEntry.direction || queueDirection;
+      
+      // Map queue direction to trip direction
+      const { mapQueueDirectionToTripDirection } = await import('../utils/tripDirectionUtils.js');
+      const tripDirection = mapQueueDirectionToTripDirection(queueEntryDirection);
 
-
-
-      const driverTrip = await findOrAssignExistingTrip(driverid, lineid, scheduledTripTime, true);
+      const driverTrip = await findOrAssignExistingTrip(driverid, lineid, scheduledTripTime, true, tripDirection);
 
       if (!driverTrip) {
         logger.warn(`[MatchingService] ⚠️ Failed to find or create trip for driver ${driverid} at ${scheduledTripTime}`);
@@ -1247,18 +1272,24 @@ export const distributeInstantBookings = async (lineid, nextTripTime = null, tri
       }
 
 
-      const driverQueueEntry = await getNextDriverFromQueue(lineid);
+      // For instant bookings, get drivers from 'going' queue by default
+      // TODO: Determine direction from booking context if needed
+      const queueDirection = 'going'; // Default for instant bookings
+      const driverQueueEntry = await getNextDriverFromQueue(lineid, queueDirection);
 
       if (!driverQueueEntry) {
-        logger.warn(`[MatchingService] ⚠️ No more drivers available in queue`);
+        logger.warn(`[MatchingService] ⚠️ No more drivers available in ${queueDirection} queue`);
         break;
       }
 
       const driverid = driverQueueEntry.driverid;
+      const queueEntryDirection = driverQueueEntry.direction || queueDirection;
+      
+      // Map queue direction to trip direction
+      const { mapQueueDirectionToTripDirection } = await import('../utils/tripDirectionUtils.js');
+      const tripDirection = mapQueueDirectionToTripDirection(queueEntryDirection);
 
-
-
-      const driverTrip = await findOrAssignExistingTrip(driverid, lineid, targetTripTime, true);
+      const driverTrip = await findOrAssignExistingTrip(driverid, lineid, targetTripTime, true, tripDirection);
 
       if (!driverTrip) {
         logger.warn(`[MatchingService] ⚠️ Failed to find or create trip for driver ${driverid} at ${targetTripTime}`);

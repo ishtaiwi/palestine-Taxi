@@ -60,6 +60,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
       'vehiclePlate': 'رقم اللوحة',
       'vehicleType': 'نوع المركبة',
       'close': 'إغلاق',
+      'skip': 'تخطي',
     },
     'en': {
       'title': 'My Reservations',
@@ -98,10 +99,13 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
       'vehiclePlate': 'Vehicle Plate',
       'vehicleType': 'Vehicle Type',
       'close': 'Close',
+      'skip': 'Skip',
     },
   };
 
   Map<String, Map<String, dynamic>?> _ratings = {};
+  Set<String> _shownPendingRatings =
+      {}; // Track which pending ratings have been shown
 
   String t(String key) => _texts[_isArabic ? 'ar' : 'en']![key]!;
 
@@ -164,6 +168,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
           _ratings = ratings;
           _isLoading = false;
         });
+        // Check for pending ratings and show dialog if needed
+        _checkAndShowPendingRatings();
       }
     } catch (e) {
       if (mounted) {
@@ -175,22 +181,47 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     }
   }
 
+  Future<void> _checkAndShowPendingRatings() async {
+    try {
+      // Get pending ratings (completed trips that haven't been rated)
+      final pendingRatings = await ApiService.getPendingRatings();
+
+      if (pendingRatings.isEmpty || !mounted) return;
+
+      // Find the first pending rating that hasn't been shown yet
+      for (final reservation in pendingRatings) {
+        final bookingid = reservation['bookingid']?.toString();
+        if (bookingid != null && !_shownPendingRatings.contains(bookingid)) {
+          // Mark as shown to avoid showing again
+          _shownPendingRatings.add(bookingid);
+          // Wait a bit to ensure the page is fully loaded
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (mounted) {
+            await _showRatingDialog(reservation, null);
+          }
+          break; // Only show one at a time
+        }
+      }
+    } catch (e) {
+      // Ignore errors - rating dialog is not critical
+    }
+  }
+
   Future<void> _showRatingDialog(Map<String, dynamic> reservation,
       Map<String, dynamic>? existingRating) async {
     final bookingid = reservation['bookingid']?.toString() ?? '';
     int selectedRating = existingRating?['rating'] ?? 5;
     final commentController =
         TextEditingController(text: existingRating?['comment'] ?? '');
-    
+
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final starSize = isSmallScreen ? 32.0 : 40.0;
-    final dialogPadding = isSmallScreen ? 16.0 : 20.0;
 
-    final result = await showDialog<bool>(
+    final result = await showDialog<String?>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+        builder: (buildContext, setDialogState) => AlertDialog(
           backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
@@ -198,7 +229,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
           title: Text(
             existingRating != null ? t('rateAgain') : t('rateTrip'),
             style: TextStyle(
-                color: const Color(0xFF1E3A5F), 
+                color: const Color(0xFF1E3A5F),
                 fontWeight: FontWeight.bold,
                 fontSize: isSmallScreen ? 18.0 : 20.0),
           ),
@@ -243,11 +274,13 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                     filled: true,
                     fillColor: Colors.grey.shade50,
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                      borderRadius:
+                          BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                       borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                      borderRadius:
+                          BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                       borderSide:
                           const BorderSide(color: Colors.orange, width: 2),
                     ),
@@ -259,17 +292,17 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogContext, 'skip'),
               child: Text(
-                t('cancel'),
+                existingRating != null ? t('cancel') : t('skip'),
                 style: TextStyle(
-                    color: Colors.grey.shade700, 
+                    color: Colors.grey.shade700,
                     fontWeight: FontWeight.w500,
                     fontSize: isSmallScreen ? 13.0 : 14.0),
               ),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(dialogContext, 'submit'),
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
@@ -278,7 +311,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                   vertical: isSmallScreen ? 10.0 : 12.0,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                  borderRadius:
+                      BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                 ),
               ),
               child: Text(t('submit'),
@@ -292,7 +326,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
       ),
     );
 
-    if (result != true) return;
+    // If user skipped or cancelled, just return (no rating submitted)
+    if (result != 'submit') return;
 
     // Show loading
     if (mounted) {
@@ -303,47 +338,64 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
       );
     }
 
-    Map<String, dynamic> ratingResult;
-    if (existingRating != null) {
-      // Update existing rating
-      ratingResult = await ApiService.updateRating(
-        ratingid: existingRating['ratingid'],
-        rating: selectedRating,
-        comment: commentController.text.trim().isEmpty
-            ? null
-            : commentController.text.trim(),
-      );
-    } else {
-      // Submit new rating
-      ratingResult = await ApiService.submitRating(
-        bookingid: bookingid,
-        rating: selectedRating,
-        comment: commentController.text.trim().isEmpty
-            ? null
-            : commentController.text.trim(),
-      );
-    }
-
-    // Close loading
-    if (mounted) Navigator.pop(context);
-
-    if (mounted) {
-      if (ratingResult['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ratingResult['message'] ?? t('rating')),
-            backgroundColor: Colors.green,
-          ),
+    try {
+      Map<String, dynamic> ratingResult;
+      if (existingRating != null) {
+        // Update existing rating
+        ratingResult = await ApiService.updateRating(
+          ratingid: existingRating['ratingid'],
+          rating: selectedRating,
+          comment: commentController.text.trim().isEmpty
+              ? null
+              : commentController.text.trim(),
         );
-        _loadReservations(); // Reload to update rating display
       } else {
+        // Submit new rating
+        ratingResult = await ApiService.submitRating(
+          bookingid: bookingid,
+          rating: selectedRating,
+          comment: commentController.text.trim().isEmpty
+              ? null
+              : commentController.text.trim(),
+        );
+      }
+
+      // Close loading
+      if (mounted) Navigator.pop(context);
+
+      if (mounted) {
+        if (ratingResult['success'] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(ratingResult['message'] ?? t('rating')),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _loadReservations(); // Reload to update rating display
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(ratingResult['message'] ?? 'Failed'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Close loading if still open
+      if (mounted) Navigator.pop(context);
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(ratingResult['message'] ?? 'Failed'),
+            content: Text('Error: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
       }
+    } finally {
+      // Dispose the comment controller
+      commentController.dispose();
     }
   }
 
@@ -374,7 +426,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
 
       final qrData = result['qrData'] as String?;
       final qrCode = result['qrCode'] as String?;
-      
+
       final screenWidth = MediaQuery.of(context).size.width;
       final isSmallScreen = screenWidth < 360;
       final qrSize = isSmallScreen ? 200.0 : 250.0;
@@ -384,8 +436,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
         context: context,
         builder: (context) => Dialog(
           backgroundColor: Colors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0)),
           child: Padding(
             padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
             child: Column(
@@ -412,7 +464,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                     padding: EdgeInsets.all(isSmallScreen ? 12.0 : 20.0),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+                      borderRadius:
+                          BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                       border: Border.all(color: Colors.grey.shade300, width: 2),
                       boxShadow: [
                         BoxShadow(
@@ -434,7 +487,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                     padding: EdgeInsets.all(isSmallScreen ? 12.0 : 20.0),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+                      borderRadius:
+                          BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
                       border: Border.all(color: Colors.grey.shade300, width: 2),
                     ),
                     child: Image.network(
@@ -483,7 +537,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                         vertical: isSmallScreen ? 12.0 : 14.0,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                        borderRadius:
+                            BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
                       ),
                     ),
                     child: Text(
@@ -515,7 +570,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
   Future<void> _cancelReservation(String bookingId) async {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
-    
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -544,7 +599,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
               ? 'هل أنت متأكد من إلغاء هذه الحجز؟'
               : 'Are you sure you want to cancel this reservation?',
           style: TextStyle(
-            color: Colors.grey.shade700, 
+            color: Colors.grey.shade700,
             fontSize: isSmallScreen ? 13.0 : 15.0,
           ),
         ),
@@ -554,7 +609,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
             child: Text(
               _isArabic ? 'لا' : 'No',
               style: TextStyle(
-                  color: Colors.grey.shade700, 
+                  color: Colors.grey.shade700,
                   fontWeight: FontWeight.w500,
                   fontSize: isSmallScreen ? 13.0 : 14.0),
             ),
@@ -569,7 +624,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                 vertical: isSmallScreen ? 10.0 : 12.0,
               ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                borderRadius:
+                    BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
               ),
             ),
             child: Text(
@@ -622,7 +678,6 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     switch (status.toLowerCase()) {
       case 'confirmed':
         return Colors.green;
-      case 'pending':
       case 'pending_payment':
         return Colors.orange;
       case 'checked_in':
@@ -640,8 +695,6 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     switch (status.toLowerCase()) {
       case 'confirmed':
         return Icons.check_circle;
-      case 'pending':
-        return Icons.hourglass_empty;
       case 'checked_in':
         return Icons.done_all;
       case 'cancelled':
@@ -657,7 +710,6 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     switch (status.toLowerCase()) {
       case 'confirmed':
         return t('confirmed');
-      case 'pending':
       case 'pending_payment':
         return t('pending');
       case 'checked_in':
@@ -675,16 +727,16 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     // Web-specific responsive breakpoints
     final isWeb = kIsWeb;
     final isDesktop = isWeb && screenWidth >= 1200;
     final isTablet = screenWidth >= 600 && screenWidth < 1200;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
-    
+
     // Responsive sizing - enhanced for web
-    final double basePadding = isWeb 
+    final double basePadding = isWeb
         ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
         : (isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0));
     final double cardPadding = isWeb
@@ -696,7 +748,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     final double iconSize = isWeb
         ? (isDesktop ? 28.0 : 24.0)
         : (isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0));
-    
+
     // Max width for web to prevent content from stretching too wide
     final double maxContentWidth = isWeb ? 1400.0 : double.infinity;
 
@@ -818,110 +870,118 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                   // Status Filter
                   Container(
                     padding: EdgeInsets.all(basePadding),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(13),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(13),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildStatusChip(null, t('all'), textPrimary, cardColor, isSmallScreen),
-                      SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-                      _buildStatusChip(
-                          'confirmed', t('confirmed'), textPrimary, cardColor, isSmallScreen),
-                      SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-                      _buildStatusChip(
-                          'pending', t('pending'), textPrimary, cardColor, isSmallScreen),
-                      SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-                      _buildStatusChip('checked_in', t('checked_in'),
-                          textPrimary, cardColor, isSmallScreen),
-                      SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-                      _buildStatusChip(
-                          'cancelled', t('cancelled'), textPrimary, cardColor, isSmallScreen),
-                    ],
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildStatusChip(null, t('all'), textPrimary,
+                              cardColor, isSmallScreen),
+                          SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                          _buildStatusChip('confirmed', t('confirmed'),
+                              textPrimary, cardColor, isSmallScreen),
+                          SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                          _buildStatusChip('checked_in', t('checked_in'),
+                              textPrimary, cardColor, isSmallScreen),
+                          SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                          _buildStatusChip('cancelled', t('cancelled'),
+                              textPrimary, cardColor, isSmallScreen),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                  ),
-                // Reservations List
-                Expanded(
-                  child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _error != null
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.error_outline,
-                                    color: Colors.red, size: 48),
-                                const SizedBox(height: 16),
-                                Text(
-                                  _error!,
-                                  style:
-                                      const TextStyle(color: Color(0xFF1E3A5F)),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: _loadReservations,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: Text(t('refresh'),
-                                      style:
-                                          const TextStyle(color: Colors.white)),
-                                ),
-                              ],
-                            ),
-                          )
-                        : _reservations.isEmpty
+                  // Reservations List
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _error != null
                             ? Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.book_online,
-                                        color: Colors.grey.shade400, size: 64),
+                                    const Icon(Icons.error_outline,
+                                        color: Colors.red, size: 48),
                                     const SizedBox(height: 16),
                                     Text(
-                                      t('noReservations'),
-                                      style: TextStyle(
-                                          color: Colors.grey.shade600,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w500),
+                                      _error!,
+                                      style: const TextStyle(
+                                          color: Color(0xFF1E3A5F)),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: _loadReservations,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blue,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      child: Text(t('refresh'),
+                                          style: const TextStyle(
+                                              color: Colors.white)),
                                     ),
                                   ],
                                 ),
                               )
-                            : isWeb && (isDesktop || isTablet)
-                                ? GridView.builder(
-                                    padding: EdgeInsets.all(basePadding),
-                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: isDesktop ? 2 : 1,
-                                      crossAxisSpacing: 16.0,
-                                      mainAxisSpacing: 16.0,
-                                      childAspectRatio: isDesktop ? 1.1 : 1.3,
+                            : _reservations.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.book_online,
+                                            color: Colors.grey.shade400,
+                                            size: 64),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          t('noReservations'),
+                                          style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w500),
+                                        ),
+                                      ],
                                     ),
-                                    itemCount: _reservations.length,
-                                    itemBuilder: (context, index) {
-                                      return _buildReservationCard(
-                                          _reservations[index], isSmallScreen, isMediumScreen, isWeb);
-                                    },
                                   )
-                                : ListView.builder(
-                                    padding: EdgeInsets.all(basePadding),
-                                    itemCount: _reservations.length,
-                                    itemBuilder: (context, index) {
-                                      return _buildReservationCard(
-                                          _reservations[index], isSmallScreen, isMediumScreen, isWeb);
-                                    },
-                                  ),
+                                : isWeb && (isDesktop || isTablet)
+                                    ? GridView.builder(
+                                        padding: EdgeInsets.all(basePadding),
+                                        gridDelegate:
+                                            SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: isDesktop ? 2 : 1,
+                                          crossAxisSpacing: 16.0,
+                                          mainAxisSpacing: 16.0,
+                                          childAspectRatio:
+                                              isDesktop ? 1.1 : 1.3,
+                                        ),
+                                        itemCount: _reservations.length,
+                                        itemBuilder: (context, index) {
+                                          return _buildReservationCard(
+                                              _reservations[index],
+                                              isSmallScreen,
+                                              isMediumScreen,
+                                              isWeb);
+                                        },
+                                      )
+                                    : ListView.builder(
+                                        padding: EdgeInsets.all(basePadding),
+                                        itemCount: _reservations.length,
+                                        itemBuilder: (context, index) {
+                                          return _buildReservationCard(
+                                              _reservations[index],
+                                              isSmallScreen,
+                                              isMediumScreen,
+                                              isWeb);
+                                        },
+                                      ),
                   ),
                 ],
               ),
@@ -973,8 +1033,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     );
   }
 
-  Widget _buildStatusChip(
-      String? status, String label, Color textColor, Color bgColor, bool isSmallScreen) {
+  Widget _buildStatusChip(String? status, String label, Color textColor,
+      Color bgColor, bool isSmallScreen) {
     final isSelected = _selectedStatus == status;
     return FilterChip(
       label: Text(
@@ -1007,7 +1067,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     );
   }
 
-  Widget _buildReservationCard(Map<String, dynamic> reservation, bool isSmallScreen, bool isMediumScreen, bool isWeb) {
+  Widget _buildReservationCard(Map<String, dynamic> reservation,
+      bool isSmallScreen, bool isMediumScreen, bool isWeb) {
     final bookingId = reservation['bookingid']?.toString() ?? '';
     final status = reservation['status']?.toString() ?? '';
     final bookingType = reservation['booking_type']?.toString() ?? 'instant';
@@ -1075,7 +1136,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
         child: Container(
-          padding: EdgeInsets.all(isSmallScreen ? 14.0 : (isMediumScreen ? 17.0 : 20.0)),
+          padding: EdgeInsets.all(
+              isSmallScreen ? 14.0 : (isMediumScreen ? 17.0 : 20.0)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1089,10 +1151,12 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                         Row(
                           children: [
                             Container(
-                              padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
+                              padding:
+                                  EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF57C00).withAlpha(51),
-                                borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                                borderRadius: BorderRadius.circular(
+                                    isSmallScreen ? 10.0 : 12.0),
                               ),
                               child: Icon(
                                 Icons.route,
@@ -1106,7 +1170,9 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                                 lineName,
                                 style: TextStyle(
                                   color: textPrimary,
-                                  fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0),
+                                  fontSize: isSmallScreen
+                                      ? 16.0
+                                      : (isMediumScreen ? 18.0 : 20.0),
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 0.5,
                                 ),
@@ -1215,7 +1281,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                     ),
                     child: Container(
                       padding: EdgeInsets.symmetric(
-                          horizontal: isSmallScreen ? 8.0 : 10.0, 
+                          horizontal: isSmallScreen ? 8.0 : 10.0,
                           vertical: isSmallScreen ? 6.0 : 8.0),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
@@ -1224,7 +1290,8 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                             Color(0xFFE65100),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 14.0),
+                        borderRadius:
+                            BorderRadius.circular(isSmallScreen ? 12.0 : 14.0),
                         boxShadow: [
                           BoxShadow(
                             color: const Color(0xFFF57C00).withAlpha(102),
@@ -1240,7 +1307,9 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                             '${price.toStringAsFixed(2)} ₪',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 18.0),
+                              fontSize: isSmallScreen
+                                  ? 14.0
+                                  : (isMediumScreen ? 16.0 : 18.0),
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.3,
                             ),
@@ -1451,15 +1520,20 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () => _showQRCodeDialog(bookingId),
-                        icon: Icon(Icons.qr_code, size: isSmallScreen ? 16.0 : 20.0),
-                        label: Text(t('showQRCode'), style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0)),
+                        icon: Icon(Icons.qr_code,
+                            size: isSmallScreen ? 16.0 : 20.0),
+                        label: Text(t('showQRCode'),
+                            style: TextStyle(
+                                fontSize: isSmallScreen ? 12.0 : 14.0)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.green.shade700,
                           side: BorderSide(
                               color: Colors.green.shade700, width: 2),
-                          padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 14.0),
+                          padding: EdgeInsets.symmetric(
+                              vertical: isSmallScreen ? 10.0 : 14.0),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                            borderRadius: BorderRadius.circular(
+                                isSmallScreen ? 10.0 : 12.0),
                           ),
                         ),
                       ),
@@ -1474,9 +1548,11 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
                           foregroundColor: Colors.red.shade700,
                           side:
                               BorderSide(color: Colors.red.shade700, width: 2),
-                          padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 14.0),
+                          padding: EdgeInsets.symmetric(
+                              vertical: isSmallScreen ? 10.0 : 14.0),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                            borderRadius: BorderRadius.circular(
+                                isSmallScreen ? 10.0 : 12.0),
                           ),
                         ),
                         child: Text(

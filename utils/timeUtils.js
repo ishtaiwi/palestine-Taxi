@@ -70,6 +70,21 @@ export const getServerTimezoneOffset = async () => {
 };
 
 /**
+ * Calculate opening window minutes based on trip interval
+ * @param {number} intervalMinutes - Trip interval in minutes (30 or 60)
+ * @returns {number} Opening window in minutes before departure
+ */
+export const getOpeningWindowMinutes = (intervalMinutes) => {
+  if (intervalMinutes === 30) {
+    return 20; // 30-minute intervals open 20 minutes before
+  } else if (intervalMinutes === 60) {
+    return 45; // 60-minute intervals open 45 minutes before
+  }
+  // Default to 45 minutes for any other interval
+  return 45;
+};
+
+/**
  * Convert local time to UTC
  * @param {Date} localDate - Date in local timezone
  * @param {number} timezoneOffset - Timezone offset in hours (e.g., 2 for UTC+2)
@@ -129,11 +144,14 @@ export const isTripOpen = (trip) => {
   const openingTime = trip.trip_opening_time ? parseUtcDate(trip.trip_opening_time) : null;
   
   if (!openingTime) {
-    // If no opening time set, check if deptime - 45 minutes has passed
+    // If no opening time set, calculate based on interval from schedule_template
     const deptime = trip.deptime ? parseUtcDate(trip.deptime) : null;
     if (!deptime) return false;
     
-    const defaultOpeningTime = new Date(deptime.getTime() - 45 * 60 * 1000);
+    // Try to get interval from schedule_template if available
+    const intervalMinutes = trip.schedule_template?.interval_minutes || 60;
+    const openingWindowMinutes = getOpeningWindowMinutes(intervalMinutes);
+    const defaultOpeningTime = new Date(deptime.getTime() - openingWindowMinutes * 60 * 1000);
     return defaultOpeningTime.getTime() <= now.getTime();
   }
   
@@ -160,10 +178,8 @@ export const canBookInstant = (trip) => {
     return false;
   }
   
-  // Must have available seats
-  if (trip.availableseats <= 0) {
-    return false;
-  }
+  // Note: We don't check available seats here - that's handled in checkInstantBookingAvailability
+  // This allows checking for alternative trips even if this trip is full
   
   // Check if opening time has passed
   const now = getUtcNow();
@@ -175,11 +191,14 @@ export const canBookInstant = (trip) => {
       return false;
     }
   } else {
-    // If no opening time, check if deptime - 45 minutes has passed
+    // If no opening time, calculate based on interval from schedule_template
     const deptime = trip.deptime ? parseUtcDate(trip.deptime) : null;
     if (!deptime) return false;
     
-    const defaultOpeningTime = new Date(deptime.getTime() - 45 * 60 * 1000);
+    // Try to get interval from schedule_template if available
+    const intervalMinutes = trip.schedule_template?.interval_minutes || 60;
+    const openingWindowMinutes = getOpeningWindowMinutes(intervalMinutes);
+    const defaultOpeningTime = new Date(deptime.getTime() - openingWindowMinutes * 60 * 1000);
     if (defaultOpeningTime.getTime() > now.getTime()) {
       return false;
     }

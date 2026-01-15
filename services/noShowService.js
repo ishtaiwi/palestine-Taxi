@@ -23,12 +23,12 @@ export const markNoShowForTrip = async (tripid) => {
     const reservations = await Reservation.findByTripId(tripid);
     
     // Filter reservations that are confirmed but not checked in
-    // No-Show: confirmed/pending reservations that haven't been checked in
+    // No-Show: confirmed reservations that haven't been checked in
     const noShowReservations = reservations.filter(
       r => {
-        const isConfirmedOrPending = r.status === 'confirmed' || r.status === 'pending';
+        const isConfirmed = r.status === 'confirmed';
         const isNotCheckedIn = r.status !== 'checked_in' && r.status !== 'cancelled' && r.status !== 'no_show';
-        return isConfirmedOrPending && isNotCheckedIn;
+        return isConfirmed && isNotCheckedIn;
       }
     );
     

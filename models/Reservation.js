@@ -108,14 +108,19 @@ class Reservation {
       .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))), payment(*)')
       .eq('booking_type', 'future')
       .eq('scheduled_trip_time', scheduledTripTime)
-      .in('status', ['confirmed', 'pending']);
+      .eq('status', 'confirmed');
 
     if (filters.tripid) {
       query = query.eq('tripid', filters.tripid);
     }
 
+    if (filters.lineid) {
+      query = query.eq('lineid', filters.lineid);
+    }
+
     const { data, error } = await query.order('bookedat', { ascending: true });
     if (error) throw error;
+
     return data;
   }
 
@@ -125,7 +130,7 @@ class Reservation {
       .select('*, passenger(*, user(*)), payment(*)')
       .eq('tripid', tripid)
       .eq('booking_type', 'instant')
-      .in('status', ['confirmed', 'pending']);
+      .eq('status', 'confirmed');
 
     const { data, error } = await query.order('bookedat', { ascending: true });
     if (error) throw error;
@@ -263,7 +268,7 @@ class Reservation {
       .from('reservation')
       .delete()
       .eq('passengerid', passengerid);
-    
+
     if (error) throw error;
     return true;
   }
@@ -273,7 +278,7 @@ class Reservation {
       .from('reservation')
       .delete()
       .eq('bookingid', bookingid);
-    
+
     if (error) throw error;
     return true;
   }

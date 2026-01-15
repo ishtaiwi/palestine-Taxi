@@ -1,6 +1,7 @@
 import supabase from '../config/dbcon.js';
 import { v4 as uuidv4 } from 'uuid';
 
+
 const ACTIVE_STATUS = 'waiting';
 
 class DriverQueue {
@@ -102,23 +103,23 @@ class DriverQueue {
     return data;
   }
 
-  
+
   static async removeDriverFromQueue(driverid) {
     return await this.leaveActiveByDriver(driverid);
   }
 
-  
+
   static async deleteByDriverId(driverid) {
     const { error } = await supabase
       .from('driver_queue')
       .delete()
       .eq('driverid', driverid);
-    
+
     if (error) throw error;
     return true;
   }
 
-  
+
   static async getQueuePosition(driverid) {
     const queueEntry = await this.findActiveByDriver(driverid);
     if (!queueEntry) {
@@ -127,8 +128,52 @@ class DriverQueue {
 
     const queue = await this.getActiveByLine(queueEntry.lineid);
     const position = queue.findIndex(entry => entry.driverid === driverid);
-    
+
     return position >= 0 ? position + 1 : null;
+  }
+
+  /**
+   * Check if there are any drivers available in the queue for a specific line
+   * @param {string} lineid - The line ID to check
+   * @returns {Promise<boolean>} - True if at least one driver is available
+   */
+  static async hasAvailableDrivers(lineid) {
+    const queue = await this.getActiveByLine(lineid);
+    return queue && queue.length > 0;
+  }
+
+  /**
+   * Get the count of available drivers in the queue for a specific line
+   * @param {string} lineid - The line ID to check
+   * @returns {Promise<number>} - Number of drivers in queue
+   */
+  static async getQueueCount(lineid) {
+    const queue = await this.getActiveByLine(lineid);
+    return queue ? queue.length : 0;
+  }
+
+  /**
+   * Check if instant booking is allowed for a line
+   * Instant booking is allowed only if there are drivers available in the queue
+   * @param {string} lineid - The line ID to check
+   * @returns {Promise<{allowed: boolean, driversAvailable: number, message?: string}>}
+   */
+  static async canAcceptInstantBooking(lineid) {
+    const queue = await this.getActiveByLine(lineid);
+    const driversAvailable = queue ? queue.length : 0;
+
+    if (driversAvailable === 0) {
+      return {
+        allowed: false,
+        driversAvailable: 0,
+        message: 'No drivers available in queue. Please try again later or book a scheduled trip.',
+      };
+    }
+
+    return {
+      allowed: true,
+      driversAvailable,
+    };
   }
 }
 

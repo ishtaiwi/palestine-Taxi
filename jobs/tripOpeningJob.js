@@ -3,16 +3,17 @@ import { openScheduledTrips } from '../services/tripOpeningService.js';
 
 /**
  * Background job to open scheduled trips (runs every minute)
- * Opens trips 45 minutes before their scheduled departure time
+ * Opens trips based on their interval: 30 min intervals = 20 min before, 60 min intervals = 45 min before
  */
 export const startTripOpeningJob = () => {
   console.log('[TripOpeningJob] 🚀 Starting trip opening job (runs every minute)');
   
-  // Run every minute
+  
   cron.schedule('* * * * *', async () => {
     try {
       console.log('[TripOpeningJob] ⏰ Running trip opening check...');
-      const result = await openScheduledTrips(45); // 45 minutes before departure
+      
+      const result = await openScheduledTrips(45);
       
       if (result.opened > 0) {
         console.log(`[TripOpeningJob] ✅ Opened ${result.opened} trips`);

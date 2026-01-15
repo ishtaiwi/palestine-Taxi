@@ -1,4 +1,5 @@
 import { BOOKING_TYPE } from './constants.js';
+import { getUtcNow, parseUtcDate } from './timeUtils.js';
 
 /**
  * Validate booking_type value

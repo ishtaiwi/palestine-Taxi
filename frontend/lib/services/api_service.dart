@@ -89,6 +89,26 @@ class ApiService {
   static Future<void> saveLanguagePreference(bool isArabic) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('language_arabic', isArabic);
+    
+    // Sync language preference to backend
+    try {
+      final token = await getToken();
+      if (token != null) {
+        await http.put(
+          Uri.parse('${AppConfig.apiBaseUrl}/auth/profile/language'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            'language': isArabic ? 'ar' : 'en',
+          }),
+        );
+      }
+    } catch (e) {
+      // Silently fail - language preference is still saved locally
+      print('Failed to sync language preference to backend: $e');
+    }
   }
 
   static Future<bool> getLanguagePreference() async {
@@ -171,6 +191,36 @@ class ApiService {
           }
           if (responseData['user'] != null) {
             await saveUserData(responseData['user']);
+            
+            // Sync language preference: use database value if available, otherwise sync local to database
+            final user = responseData['user'] as Map<String, dynamic>?;
+            final dbLanguage = user?['language_preference'] as String?;
+            final prefs = await SharedPreferences.getInstance();
+            if (dbLanguage != null && (dbLanguage == 'ar' || dbLanguage == 'en')) {
+              // Update local preference to match database
+              await prefs.setBool('language_arabic', dbLanguage == 'ar');
+            } else {
+              // If no language preference in database, sync local preference to backend
+              final localIsArabic = await getLanguagePreference();
+              try {
+                final syncResponse = await http.put(
+                  Uri.parse('${AppConfig.apiBaseUrl}/auth/profile/language'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ${responseData['token']}',
+                  },
+                  body: jsonEncode({
+                    'language': localIsArabic ? 'ar' : 'en',
+                  }),
+                );
+                if (syncResponse.statusCode == 200) {
+                  print('✅ Language preference synced to backend on login');
+                }
+              } catch (e) {
+                // Silently fail - language sync is not critical for login
+                print('⚠️ Failed to sync language preference on login: $e');
+              }
+            }
           }
           return {
             'success': true,
@@ -3805,6 +3855,300 @@ class ApiService {
       return {
         'success': false,
         'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Register FCM token with backend
+  static Future<Map<String, dynamic>> registerFcmToken(
+      String token, String deviceType, String? deviceId) async {
+    try {
+      final authToken = await getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/notifications/register-token');
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $authToken',
+        },
+        body: jsonEncode({
+          'fcm_token': token,
+          'device_type': deviceType,
+          'device_id': deviceId,
+        }),
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Token registered successfully',
+          'token': decoded['token'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to register token',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Get user notifications
+  static Future<Map<String, dynamic>> getNotifications({
+    int page = 1,
+    int limit = 20,
+    bool? read,
+    String? type,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+      if (read != null) {
+        queryParams['read'] = read.toString();
+      }
+      if (type != null) {
+        queryParams['type'] = type;
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/notifications')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'notifications': decoded['notifications'] ?? [],
+          'pagination': decoded['pagination'] ?? {},
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to get notifications',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Get unread notification count
+  static Future<Map<String, dynamic>> getUnreadCount() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/notifications/unread-count');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'count': decoded['count'] ?? 0,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to get unread count',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Mark notification as read
+  static Future<Map<String, dynamic>> markNotificationAsRead(
+      String notificationId) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri = Uri.parse(
+          '${AppConfig.apiBaseUrl}/notifications/$notificationId/read');
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Notification marked as read',
+          'notification': decoded['notification'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to mark notification as read',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Mark all notifications as read
+  static Future<Map<String, dynamic>> markAllNotificationsAsRead() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/notifications/read-all');
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'All notifications marked as read',
+          'count': decoded['count'] ?? 0,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to mark all notifications as read',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Delete notification
+  static Future<Map<String, dynamic>> deleteNotification(
+      String notificationId) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri =
+          Uri.parse('${AppConfig.apiBaseUrl}/notifications/$notificationId');
+
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Notification deleted successfully',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to delete notification',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
       };
     }
   }

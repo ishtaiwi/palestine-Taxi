@@ -56,6 +56,57 @@ export const markNoShowForTrip = async (tripid) => {
         // No refund for No-Show (full charge deducted)
         // Payment is already completed, so no refund needed
         
+        // Send notifications
+        try {
+          const { sendNotification, NOTIFICATION_TYPES } = await import('./notificationService.js');
+          const Passenger = (await import('../models/Passenger.js')).default;
+          const Trip = (await import('../models/Trip.js')).default;
+          const Driver = (await import('../models/Driver.js')).default;
+          const Line = (await import('../models/Line.js')).default;
+          
+          const passenger = await Passenger.findById(reservation.passengerid);
+          const trip = await Trip.findById(tripid);
+          const line = trip ? await Line.findById(trip.lineid) : null;
+          const passengerName = passenger?.user?.fullname || 'Passenger';
+          const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+
+          // Notify passenger
+          if (passenger?.userid) {
+            const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid);
+            await sendNotification(
+              passenger.userid,
+              NOTIFICATION_TYPES.NO_SHOW_WARNING,
+              {
+                from: passengerFromName,
+                to: passengerToName,
+              },
+              passengerLanguage,
+              { line, trip } // Pass raw data for separate Arabic/English formatting
+            );
+          }
+
+          // Notify driver
+          if (trip?.assigned_driverid) {
+            const driver = await Driver.findById(trip.assigned_driverid);
+            if (driver?.userid) {
+              const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid);
+              await sendNotification(
+                driver.userid,
+                NOTIFICATION_TYPES.NO_SHOW_MARKED,
+                {
+                  passengerName,
+                  from: driverFromName,
+                  to: driverToName,
+                },
+                driverLanguage,
+                { line, trip } // Pass raw data for separate Arabic/English formatting
+              );
+            }
+          }
+        } catch (notifError) {
+          console.error(`[NoShowService] Failed to send no-show notifications for reservation ${reservation.bookingid}:`, notifError);
+        }
+        
         results.push({
           bookingid: reservation.bookingid,
           success: true,

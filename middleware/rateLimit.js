@@ -20,9 +20,19 @@ const baseLimiterConfig = {
   },
 };
 
+// Create a skip function for frequently accessed endpoints
+const skipFrequentEndpoints = (req) => {
+  const frequentPaths = [
+    '/api/reservations/my-reservations',
+    '/api/notifications/unread-count',
+  ];
+  return frequentPaths.some(path => req.originalUrl.startsWith(path));
+};
+
 export const generalLimiter = rateLimit({
   ...baseLimiterConfig,
   max: isProduction ? 200 : 500,
+  skip: skipFrequentEndpoints, // Skip general limiter for frequent endpoints
 });
 
 export const authLimiter = rateLimit({
@@ -37,3 +47,10 @@ export const passwordResetLimiter = rateLimit({
   max: isProduction ? 3 : 10,
 });
 
+// More lenient limiter for frequently accessed user endpoints
+// (notifications, reservations) that may be polled or accessed frequently
+export const userDataLimiter = rateLimit({
+  ...baseLimiterConfig,
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: isProduction ? 100 : 300, // More requests allowed for frequently accessed endpoints
+});

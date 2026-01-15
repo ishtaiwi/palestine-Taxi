@@ -10,6 +10,9 @@ import 'passenger_trips_page.dart';
 import 'passenger_reservations_page.dart';
 import 'passenger_wallet_page.dart';
 import 'passenger_profile_page.dart';
+import 'passenger_notifications_page.dart';
+import '../../widgets/notification_badge.dart';
+import '../../services/notification_service.dart';
 
 class PassengerHomePage extends StatefulWidget {
   const PassengerHomePage({super.key});
@@ -26,6 +29,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   final ImagePicker _imagePicker = ImagePicker();
 
   List<Map<String, dynamic>> _favoriteLines = [];
+  int _unreadNotificationCount = 0;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -93,6 +97,33 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     _loadThemePreference();
     _loadProfileImage();
     _loadFavoriteLines();
+    _initializeNotifications();
+    _loadUnreadCount();
+  }
+
+  Future<void> _initializeNotifications() async {
+    try {
+      await NotificationService().initialize();
+      NotificationService().setOnNotificationTap((data) {
+        // Handle notification tap navigation
+        // You can add navigation logic here based on data['action']
+      });
+    } catch (e) {
+      print('Error initializing notifications: $e');
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final result = await ApiService.getUnreadCount();
+      if (result['success'] == true && mounted) {
+        setState(() {
+          _unreadNotificationCount = result['count'] as int? ?? 0;
+        });
+      }
+    } catch (e) {
+      // Ignore errors
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -345,6 +376,8 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
+    // Refresh unread count when app bar is built
+    _loadUnreadCount();
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
@@ -365,6 +398,21 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
         ),
       ),
       actions: [
+        NotificationBadge(
+          count: _unreadNotificationCount,
+          child: IconButton(
+            icon: const Icon(Icons.notifications, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PassengerNotificationsPage(),
+                ),
+              ).then((_) => _loadUnreadCount());
+            },
+            tooltip: 'Notifications',
+          ),
+        ),
         IconButton(
           icon: const Icon(Icons.logout_rounded, color: Colors.white),
           onPressed: _handleLogout,

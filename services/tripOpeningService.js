@@ -167,6 +167,96 @@ export const assignVehicleFromQueue = async (tripid, lineid) => {
 
     logger.info(`[TripOpeningService] ✅ Vehicle ${vehicle.vehicleid} and driver ${driverid} assigned to trip ${tripid}`);
 
+    // Send notifications
+    try {
+      const { sendNotification, sendBulkNotifications, NOTIFICATION_TYPES } = await import('./notificationService.js');
+      const Driver = (await import('../models/Driver.js')).default;
+      const Line = (await import('../models/Line.js')).default;
+      
+      // Get driver and line info
+      const driver = await Driver.findById(driverid);
+      const line = await Line.findById(updatedTrip.lineid);
+      const driverName = driver?.user?.fullname || 'Driver';
+      const plateNumber = vehicle.plateno || 'N/A';
+      const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+
+      // Notify driver
+      if (driver?.userid) {
+        const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid);
+        const { DateTime } = await import('luxon');
+        const deptime = DateTime.fromISO(new Date(updatedTrip.deptime).toISOString())
+          .setLocale(driverLanguage === 'en' ? 'en' : 'ar')
+          .toLocaleString({ 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: driverLanguage === 'en'
+          });
+
+        await sendNotification(
+          driver.userid,
+          NOTIFICATION_TYPES.TRIP_ASSIGNED,
+          {
+            from: driverFromName,
+            to: driverToName,
+            time: deptime,
+            tripid: tripid,
+          },
+          driverLanguage,
+          { line, trip: updatedTrip } // Pass raw data for separate Arabic/English formatting
+        );
+      }
+
+      // Notify all passengers on the trip (send individually to use per-user language)
+      const reservations = await Reservation.findByTripId(tripid);
+      const activeReservations = reservations.filter(
+        r => r.status === 'confirmed' || r.status === 'checked_in'
+      );
+
+      if (activeReservations.length > 0) {
+        for (const reservation of activeReservations) {
+          const Passenger = (await import('../models/Passenger.js')).default;
+          const passenger = await Passenger.findById(reservation.passengerid);
+          if (passenger?.userid) {
+            try {
+              const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid);
+              const { DateTime } = await import('luxon');
+              const deptime = DateTime.fromISO(new Date(updatedTrip.deptime).toISOString())
+                .setLocale(passengerLanguage === 'en' ? 'en' : 'ar')
+                .toLocaleString({ 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric', 
+                  hour: '2-digit', 
+                  minute: '2-digit',
+                  hour12: passengerLanguage === 'en'
+                });
+
+              await sendNotification(
+                passenger.userid,
+                NOTIFICATION_TYPES.DRIVER_ASSIGNED,
+                {
+                  driverName,
+                  plateNumber,
+                  from: passengerFromName,
+                  to: passengerToName,
+                  time: deptime,
+                },
+                passengerLanguage,
+                { line, trip: updatedTrip } // Pass raw data for separate Arabic/English formatting
+              );
+            } catch (notifError) {
+              logger.warn(`[TripOpeningService] Failed to send notification to passenger ${passenger.userid}:`, notifError);
+            }
+          }
+        }
+      }
+    } catch (notifError) {
+      logger.warn(`[TripOpeningService] Failed to send notifications for trip ${tripid}:`, notifError);
+    }
+
     return {
       success: true,
       vehicle,
@@ -313,9 +403,12 @@ export const openScheduledTrip = async (tripid) => {
       // Don't fail trip opening if distribution fails
     }
 
+    // Send trip opening notifications (already handled in openScheduledTrip, but ensure it's called)
+    const updatedTrip = await Trip.findById(tripid);
+
     return {
       success: true,
-      trip,
+      trip: updatedTrip || trip,
       vehicleAssigned,
       distribution: distributionResult,
     };

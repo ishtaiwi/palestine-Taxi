@@ -15,6 +15,9 @@ import 'driver_vehicle_page.dart';
 import 'driver_profile_page.dart';
 import 'driver_wallet_page.dart';
 import 'driver_location_tracking_page.dart';
+import 'driver_notifications_page.dart';
+import '../../widgets/notification_badge.dart';
+import '../../services/notification_service.dart';
 
 class DriverHomePage extends StatefulWidget {
   const DriverHomePage({super.key});
@@ -41,6 +44,7 @@ class _DriverHomePageState extends State<DriverHomePage>
   int _passengers = 0;
   double _rating = 0.0;
   bool _isLoadingStats = true;
+  int _unreadNotificationCount = 0;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -146,6 +150,35 @@ class _DriverHomePageState extends State<DriverHomePage>
     // Auto-start location tracking for drivers
     if (userData != null && userData['role'] == 'DRIVER') {
       await _checkAndStartTracking();
+    }
+
+    // Initialize notifications
+    _initializeNotifications();
+    _loadUnreadCount();
+  }
+
+  Future<void> _initializeNotifications() async {
+    try {
+      await NotificationService().initialize();
+      NotificationService().setOnNotificationTap((data) {
+        // Handle notification tap navigation
+        // You can add navigation logic here based on data['action']
+      });
+    } catch (e) {
+      print('Error initializing notifications: $e');
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final result = await ApiService.getUnreadCount();
+      if (result['success'] == true && mounted) {
+        setState(() {
+          _unreadNotificationCount = result['count'] as int? ?? 0;
+        });
+      }
+    } catch (e) {
+      // Ignore errors
     }
   }
 
@@ -416,6 +449,22 @@ class _DriverHomePageState extends State<DriverHomePage>
               iconTheme: const IconThemeData(color: Colors.white),
               actionsIconTheme: const IconThemeData(color: Colors.white),
               actions: [
+                // Notification badge
+                NotificationBadge(
+                  count: _unreadNotificationCount,
+                  child: IconButton(
+                    icon: const Icon(Icons.notifications, color: Colors.white),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DriverNotificationsPage(),
+                        ),
+                      ).then((_) => _loadUnreadCount());
+                    },
+                    tooltip: 'Notifications',
+                  ),
+                ),
                 // Tracking status indicator
                 GestureDetector(
                   onTap: () async {

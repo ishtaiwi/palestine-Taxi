@@ -53,3 +53,9 @@ export const adminLimiter = rateLimit({
   max: isProduction ? 1000 : 2000, // Much higher limit for admin endpoints
 });
 
+export const userDataLimiter = rateLimit({
+  ...baseLimiterConfig,
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: isProduction ? 60 : 120, // Higher limit for frequently accessed user data endpoints
+});
+

@@ -34,6 +34,17 @@ class Payment {
     return data;
   }
 
+  static async findByTripid(tripid) {
+    const { data, error } = await supabase
+      .from('payment')
+      .select('*')
+      .eq('tripid', tripid)
+      .order('time', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  }
+
   static async update(paymentid, updates) {
     const { data, error } = await supabase
       .from('payment')

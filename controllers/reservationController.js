@@ -258,12 +258,16 @@ export const createReservation = async (req, res, next) => {
     }
 
 
+    // Determine tripid for payment (set if available, null for future bookings without trip)
+    const paymentTripid = bookingType === BOOKING_TYPE.INSTANT ? tripid : (tripid || null);
+
     paymentRecord = await Payment.create({
       paymentid: uuidv4(),
       amount: bookingPrice,
       method: paymentMethod,
       status: PAYMENT_STATUS.PENDING,
       type: 'reservation',
+      tripid: paymentTripid,
     });
 
 
@@ -292,10 +296,49 @@ export const createReservation = async (req, res, next) => {
       walletUsed = wallet.walletid;
       walletChargeAmount = bookingPrice;
 
-      await Payment.update(paymentRecord.paymentid, {
+      // Prepare payment update data
+      const paymentUpdateData = {
         status: PAYMENT_STATUS.COMPLETED,
         fromwalletid: wallet.walletid,
-      });
+      };
+
+      // For instant bookings, get driver wallet and add amount to it
+      if (bookingType === BOOKING_TYPE.INSTANT && trip) {
+        try {
+          // Get driver from trip - check assigned_driverid first, then vehicle driver
+          let driverUserid = null;
+          
+          if (trip.assigned_driverid) {
+            // If we have assigned_driverid, we need to get the driver's userid
+            // The trip object should have vehicle.driver populated
+            driverUserid = trip.vehicle?.driver?.userid || trip.vehicle?.driver?.user?.userid;
+          } else if (trip.vehicle?.driver) {
+            // Fallback to vehicle driver if no assigned_driverid
+            driverUserid = trip.vehicle.driver.userid || trip.vehicle.driver.user?.userid;
+          }
+          
+          if (driverUserid) {
+            const driverWallets = await Wallet.findByUserId(driverUserid, 'main');
+            const driverWallet = driverWallets?.[0];
+
+            if (driverWallet) {
+              // Add booking price to driver wallet
+              await Wallet.updateBalance(driverWallet.walletid, bookingPrice, 'add');
+              paymentUpdateData.towalletid = driverWallet.walletid;
+            }
+          }
+        } catch (error) {
+          // Log error but don't fail the reservation
+          logger.warn('Error processing driver wallet for instant booking', {
+            paymentid: paymentRecord.paymentid,
+            error: error.message,
+          });
+        }
+      }
+      // For future bookings, towalletid stays null (not set in paymentUpdateData)
+
+      // Update payment with all collected data
+      await Payment.update(paymentRecord.paymentid, paymentUpdateData);
     }
 
 

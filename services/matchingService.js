@@ -2,6 +2,9 @@ import Reservation from '../models/Reservation.js';
 import Trip from '../models/Trip.js';
 import DriverQueue from '../models/DriverQueue.js';
 import Vehicle from '../models/Vehicle.js';
+import Payment from '../models/Payment.js';
+import Wallet from '../models/Wallet.js';
+import Driver from '../models/Driver.js';
 import { BOOKING_TYPE } from '../utils/constants.js';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
 import { parseUtcDate } from '../utils/timeUtils.js';
@@ -154,6 +157,88 @@ const findOrCreateDriverTrip = async (driverid, lineid, deptime) => {
 };
 
 /**
+ * Transfer payments for a trip to the driver's wallet
+ * @param {string} tripid - The trip ID
+ * @returns {Promise<void>}
+ */
+const transferPaymentsToDriver = async (tripid) => {
+  try {
+    const trip = await Trip.findById(tripid);
+    if (!trip || !trip.assigned_driverid) {
+      console.log(`[MatchingService] ⚠️ Trip ${tripid} has no assigned driver, skipping payment transfer`);
+      return;
+    }
+
+    // Get driver's userid - try from trip object first, then fetch driver directly
+    let driverUserid = trip.vehicle?.driver?.userid || trip.vehicle?.driver?.user?.userid;
+    
+    if (!driverUserid) {
+      // Fallback: fetch driver directly
+      try {
+        const driver = await Driver.findById(trip.assigned_driverid);
+        driverUserid = driver?.userid;
+      } catch (error) {
+        console.error(`[MatchingService] Error fetching driver ${trip.assigned_driverid}:`, error);
+      }
+    }
+
+    if (!driverUserid) {
+      console.log(`[MatchingService] ⚠️ Could not find driver userid for trip ${tripid}, skipping payment transfer`);
+      return;
+    }
+
+    // Get driver's wallet
+    const driverWallets = await Wallet.findByUserId(driverUserid, 'main');
+    const driverWallet = driverWallets?.[0];
+    if (!driverWallet) {
+      console.log(`[MatchingService] ⚠️ Driver wallet not found for user ${driverUserid}, skipping payment transfer`);
+      return;
+    }
+
+    // Get all reservations for this trip
+    const reservations = await Reservation.findByTripId(tripid);
+    
+    // Process payments for each reservation
+    for (const reservation of reservations) {
+      if (!reservation.paymentid) {
+        continue;
+      }
+
+      try {
+        const payment = await Payment.findById(reservation.paymentid);
+        if (!payment || payment.status !== 'completed') {
+          continue;
+        }
+
+        // Skip if payment already has towalletid set
+        if (payment.towalletid) {
+          continue;
+        }
+
+        // Update payment tripid if it was null, and set towalletid
+        const paymentUpdates = {
+          tripid: tripid,
+          towalletid: driverWallet.walletid,
+        };
+
+        await Payment.update(payment.paymentid, paymentUpdates);
+
+        // Add payment amount to driver wallet
+        await Wallet.updateBalance(driverWallet.walletid, payment.amount, 'add');
+
+        console.log(`[MatchingService] ✅ Transferred payment ${payment.paymentid} (${payment.amount}) to driver wallet for trip ${tripid}`);
+      } catch (error) {
+        console.error(`[MatchingService] Error transferring payment for reservation ${reservation.bookingid}:`, error);
+        // Continue with other payments even if one fails
+      }
+    }
+  } catch (error) {
+    console.error(`[MatchingService] Error in transferPaymentsToDriver for trip ${tripid}:`, error);
+    // Don't throw - allow the distribution to continue
+  }
+};
+
+/**
  * Distribute future bookings to drivers
  * @param {string} scheduledTripTime - The scheduled trip departure time
  * @param {string} lineid - The line ID
@@ -225,6 +310,9 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
 
         remainingBookings = remainingBookings.slice(bookingsToAssign.length);
 
+        // Transfer payments to driver wallet after assigning reservations
+        await transferPaymentsToDriver(targetTrip.tripid);
+
         driversUsed.push({
           driverid: targetTrip.assigned_driverid,
           tripid: targetTrip.tripid,
@@ -281,6 +369,9 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
 
       // Remove assigned bookings from remaining list
       remainingBookings = remainingBookings.slice(bookingsToAssign.length);
+
+      // Transfer payments to driver wallet after assigning reservations
+      await transferPaymentsToDriver(driverTrip.tripid);
 
       driversUsed.push({
         driverid,

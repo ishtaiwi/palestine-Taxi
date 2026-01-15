@@ -340,6 +340,7 @@ export const createReservation = async (req, res, next) => {
     // Determine tripid for payment (set if available, null for future bookings without trip)
     const paymentTripid = bookingType === BOOKING_TYPE.INSTANT ? tripid : (tripid || null);
 
+    // Set payment time to current time (will be stored in database timezone, converted to local on frontend)
     paymentRecord = await Payment.create({
       paymentid: uuidv4(),
       amount: bookingPrice,
@@ -347,6 +348,7 @@ export const createReservation = async (req, res, next) => {
       status: PAYMENT_STATUS.PENDING,
       type: 'reservation',
       tripid: tripid || null,
+      time: new Date().toISOString(), // Explicitly set reservation time
     });
 
 
@@ -878,6 +880,73 @@ export const createReservation = async (req, res, next) => {
       lineid: trip?.lineid || req.body.lineid || null,
     });
 
+    // Send notification to passenger
+    try {
+      const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notificationService.js');
+      const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+      const Line = (await import('../models/Line.js')).default;
+
+      // Ensure we have a complete line object with all fields (including name_en)
+      // Fetch fresh if we don't have lineid or if trip.line might be incomplete
+      let line = null;
+      const lineid = trip?.lineid || req.body.lineid;
+      if (lineid) {
+        line = await Line.findById(lineid);
+      } else if (trip?.line) {
+        // Use trip.line if no lineid available, but it might be incomplete
+        line = trip.line;
+      }
+
+      // Get line names using user's language preference (pass req for Accept-Language fallback)
+      const { fromName, toName, language } = await getLineNamesForNotification(line, req.user.userid, req);
+
+      // Format time based on language using Luxon for reliable locale formatting
+      let deptime = '';
+      if (trip?.deptime || scheduled_trip_time) {
+        const { DateTime } = await import('luxon');
+        const timeToFormat = trip?.deptime || scheduled_trip_time;
+        const date = DateTime.fromISO(new Date(timeToFormat).toISOString());
+
+        if (language === 'en') {
+          // Full English format: "January 12, 2026 at 07:00 PM"
+          deptime = date.setLocale('en').toLocaleString({
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          });
+        } else {
+          // Arabic format
+          deptime = date.setLocale('ar').toLocaleString({
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        }
+      }
+
+      await sendNotification(
+        req.user.userid,
+        NOTIFICATION_TYPES.RESERVATION_CONFIRMED,
+        {
+          from: fromName,
+          to: toName,
+          time: deptime,
+          bookingid: reservation.bookingid,
+          tripid: reservation.tripid || '',
+        },
+        language,
+        { line, trip } // Pass raw data for separate Arabic/English formatting
+      );
+    } catch (notifError) {
+      logger.warn('[ReservationController] Failed to send reservation confirmation notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+
     res.status(201).json({
       message: req.t('reservation.created') || 'Reservation created successfully',
       reservation,
@@ -987,6 +1056,9 @@ export const cancelReservation = async (req, res, next) => {
             type: 'refund',
             fromwalletid: wallets[0].walletid,
             towalletid: wallets[0].walletid,
+            tripid: reservation.tripid || null, // Include tripid to track which trip was cancelled
+            time: new Date().toISOString(), // Explicitly set refund time
+            external_reference: 'cancelled_by_passenger', // Track that passenger cancelled the reservation
           });
         }
       }
@@ -999,6 +1071,66 @@ export const cancelReservation = async (req, res, next) => {
     // Sync trip stats after cancellation - this will recalculate based on actual active reservations
     if (reservation.tripid && (reservation.status === RESERVATION_STATUS.CONFIRMED || reservation.status === RESERVATION_STATUS.CHECKED_IN)) {
       await syncTripStats(reservation.tripid);
+    }
+
+    // Send notification to passenger about cancellation
+    try {
+      const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notificationService.js');
+      const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+      const Line = (await import('../models/Line.js')).default;
+      const trip = reservation.tripid ? await Trip.findById(reservation.tripid) : null;
+
+      // Ensure we have a complete line object with all fields (including name_en)
+      let line = null;
+      const lineid = trip?.lineid || reservation.lineid;
+      if (lineid) {
+        line = await Line.findById(lineid);
+      } else if (trip?.line) {
+        line = trip.line;
+      }
+
+      // Get line names for passenger (pass req for Accept-Language fallback)
+      const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, req.user.userid, req);
+
+      await sendNotification(
+        req.user.userid,
+        NOTIFICATION_TYPES.RESERVATION_CANCELLED,
+        {
+          from: passengerFromName,
+          to: passengerToName,
+          bookingid: reservation.bookingid,
+        },
+        passengerLanguage,
+        { line, trip } // Pass raw data for separate Arabic/English formatting
+      );
+
+      // Notify driver if trip has driver assigned
+      if (trip?.assigned_driverid) {
+        const Driver = (await import('../models/Driver.js')).default;
+        const driver = await Driver.findById(trip.assigned_driverid);
+        if (driver?.userid) {
+          const Passenger = (await import('../models/Passenger.js')).default;
+          const passenger = await Passenger.findById(reservation.passengerid);
+          const passengerName = passenger?.user?.fullname || 'Passenger';
+
+          // Get line names for driver (pass req for Accept-Language fallback if available)
+          const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid, req);
+
+          await sendNotification(
+            driver.userid,
+            NOTIFICATION_TYPES.RESERVATION_CANCELLED,
+            {
+              passengerName,
+              from: driverFromName,
+              to: driverToName,
+            },
+            driverLanguage,
+            { line, trip } // Pass raw data for separate Arabic/English formatting
+          );
+        }
+      }
+    } catch (notifError) {
+      logger.warn('[ReservationController] Failed to send cancellation notification:', notifError);
     }
 
     res.json({
@@ -1058,6 +1190,30 @@ export const checkInReservation = async (req, res, next) => {
     await Reservation.update(finalBookingId, { status: RESERVATION_STATUS.CHECKED_IN });
 
     const updatedReservation = await Reservation.findById(finalBookingId);
+
+    // Send notification to driver about passenger check-in
+    try {
+      const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notificationService.js');
+      const Passenger = (await import('../models/Passenger.js')).default;
+      const passenger = await Passenger.findById(reservation.passengerid);
+      const passengerName = passenger?.user?.fullname || 'Passenger';
+
+      // Get driver's language preference
+      const { getUserLanguage } = await import('../utils/lineHelpers.js');
+      const driverLanguage = await getUserLanguage(req.user.userid);
+
+      await sendNotification(
+        req.user.userid, // Driver's userid
+        NOTIFICATION_TYPES.PASSENGER_CHECKED_IN,
+        {
+          passengerName,
+          bookingid: reservation.bookingid,
+        },
+        driverLanguage
+      );
+    } catch (notifError) {
+      logger.warn('[ReservationController] Failed to send check-in notification:', notifError);
+    }
 
     res.json({
       message: req.t('reservation.checked_in') || 'Passenger checked in successfully',

@@ -7,53 +7,87 @@ import '../../services/api_service.dart';
 import '../../pages/passenger/passenger_home.dart';
 import '../../pages/driver/driver_home.dart';
 import '../../pages/admin/admin_dashboard.dart';
-import 'package:responsive_sizer/responsive_sizer.dart';
 
 class TaxiPalestineApp extends StatelessWidget {
   const TaxiPalestineApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ResponsiveSizer(builder: (context, orientation, screenType) {
-      return MaterialApp(
-          title: 'Pal Taxi',
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            fontFamily: 'Roboto',
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFFf57c00),
-              primary: const Color(0xFFf57c00),
-              secondary: const Color(0xFF0B132B),
-            ),
-            scaffoldBackgroundColor: const Color(0xFF060A1A),
-            useMaterial3: true,
+    return MaterialApp(
+      title: 'Pal Taxi',
+      debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.system,
+      theme: ThemeData(
+        brightness: Brightness.light,
+        fontFamily: 'Roboto',
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFf57c00),
+          brightness: Brightness.light,
+          primary: const Color(0xFFf57c00),
+          secondary: const Color(0xFF0B132B),
+        ),
+        scaffoldBackgroundColor: Colors.grey[50],
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.grey[50],
+          elevation: 0,
+          titleTextStyle: const TextStyle(
+            color: Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
           ),
-          // Add localization support for DatePicker and other Material widgets
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: const [
-            Locale('en', ''), // English
-            Locale('ar', ''), // Arabic
-          ],
-          // Start with a small router that decides whether to go to login
-          // or directly into the appropriate dashboard based on saved session.
-          home: const _StartupRouter(),
-          routes: {
-            '/login': (context) => const LoginScreen(),
-            '/passenger': (context) => const PassengerHomePage(),
-            '/driver': (context) => const DriverHomePage(),
-            '/admin': (context) => const AdminDashboardPage(),
-          });
-    });
+          iconTheme: const IconThemeData(color: Colors.black),
+        ),
+      ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        fontFamily: 'Roboto',
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFf57c00),
+          brightness: Brightness.dark,
+          primary: const Color(0xFFf57c00),
+          secondary: const Color(0xFF0B132B),
+          surface: const Color(0xFF101931),
+        ),
+        scaffoldBackgroundColor: const Color(0xFF060A1A),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF060A1A),
+          elevation: 0,
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+          iconTheme: IconThemeData(color: Colors.white),
+        ),
+      ),
+      // Add localization support for DatePicker and other Material widgets
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', ''), // English
+        Locale('ar', ''), // Arabic
+      ],
+      // Start with a small router that decides whether to go to login
+      // or directly into the appropriate dashboard based on saved session.
+      home: const _StartupRouter(),
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/passenger': (context) => const PassengerHomePage(),
+        '/driver': (context) => const DriverHomePage(),
+        '/admin': (context) => const AdminDashboardPage(),
+      },
+    );
   }
 }
 
 /// Small wrapper that checks for a saved session and routes accordingly.
 class _StartupRouter extends StatefulWidget {
-  const _StartupRouter({super.key});
+  const _StartupRouter();
 
   @override
   State<_StartupRouter> createState() => _StartupRouterState();

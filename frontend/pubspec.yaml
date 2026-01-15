@@ -26,6 +26,10 @@ dependencies:
   image_picker: ^1.0.7
   flutter_stripe: ^10.1.1
   responsive_sizer: ^3.3.1
+  firebase_core: ^3.6.0
+  firebase_messaging: ^15.2.10
+  flutter_local_notifications: ^17.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

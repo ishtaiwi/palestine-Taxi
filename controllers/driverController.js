@@ -6,6 +6,7 @@ import Trip from '../models/Trip.js';
 import Reservation from '../models/Reservation.js';
 import Payment from '../models/Payment.js';
 import Wallet from '../models/Wallet.js';
+import Rating from '../models/Rating.js';
 import { v4 as uuidv4 } from 'uuid';
 import { RESERVATION_STATUS, PAYMENT_STATUS, PAYMENT_METHOD } from '../utils/constants.js';
 import { checkAndAssignWaitingTrips } from '../services/tripOpeningService.js';
@@ -448,6 +449,8 @@ export const updateDriverReservationStatus = async (req, res, next) => {
                 fromwalletid: driverWalletId || null, // Driver wallet if payment was transferred, null if not
                 towalletid: wallets[0].walletid, // Passenger wallet (refund destination)
                 tripid: reservation.tripid || null,
+                time: new Date().toISOString(), // Explicitly set refund time
+                external_reference: 'cancelled_by_driver', // Track that driver cancelled/rejected the reservation
               });
             }
           }
@@ -472,6 +475,78 @@ export const updateDriverReservationStatus = async (req, res, next) => {
       }
     }
 
+    // Send notification to passenger when driver rejects/cancels reservation
+    if (action === 'reject') {
+      try {
+        const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notificationService.js');
+        const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+        const Passenger = (await import('../models/Passenger.js')).default;
+        
+        // Get passenger information
+        const passenger = await Passenger.findById(reservation.passengerid);
+        if (passenger?.userid) {
+          // Get trip and line information
+          let line = null;
+          let trip = null;
+          
+          if (reservation.tripid) {
+            trip = await Trip.findById(reservation.tripid);
+            if (trip?.lineid) {
+              line = await Line.findById(trip.lineid);
+            }
+          } else if (reservation.lineid) {
+            line = await Line.findById(reservation.lineid);
+          }
+          
+          // Get line names for passenger's language
+          const { fromName, toName, language } = await getLineNamesForNotification(line, passenger.userid, req);
+          
+          // Format time if trip exists
+          let deptime = '';
+          if (trip?.deptime) {
+            const { DateTime } = await import('luxon');
+            const date = DateTime.fromISO(new Date(trip.deptime).toISOString());
+            
+            if (language === 'en') {
+              deptime = date.setLocale('en').toLocaleString({ 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true
+              });
+            } else {
+              deptime = date.setLocale('ar').toLocaleString({ 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit'
+              });
+            }
+          }
+          
+          // Send notification to passenger
+          await sendNotification(
+            passenger.userid,
+            NOTIFICATION_TYPES.RESERVATION_CANCELLED,
+            {
+              from: fromName,
+              to: toName,
+              bookingid: reservation.bookingid,
+              ...(deptime && { time: deptime }),
+            },
+            language,
+            { line, trip } // Pass raw data for separate Arabic/English formatting
+          );
+        }
+      } catch (notifError) {
+        logger.warn('[DriverController] Failed to send cancellation notification to passenger:', notifError);
+        // Don't fail the rejection if notification fails
+      }
+    }
+
     // Prepare response message
     let message;
     if (action === 'approve') {
@@ -493,6 +568,93 @@ export const updateDriverReservationStatus = async (req, res, next) => {
         message: req.t('driver.trip_forbidden') || 'Driver not authorized for this trip',
       });
     }
+    next(error);
+  }
+};
+
+export const getDriverStatistics = async (req, res, next) => {
+  try {
+    const driverRecord = await Driver.findById(req.user.driverid);
+    if (!driverRecord) {
+      return res.status(404).json({
+        message: req.t('driver.not_found') || 'Driver not found',
+      });
+    }
+
+    // Get today's date range (UTC)
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    const todayStartISO = todayStart.toISOString();
+    const todayEndISO = todayEnd.toISOString();
+
+    // Get vehicles for this driver
+    const vehicles = await Vehicle.findByDriverId(driverRecord.driverid);
+    const vehicleIds = vehicles.map((vehicle) => vehicle.vehicleid).filter(Boolean);
+
+    // Get all trips for this driver (similar to getDriverTrips)
+    const tripsByVehicle = vehicleIds.length > 0
+      ? await Trip.findByVehicleIds(vehicleIds)
+      : [];
+    const tripsByDriver = await Trip.findAssignedTrips(driverRecord.driverid);
+
+    // Combine and deduplicate trips
+    const allTrips = [...tripsByVehicle, ...tripsByDriver];
+    const uniqueTrips = Array.from(
+      new Map(allTrips.map(trip => [trip.tripid, trip])).values()
+    );
+
+    // Filter for today's trips
+    const todayTrips = uniqueTrips.filter(trip => {
+      if (!trip.deptime) return false;
+      const tripDate = new Date(trip.deptime);
+      return tripDate >= todayStart && tripDate <= todayEnd;
+    });
+
+    const todayTripsCount = todayTrips.length;
+
+    // Get passenger count (confirmed/checked_in reservations for today's trips)
+    const todayTripIds = todayTrips.map(trip => trip.tripid);
+    let totalPassengers = 0;
+
+    if (todayTripIds.length > 0) {
+      // Get reservations for today's trips
+      const allReservations = await Reservation.findAll({});
+      const todayReservations = allReservations.filter(res => 
+        todayTripIds.includes(res.tripid) &&
+        (res.status === RESERVATION_STATUS.CONFIRMED || res.status === RESERVATION_STATUS.CHECKED_IN)
+      );
+      totalPassengers = todayReservations.length;
+    }
+
+    // Get driver rating (use driver.rating field, or calculate from trip_rating if null/0)
+    let driverRating = driverRecord.rating || 0;
+    
+    // If driver rating is null or 0, calculate from trip_rating
+    if (!driverRating || driverRating === 0) {
+      // Get ratings for all trips
+      let totalRating = 0;
+      let ratingCount = 0;
+      
+      for (const trip of uniqueTrips) {
+        const tripRating = await Rating.getAverageRating(trip.tripid);
+        if (tripRating.count > 0) {
+          totalRating += tripRating.average * tripRating.count;
+          ratingCount += tripRating.count;
+        }
+      }
+
+      if (ratingCount > 0) {
+        driverRating = Math.round((totalRating / ratingCount) * 10) / 10;
+      }
+    }
+
+    res.json({
+      todayTrips: todayTripsCount,
+      passengers: totalPassengers,
+      rating: driverRating || 0,
+    });
+  } catch (error) {
     next(error);
   }
 };

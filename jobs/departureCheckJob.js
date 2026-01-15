@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { checkAndDepartTrips } from '../services/departureService.js';
+import { checkAndDepartTrips, sendDepartureReminders } from '../services/departureService.js';
 
 /**
  * Background job to check and depart trips (runs every minute)
@@ -15,6 +15,18 @@ export const startDepartureCheckJob = () => {
   cron.schedule('* * * * *', async () => {
     try {
       console.log('[DepartureCheckJob] ⏰ Running departure check...');
+      
+      // Send departure reminders (15 minutes before)
+      try {
+        const reminderResult = await sendDepartureReminders();
+        if (reminderResult.reminded > 0) {
+          console.log(`[DepartureCheckJob] 📢 Sent ${reminderResult.reminded} departure reminder(s)`);
+        }
+      } catch (reminderError) {
+        console.error('[DepartureCheckJob] ⚠️ Error sending departure reminders:', reminderError);
+      }
+      
+      // Check and depart trips
       const result = await checkAndDepartTrips();
       
       if (result.departed > 0) {

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "662652931995",
+    "project_id": "palestine-taxi-fc752",
+    "storage_bucket": "palestine-taxi-fc752.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:662652931995:android:5767cf8d0d1851e178db3e",
+        "android_client_info": {
+          "package_name": "com.example.taxi_palestine_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyClXzRovHHvnp8lwxRPyXiB1oKzsNvKV5Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

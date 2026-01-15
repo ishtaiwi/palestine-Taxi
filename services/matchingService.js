@@ -474,6 +474,86 @@ export const createNewTripForFullTripBooking = async (fullTripId, bookingId) => 
     const finalTrip = await Trip.findById(newTrip.tripid);
     logger.info(`[MatchingService] ✅ Created new trip ${newTrip.tripid} with driver ${driverid} for booking ${bookingId}`);
 
+    // Send notifications
+    try {
+      const { sendNotification, NOTIFICATION_TYPES } = await import('./notificationService.js');
+      const Driver = (await import('../models/Driver.js')).default;
+      const Line = (await import('../models/Line.js')).default;
+      const Passenger = (await import('../models/Passenger.js')).default;
+      
+      // Get driver, line, and passenger info
+      const driver = await Driver.findById(driverid);
+      const line = await Line.findById(finalTrip.lineid);
+      const reservation = await Reservation.findById(bookingId);
+      const passenger = reservation ? await Passenger.findById(reservation.passengerid) : null;
+      
+      const driverName = driver?.user?.fullname || 'Driver';
+      const vehicle = await Vehicle.findById(vehicle.vehicleid);
+      const plateNumber = vehicle?.plateno || 'N/A';
+      const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+
+      // Notify driver
+      if (driver?.userid) {
+        const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid);
+        const { DateTime } = await import('luxon');
+        const deptime = DateTime.fromISO(new Date(finalTrip.deptime).toISOString())
+          .setLocale(driverLanguage === 'en' ? 'en' : 'ar')
+          .toLocaleString({ 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: driverLanguage === 'en'
+          });
+
+        await sendNotification(
+          driver.userid,
+          NOTIFICATION_TYPES.TRIP_ASSIGNED,
+          {
+            from: driverFromName,
+            to: driverToName,
+            time: deptime,
+            tripid: finalTrip.tripid,
+          },
+          driverLanguage,
+          { line, trip: finalTrip } // Pass raw data for separate Arabic/English formatting
+        );
+      }
+
+      // Notify passenger
+      if (passenger?.userid) {
+        const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid);
+        const { DateTime } = await import('luxon');
+        const deptime = DateTime.fromISO(new Date(finalTrip.deptime).toISOString())
+          .setLocale(passengerLanguage === 'en' ? 'en' : 'ar')
+          .toLocaleString({ 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: passengerLanguage === 'en'
+          });
+
+        await sendNotification(
+          passenger.userid,
+          NOTIFICATION_TYPES.DRIVER_ASSIGNED,
+          {
+            driverName,
+            plateNumber,
+            from: passengerFromName,
+            to: passengerToName,
+            time: deptime,
+          },
+          passengerLanguage,
+          { line, trip: finalTrip } // Pass raw data for separate Arabic/English formatting
+        );
+      }
+    } catch (notifError) {
+      logger.warn(`[MatchingService] Failed to send notifications for new trip ${newTrip.tripid}:`, notifError);
+    }
+
     return finalTrip;
   } catch (error) {
     logger.error(`[MatchingService] ❌ Error creating new trip for full trip booking:`, error);
@@ -1473,3 +1553,127 @@ export const distributeAllBookings = async (tripid) => {
   }
 };
 
+/**
+ * Adjust future reservations when schedule interval changes
+ * Moves reservations to the next available trip time based on new schedule
+ */
+export const adjustReservationsForScheduleChange = async (
+  lineid,
+  oldInterval,
+  newInterval,
+  startHour,
+  endHour
+) => {
+  try {
+    logger.info(`[MatchingService] 🔄 Adjusting reservations for schedule change: line=${lineid}, oldInterval=${oldInterval}, newInterval=${newInterval}`);
+
+    // Get all future reservations for this line
+    const Reservation = (await import('../models/Reservation.js')).default;
+    const futureReservations = await Reservation.findByBookingType('future', {
+      status: 'confirmed',
+    });
+
+    const lineReservations = futureReservations.filter(r => r.lineid === lineid);
+
+    if (lineReservations.length === 0) {
+      logger.info(`[MatchingService] No future reservations found for line ${lineid}`);
+      return { adjusted: 0, errors: [] };
+    }
+
+    logger.info(`[MatchingService] Found ${lineReservations.length} future reservation(s) to adjust`);
+
+    const adjusted = [];
+    const errors = [];
+    const timezoneOffset = await getServerTimezoneOffset();
+
+    for (const reservation of lineReservations) {
+      try {
+        if (!reservation.scheduled_trip_time) {
+          logger.warn(`[MatchingService] Reservation ${reservation.bookingid} has no scheduled_trip_time, skipping`);
+          continue;
+        }
+
+        const oldScheduledTime = parseUtcDate(reservation.scheduled_trip_time);
+        if (!oldScheduledTime) {
+          logger.warn(`[MatchingService] Invalid scheduled_trip_time for reservation ${reservation.bookingid}`);
+          continue;
+        }
+
+        // Generate new trip times based on new schedule
+        const year = oldScheduledTime.getFullYear();
+        const month = String(oldScheduledTime.getMonth() + 1).padStart(2, '0');
+        const day = String(oldScheduledTime.getDate()).padStart(2, '0');
+        const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+        const offsetHours = String(Math.abs(timezoneOffset)).padStart(2, '0');
+
+        // Generate all possible trip times for the day with new interval
+        const newTripTimes = [];
+        let currentMinutes = startHour * 60;
+        const endMinutes = endHour * 60;
+
+        while (currentMinutes <= endMinutes) {
+          const hours = Math.floor(currentMinutes / 60);
+          const mins = currentMinutes % 60;
+          const localTimeString = `${year}-${month}-${day}T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00${offsetSign}${offsetHours}:00`;
+          const utcTime = parseUtcDate(localTimeString);
+          if (utcTime) {
+            newTripTimes.push(utcTime);
+          }
+          currentMinutes += newInterval;
+        }
+
+        // Find the next available trip time (equal or after the old scheduled time)
+        const nextAvailableTime = newTripTimes.find(time => 
+          time.getTime() >= oldScheduledTime.getTime()
+        ) || newTripTimes[newTripTimes.length - 1]; // If no time found, use the last one
+
+        if (!nextAvailableTime) {
+          logger.warn(`[MatchingService] No available trip time found for reservation ${reservation.bookingid}`);
+          errors.push(`No available time for reservation ${reservation.bookingid}`);
+          continue;
+        }
+
+        // Update the reservation's scheduled_trip_time
+        const newScheduledTime = nextAvailableTime.toISOString();
+        await Reservation.update(reservation.bookingid, {
+          scheduled_trip_time: newScheduledTime,
+          tripid: null, // Clear tripid so it gets reassigned to the new trip
+        });
+
+        // Update payment if exists
+        if (reservation.paymentid) {
+          try {
+            const Payment = (await import('../models/Payment.js')).default;
+            await Payment.update(reservation.paymentid, {
+              tripid: null, // Clear tripid
+            });
+          } catch (error) {
+            logger.warn(`[MatchingService] ⚠️ Failed to update payment.tripid for reservation ${reservation.bookingid}:`, error);
+          }
+        }
+
+        adjusted.push({
+          bookingid: reservation.bookingid,
+          oldTime: oldScheduledTime.toISOString(),
+          newTime: newScheduledTime,
+        });
+
+        logger.info(`[MatchingService] ✅ Adjusted reservation ${reservation.bookingid} from ${oldScheduledTime.toISOString()} to ${newScheduledTime}`);
+      } catch (error) {
+        logger.error(`[MatchingService] ❌ Error adjusting reservation ${reservation.bookingid}:`, error);
+        errors.push(`Error adjusting reservation ${reservation.bookingid}: ${error.message}`);
+      }
+    }
+
+    logger.info(`[MatchingService] ✅ Adjusted ${adjusted.length} reservation(s), ${errors.length} error(s)`);
+
+    return {
+      adjusted: adjusted.length,
+      errors,
+      details: adjusted,
+    };
+  } catch (error) {
+    logger.error('[MatchingService] Error adjusting reservations for schedule change:', error);
+    throw error;
+  }
+};

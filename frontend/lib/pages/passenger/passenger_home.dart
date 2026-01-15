@@ -10,6 +10,9 @@ import 'passenger_trips_page.dart';
 import 'passenger_reservations_page.dart';
 import 'passenger_wallet_page.dart';
 import 'passenger_profile_page.dart';
+import 'passenger_notifications_page.dart';
+import '../../widgets/notification_badge.dart';
+import '../../services/notification_service.dart';
 
 class PassengerHomePage extends StatefulWidget {
   const PassengerHomePage({super.key});
@@ -25,7 +28,8 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   bool _isDarkMode = false; 
   final ImagePicker _imagePicker = ImagePicker();
 
-  List<Map<String, dynamic>> _favoriteTrips = [];
+  List<Map<String, dynamic>> _favoriteLines = [];
+  int _unreadNotificationCount = 0;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -38,8 +42,8 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       'myReservations': 'حجوزاتي',
       'myWallet': 'محفظتي',
       'profile': 'الملف الشخصي',
-      'favoriteTrips': 'الرحلات المفضلة',
-      'noFavorites': 'لا توجد رحلات مفضلة حتى الآن',
+      'favoriteLines': 'الخطوط المفضلة',
+      'noFavorites': 'لا توجد خطوط مفضلة حتى الآن',
       'accountInfo': 'معلومات الحساب',
       'name': 'الاسم',
       'email': 'البريد الإلكتروني',
@@ -48,7 +52,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       'passenger': 'المسافر',
       'fromTo': 'من {from} إلى {to}',
       'lastBooked': 'آخر حجز',
-      'bookThisTrip': 'احجز هذه الرحلة',
+      'viewTripsForLine': 'عرض الرحلات لهذا الخط',
       'logout': 'تسجيل الخروج',
     },
     'en': {
@@ -61,8 +65,8 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       'myReservations': 'My Reservations',
       'myWallet': 'My Wallet',
       'profile': 'Profile',
-      'favoriteTrips': 'Favorite Trips',
-      'noFavorites': 'No favorite trips yet',
+      'favoriteLines': 'Favorite Lines',
+      'noFavorites': 'No favorite lines yet',
       'accountInfo': 'Account Information',
       'name': 'Name',
       'email': 'Email',
@@ -92,7 +96,69 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     _loadUserData();
     _loadThemePreference();
     _loadProfileImage();
-    _loadFavoriteTrips();
+    _loadFavoriteLines();
+    _initializeNotifications();
+    _loadUnreadCount();
+  }
+
+  Future<void> _initializeNotifications() async {
+    try {
+      await NotificationService().initialize();
+      NotificationService().setOnNotificationTap((data) {
+        // Show notification dialog when push notification is tapped
+        final isArabic = _isArabic;
+        final title = data['title'] as String? ?? (isArabic ? 'إشعار' : 'Notification');
+        final body = data['body'] as String? ?? (isArabic ? 'إشعار جديد' : 'New notification');
+        
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              content: SingleChildScrollView(
+                child: Text(
+                  body,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(isArabic ? 'إغلاق' : 'Close'),
+                ),
+              ],
+            );
+          },
+        );
+        
+        // Handle notification tap navigation based on data['action']
+        if (data['action'] == 'view_reservation' && data['bookingid'] != null) {
+          // Navigate to reservation details
+          // Navigator.push(...);
+        } else if (data['action'] == 'view_trip' && data['tripid'] != null) {
+          // Navigate to trip details
+          // Navigator.push(...);
+        }
+      });
+    } catch (e) {
+      print('Error initializing notifications: $e');
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final result = await ApiService.getUnreadCount();
+      if (result['success'] == true && mounted) {
+        setState(() {
+          _unreadNotificationCount = result['count'] as int? ?? 0;
+        });
+      }
+    } catch (e) {
+      // Ignore errors
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -102,9 +168,9 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       _userData = userData;
       _isLoading = false;
       _isArabic = isArabic;
-      _favoriteTrips = [];
+      _favoriteLines = [];
     });
-    await _loadFavoriteTrips();
+    await _loadFavoriteLines();
   }
 
   Future<void> _loadThemePreference() async {
@@ -192,13 +258,13 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     }
   }
 
-  Future<void> _loadFavoriteTrips() async {
+  Future<void> _loadFavoriteLines() async {
     try {
       final reservations = await ApiService.fetchPassengerReservations();
       if (!mounted || reservations.isEmpty) {
         if (mounted) {
           setState(() {
-            _favoriteTrips = [];
+            _favoriteLines = [];
           });
         }
         return;
@@ -306,6 +372,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
             : (_isArabic ? 'غير متوفر' : 'Not available');
 
         return {
+          'lineId': stat['lineId'] as String? ?? '',
           'fromAr': stat['fromAr'] as String? ?? '',
           'toAr': stat['toAr'] as String? ?? '',
           'fromEn': stat['fromEn'] as String? ?? '',
@@ -318,12 +385,12 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
       }).toList();
 
       setState(() {
-        _favoriteTrips = topFavorites;
+        _favoriteLines = topFavorites;
       });
     } catch (_) {
       if (mounted) {
         setState(() {
-          _favoriteTrips = [];
+          _favoriteLines = [];
         });
       }
     }
@@ -333,7 +400,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   Future<void> _handleLogout() async {
     await ApiService.clearAuthData();
     setState(() {
-      _favoriteTrips = [];
+      _favoriteLines = [];
     });
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
@@ -344,6 +411,8 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
+    // Refresh unread count when app bar is built
+    _loadUnreadCount();
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
@@ -364,6 +433,21 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
         ),
       ),
       actions: [
+        NotificationBadge(
+          count: _unreadNotificationCount,
+          child: IconButton(
+            icon: const Icon(Icons.notifications, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PassengerNotificationsPage(),
+                ),
+              ).then((_) => _loadUnreadCount());
+            },
+            tooltip: 'Notifications',
+          ),
+        ),
         IconButton(
           icon: const Icon(Icons.logout_rounded, color: Colors.white),
           onPressed: _handleLogout,
@@ -961,7 +1045,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                             ),
                             SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                             Text(
-                              t('favoriteTrips'),
+                              t('favoriteLines'),
                               style: TextStyle(
                                 color: textPrimaryColor,
                                 fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0),
@@ -973,7 +1057,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                         ),
                       ),
                       SizedBox(height: isSmallScreen ? 14.0 : 20.0),
-                      if (_favoriteTrips.isEmpty)
+                      if (_favoriteLines.isEmpty)
                         Container(
                           padding: EdgeInsets.all(isWeb ? (isDesktop ? 32.0 : 24.0) : (isSmallScreen ? 16.0 : 24.0)),
                           decoration: BoxDecoration(
@@ -1024,22 +1108,23 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                   mainAxisSpacing: 16.0,
                                   childAspectRatio: isDesktop ? 1.1 : 1.0,
                                 ),
-                                itemCount: _favoriteTrips.length,
+                                itemCount: _favoriteLines.length,
                                 itemBuilder: (context, index) {
-                                  final trip = _favoriteTrips[index];
-                                  return _buildFavoriteTripCard(
+                                  final line = _favoriteLines[index];
+                                  return _buildFavoriteLineCard(
                                     context: context,
+                                    lineId: line['lineId'] as String? ?? '',
                                     from: _isArabic
-                                        ? trip['fromAr'] as String
-                                        : trip['fromEn'] as String,
+                                        ? line['fromAr'] as String
+                                        : line['fromEn'] as String,
                                     to: _isArabic
-                                        ? trip['toAr'] as String
-                                        : trip['toEn'] as String,
-                                    line: trip['line'] as String,
+                                        ? line['toAr'] as String
+                                        : line['toEn'] as String,
+                                    lineName: line['line'] as String,
                                     lastBooked: _isArabic
-                                        ? trip['lastBookedAr'] as String
-                                        : trip['lastBookedEn'] as String,
-                                    accentColor: trip['color'] as Color? ?? Colors.blue,
+                                        ? line['lastBookedAr'] as String
+                                        : line['lastBookedEn'] as String,
+                                    accentColor: line['color'] as Color? ?? Colors.blue,
                                     cardColor: cardColor,
                                     textColor: textPrimaryColor,
                                     textSecondaryColor: textSecondaryColor,
@@ -1051,23 +1136,24 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                                 },
                               )
                             : Column(
-                                children: _favoriteTrips
+                                children: _favoriteLines
                                     .map(
-                                      (trip) => Padding(
+                                      (line) => Padding(
                                         padding: EdgeInsets.only(bottom: isSmallScreen ? 10.0 : 14.0),
-                                        child: _buildFavoriteTripCard(
+                                        child: _buildFavoriteLineCard(
                                           context: context,
+                                          lineId: line['lineId'] as String? ?? '',
                                           from: _isArabic
-                                              ? trip['fromAr'] as String
-                                              : trip['fromEn'] as String,
+                                              ? line['fromAr'] as String
+                                              : line['fromEn'] as String,
                                           to: _isArabic
-                                              ? trip['toAr'] as String
-                                              : trip['toEn'] as String,
-                                          line: trip['line'] as String,
+                                              ? line['toAr'] as String
+                                              : line['toEn'] as String,
+                                          lineName: line['line'] as String,
                                           lastBooked: _isArabic
-                                              ? trip['lastBookedAr'] as String
-                                              : trip['lastBookedEn'] as String,
-                                          accentColor: trip['color'] as Color? ?? Colors.blue,
+                                              ? line['lastBookedAr'] as String
+                                              : line['lastBookedEn'] as String,
+                                          accentColor: line['color'] as Color? ?? Colors.blue,
                                           cardColor: cardColor,
                                           textColor: textPrimaryColor,
                                           textSecondaryColor: textSecondaryColor,
@@ -1406,11 +1492,12 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
     );
   }
 
-  Widget _buildFavoriteTripCard({
+  Widget _buildFavoriteLineCard({
     required BuildContext context,
+    required String lineId,
     required String from,
     required String to,
-    required String line,
+    required String lineName,
     required String lastBooked,
     required Color accentColor,
     required Color cardColor,
@@ -1485,7 +1572,7 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
                     ),
                     SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                     Text(
-                      line,
+                      lineName,
                       style: TextStyle(
                         color: accentColor,
                         fontWeight: FontWeight.bold,
@@ -1558,10 +1645,17 @@ class _PassengerHomePageState extends State<PassengerHomePage> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () {},
-              icon: Icon(Icons.flash_on_rounded, size: isSmallScreen ? 16.0 : 20.0),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PassengerTripsPage(initialLineId: lineId),
+                  ),
+                );
+              },
+              icon: Icon(Icons.route_rounded, size: isSmallScreen ? 16.0 : 20.0),
               label: Text(
-                t('bookThisTrip'),
+                t('viewTripsForLine'),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: isSmallScreen ? 13.0 : 15.0,

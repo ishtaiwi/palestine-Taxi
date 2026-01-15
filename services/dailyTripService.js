@@ -18,21 +18,21 @@ import { getServerTimezoneOffset, parseUtcDate, getUtcNow, getOpeningWindowMinut
  * @returns {Promise<Date[]>} Array of trip departure times in UTC
  */
 async function generateTripTimes(startHour, endHour, intervalMinutes, targetDate) {
-  
+
   const timezoneOffset = await getServerTimezoneOffset();
 
   const tripTimes = [];
 
-  
+
   const year = targetDate.getFullYear();
   const month = String(targetDate.getMonth() + 1).padStart(2, '0');
   const day = String(targetDate.getDate()).padStart(2, '0');
 
-  
+
   const offsetSign = timezoneOffset >= 0 ? '+' : '-';
   const offsetHours = String(Math.abs(timezoneOffset)).padStart(2, '0');
 
-  
+
   let currentMinutes = startHour * 60;
   const endMinutes = endHour * 60;
 
@@ -40,11 +40,11 @@ async function generateTripTimes(startHour, endHour, intervalMinutes, targetDate
     const hours = Math.floor(currentMinutes / 60);
     const mins = currentMinutes % 60;
 
-    
-    
+
+
     const localTimeString = `${year}-${month}-${day}T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00${offsetSign}${offsetHours}:00`;
 
-    
+
     const utcTime = parseUtcDate(localTimeString);
     if (utcTime) {
       tripTimes.push(utcTime);
@@ -63,7 +63,7 @@ async function generateTripTimes(startHour, endHour, intervalMinutes, targetDate
  */
 async function getVehicleForLine(lineid) {
   try {
-    
+
     const { data: vehicles, error } = await supabase
       .from('vehicle')
       .select('*')
@@ -80,7 +80,7 @@ async function getVehicleForLine(lineid) {
       return vehicles[0];
     }
 
-    
+
     logger.warn('No vehicle found for line', { lineid });
     return null;
   } catch (error) {
@@ -99,7 +99,7 @@ async function createTripsForDate(template, targetDate) {
   const { templateid, lineid, start_hour, end_hour, interval_minutes } = template;
 
   try {
-    
+
     const tripTimes = await generateTripTimes(start_hour, end_hour, interval_minutes, targetDate);
 
     if (tripTimes.length === 0) {
@@ -107,25 +107,25 @@ async function createTripsForDate(template, targetDate) {
       return { created: 0, errors: [] };
     }
 
-    
+
     const line = await Line.findById(lineid);
     if (!line) {
       logger.error('Line not found', { lineid });
       return { created: 0, errors: ['Line not found'] };
     }
 
-    
-    
+
+
     const vehicle = await getVehicleForLine(lineid);
 
     const createdTrips = [];
     const errors = [];
 
-    
+
     const now = getUtcNow();
     for (const deptime of tripTimes) {
       try {
-        
+
         if (deptime.getTime() <= now.getTime()) {
           logger.debug('Skipping trip in the past', {
             lineid,
@@ -135,8 +135,8 @@ async function createTripsForDate(template, targetDate) {
           continue;
         }
 
-        
-        
+
+
         const timeWindowStart = new Date(deptime.getTime() - 5 * 60 * 1000);
         const timeWindowEnd = new Date(deptime.getTime() + 5 * 60 * 1000);
 
@@ -162,21 +162,21 @@ async function createTripsForDate(template, targetDate) {
           continue;
         }
 
-        
+
         const openingWindowMinutes = getOpeningWindowMinutes(interval_minutes);
         const openingTime = new Date(deptime.getTime() - openingWindowMinutes * 60 * 1000);
 
-        
-        
-        const defaultSeats = vehicle ? vehicle.seatnum : 5; 
+
+
+        const defaultSeats = vehicle ? vehicle.seatnum : 5;
         const defaultAvailableSeats = calculateAvailablePassengerSeats(defaultSeats, 0, 0);
 
-        
-        
+
+
         const tripData = {
           tripid: uuidv4(),
           lineid,
-          vehicleid: null, 
+          vehicleid: null,
           deptime: deptime.toISOString(),
           status: 'scheduled',
           availableseats: defaultAvailableSeats,
@@ -185,17 +185,40 @@ async function createTripsForDate(template, targetDate) {
           auto_departure_enabled: template.auto_departure_enabled ?? false,
           early_departure_allowed: true,
           scheduled_departure_enforced: template.scheduled_departure_enforced ?? false,
-          templateid: templateid, 
+          templateid: templateid,
         };
 
         const trip = await Trip.create(tripData);
+
+        // Assign any existing future bookings to this newly created trip
+        try {
+          const { distributeFutureBookings } = await import('./matchingService.js');
+          const futureResult = await distributeFutureBookings(deptime.toISOString(), lineid, trip.tripid);
+          if (futureResult.distributed > 0) {
+            logger.info('Assigned existing future bookings to newly created trip', {
+              tripid: trip.tripid,
+              lineid,
+              deptime: deptime.toISOString(),
+              distributed: futureResult.distributed,
+            });
+          }
+        } catch (error) {
+          logger.warn('Error assigning future bookings to new trip', {
+            tripid: trip.tripid,
+            lineid,
+            deptime: deptime.toISOString(),
+            error: error.message,
+          });
+          // Don't fail trip creation if booking assignment fails
+        }
+
         createdTrips.push(trip);
 
         logger.info('Trip created from schedule', {
           tripid: trip.tripid,
           lineid,
           deptime: deptime.toISOString(),
-          vehicleid: null, 
+          vehicleid: null,
         });
       } catch (error) {
         logger.error('Error creating trip', {
@@ -236,7 +259,7 @@ export async function createDailyTrips() {
   try {
     logger.info('Starting daily trip creation job');
 
-    
+
     const templates = await ScheduleTemplate.getActiveTemplates();
 
     if (templates.length === 0) {
@@ -249,17 +272,17 @@ export async function createDailyTrips() {
       };
     }
 
-    
+
     const tomorrow = new Date();
-    
-    tomorrow.setDate(tomorrow.getDate());
-    
+
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
     tomorrow.setHours(0, 0, 0, 0);
 
     const results = [];
     let totalCreated = 0;
 
-    
+
     for (const template of templates) {
       try {
         const result = await createTripsForDate(template, tomorrow);

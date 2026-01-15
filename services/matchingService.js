@@ -714,8 +714,8 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
     let targetTrip = null;
     if (tripid) {
       targetTrip = await Trip.findById(tripid);
-      if (!targetTrip || !targetTrip.vehicleid) {
-        logger.warn(`[MatchingService] ⚠️ Trip ${tripid} not found or has no vehicle, cannot distribute bookings`);
+      if (!targetTrip) {
+        logger.warn(`[MatchingService] ⚠️ Trip ${tripid} not found, cannot distribute bookings`);
         return {
           success: false,
           distributed: 0,
@@ -730,13 +730,26 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
     while (remainingBookings.length > 0) {
 
       if (targetTrip) {
-        const driverVehicle = await Vehicle.findById(targetTrip.vehicleid);
-        let availableSeats = await getAvailableSeats(driverVehicle, targetTrip.tripid);
+        // If trip has a vehicle, check capacity; otherwise assign all bookings (capacity will be checked later)
+        let bookingsToAssign = [];
 
-        if (availableSeats > 0) {
+        if (targetTrip.vehicleid) {
+          const driverVehicle = await Vehicle.findById(targetTrip.vehicleid);
+          let availableSeats = await getAvailableSeats(driverVehicle, targetTrip.tripid);
 
-          const bookingsToAssign = remainingBookings.slice(0, availableSeats);
+          if (availableSeats > 0) {
+            bookingsToAssign = remainingBookings.slice(0, availableSeats);
+          } else {
+            // Trip is full, break to look for other trips
+            break;
+          }
+        } else {
+          // Trip has no vehicle yet - assign all bookings to this trip
+          // Capacity will be checked when vehicle is assigned
+          bookingsToAssign = [...remainingBookings];
+        }
 
+        if (bookingsToAssign.length > 0) {
           for (const booking of bookingsToAssign) {
             await Reservation.update(booking.bookingid, {
               tripid: targetTrip.tripid,
@@ -755,11 +768,10 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
             distributedCount++;
           }
 
-
           if (bookingsToAssign.length > 0) {
             await syncTripStats(targetTrip.tripid);
 
-            // Transfer payments for this trip to the driver
+            // Transfer payments for this trip to the driver (only if driver is assigned)
             if (targetTrip.assigned_driverid) {
               try {
                 const { transferPaymentsForTrip } = await import('./paymentService.js');
@@ -775,72 +787,91 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
 
           remainingBookings = remainingBookings.slice(bookingsToAssign.length);
 
+          const vehicleInfo = targetTrip.vehicleid ? await Vehicle.findById(targetTrip.vehicleid) : null;
           driversUsed.push({
-            driverid: targetTrip.assigned_driverid,
+            driverid: targetTrip.assigned_driverid || null,
             tripid: targetTrip.tripid,
             bookingsAssigned: bookingsToAssign.length,
-            vehicle: driverVehicle,
+            vehicle: vehicleInfo,
           });
 
-          logger.info(`[MatchingService] ✅ Assigned ${bookingsToAssign.length} future bookings to trip ${targetTrip.tripid}`);
+          logger.info(`[MatchingService] ✅ Assigned ${bookingsToAssign.length} future bookings to trip ${targetTrip.tripid}${!targetTrip.vehicleid ? ' (no vehicle yet)' : ''}`);
+        }
+
+        // If tripid was provided, only assign to that specific trip (don't look for other trips)
+        // Exit the while loop and return
+        break;
+      }
+
+      // Code below only executes when tripid is null (no specific trip provided)
+      if (remainingBookings.length > 0) {
+        const tripsAtSameTime = await findTripsAtSameTime(scheduledTripTime, lineid);
+        const otherTrips = tripsAtSameTime.filter(t =>
+          t.tripid !== targetTrip.tripid &&
+          t.vehicleid &&
+          t.assigned_driverid &&
+          (t.status === 'scheduled' || t.status === 'open' || t.status === 'delayed')
+        );
+
+
+        for (const otherTrip of otherTrips) {
+          if (remainingBookings.length === 0) break;
+
+          const otherVehicle = await Vehicle.findById(otherTrip.vehicleid);
+          const otherAvailableSeats = await getAvailableSeats(otherVehicle, otherTrip.tripid);
+
+          if (otherAvailableSeats > 0) {
+            const bookingsToAssign = remainingBookings.slice(0, otherAvailableSeats);
+
+            for (const booking of bookingsToAssign) {
+              await Reservation.update(booking.bookingid, {
+                tripid: otherTrip.tripid,
+              });
+              distributedCount++;
+            }
+
+            if (bookingsToAssign.length > 0) {
+              await syncTripStats(otherTrip.tripid);
+            }
+
+            remainingBookings = remainingBookings.slice(bookingsToAssign.length);
+
+            driversUsed.push({
+              driverid: otherTrip.assigned_driverid,
+              tripid: otherTrip.tripid,
+              bookingsAssigned: bookingsToAssign.length,
+              vehicle: otherVehicle,
+            });
+
+            logger.info(`[MatchingService] ✅ Assigned ${bookingsToAssign.length} future bookings to additional trip ${otherTrip.tripid} at same time`);
+          }
         }
 
 
         if (remainingBookings.length > 0) {
-          const tripsAtSameTime = await findTripsAtSameTime(scheduledTripTime, lineid);
-          const otherTrips = tripsAtSameTime.filter(t =>
-            t.tripid !== targetTrip.tripid &&
-            t.vehicleid &&
-            t.assigned_driverid &&
-            (t.status === 'scheduled' || t.status === 'open' || t.status === 'delayed')
-          );
-
-
-          for (const otherTrip of otherTrips) {
-            if (remainingBookings.length === 0) break;
-
-            const otherVehicle = await Vehicle.findById(otherTrip.vehicleid);
-            const otherAvailableSeats = await getAvailableSeats(otherVehicle, otherTrip.tripid);
-
-            if (otherAvailableSeats > 0) {
-              const bookingsToAssign = remainingBookings.slice(0, otherAvailableSeats);
-
-              for (const booking of bookingsToAssign) {
-                await Reservation.update(booking.bookingid, {
-                  tripid: otherTrip.tripid,
-                });
-                distributedCount++;
-              }
-
-              if (bookingsToAssign.length > 0) {
-                await syncTripStats(otherTrip.tripid);
-              }
-
-              remainingBookings = remainingBookings.slice(bookingsToAssign.length);
-
-              driversUsed.push({
-                driverid: otherTrip.assigned_driverid,
-                tripid: otherTrip.tripid,
-                bookingsAssigned: bookingsToAssign.length,
-                vehicle: otherVehicle,
-              });
-
-              logger.info(`[MatchingService] ✅ Assigned ${bookingsToAssign.length} future bookings to additional trip ${otherTrip.tripid} at same time`);
-            }
-          }
-
-
-          if (remainingBookings.length > 0) {
-            targetTrip = null;
-          } else {
-            break;
-          }
+          targetTrip = null;
         } else {
           break;
         }
+      } else {
+        break;
       }
+    }
 
+    // Code below only executes when tripid is null (no specific trip provided)
+    // It creates new trips with drivers from the queue
+    if (tripid) {
+      // If tripid was provided, we've already assigned bookings to that trip, so return
+      return {
+        success: true,
+        distributed: distributedCount,
+        remaining: remainingBookings.length,
+        driversUsed,
+      };
+    }
 
+    // Continue with creating new trips for remaining bookings
+    while (remainingBookings.length > 0) {
       const driverQueueEntry = await getNextDriverFromQueue(lineid);
 
       if (!driverQueueEntry) {

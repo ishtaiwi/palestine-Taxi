@@ -1,6 +1,7 @@
 import supabase from '../config/dbcon.js';
 import { v4 as uuidv4 } from 'uuid';
 
+
 const ACTIVE_STATUS = 'waiting';
 
 class DriverQueue {
@@ -102,23 +103,23 @@ class DriverQueue {
     return data;
   }
 
-  
+
   static async removeDriverFromQueue(driverid) {
     return await this.leaveActiveByDriver(driverid);
   }
 
-  
+
   static async deleteByDriverId(driverid) {
     const { error } = await supabase
       .from('driver_queue')
       .delete()
       .eq('driverid', driverid);
-    
+
     if (error) throw error;
     return true;
   }
 
-  
+
   static async getQueuePosition(driverid) {
     const queueEntry = await this.findActiveByDriver(driverid);
     if (!queueEntry) {
@@ -127,7 +128,7 @@ class DriverQueue {
 
     const queue = await this.getActiveByLine(queueEntry.lineid);
     const position = queue.findIndex(entry => entry.driverid === driverid);
-    
+
     return position >= 0 ? position + 1 : null;
   }
 
@@ -160,7 +161,7 @@ class DriverQueue {
   static async canAcceptInstantBooking(lineid) {
     const queue = await this.getActiveByLine(lineid);
     const driversAvailable = queue ? queue.length : 0;
-    
+
     if (driversAvailable === 0) {
       return {
         allowed: false,

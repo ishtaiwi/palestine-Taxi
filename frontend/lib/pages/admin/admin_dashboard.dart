@@ -23,6 +23,7 @@ import 'admin_base_station_page.dart';
 import 'admin_reports_page.dart';
 import 'admin_settings_page.dart';
 import 'admin_driver_approvals_page.dart';
+import 'admin_routes_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -83,6 +84,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'settings': 'الإعدادات',
       'analytics': 'التحليلات',
       'map': 'الخريطة',
+      'routes': 'المسارات',
     },
     'en': {
       'title': 'Admin Dashboard',
@@ -110,6 +112,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'settings': 'Settings',
       'analytics': 'Analytics',
       'map': 'Map',
+      'routes': 'Routes',
     },
   };
 
@@ -687,7 +690,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                     Expanded(
                       child: _buildActionCard(
-                        icon: Icons.route_rounded,
+                        icon: Icons.timeline_rounded,
                         title: t('lines'),
                         color: Colors.green,
                         isSmallScreen: isSmallScreen,
@@ -696,6 +699,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             context,
                             MaterialPageRoute(
                                 builder: (_) => const AdminLinesPage())),
+                      ),
+                    ),
+                    SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                    Expanded(
+                      child: _buildActionCard(
+                        icon: Icons.route_rounded,
+                        title: t('routes'),
+                        color: Colors.cyan,
+                        isSmallScreen: isSmallScreen,
+                        isMediumScreen: isMediumScreen,
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const AdminRoutesPage())),
                       ),
                     ),
                   ],
@@ -989,11 +1006,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 title: t('lines'),
                 titleStyle: TextStyle(
                     color: _isDarkMode ? Colors.white : Colors.black87),
-                icon: Icon(Icons.route_rounded,
+                icon: Icon(Icons.timeline_rounded,
                     color: _isDarkMode ? Colors.white70 : Colors.black54),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AdminLinesPage()),
+                ),
+              ),
+              SideMenuItemDataTile(
+                isSelected: false,
+                title: t('routes'),
+                titleStyle: TextStyle(
+                    color: _isDarkMode ? Colors.white : Colors.black87),
+                icon: Icon(Icons.route_rounded,
+                    color: _isDarkMode ? Colors.white70 : Colors.black54),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AdminRoutesPage()),
                 ),
               ),
               SideMenuItemDataTile(
@@ -2358,12 +2387,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final totalTransactions = _revenueStats?['totalTransactions'] ?? 0;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(_formatRevenue(totalRevenue),
                     style: TextStyle(
@@ -2375,6 +2406,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text('$totalTransactions',
                     style: TextStyle(
@@ -2388,10 +2420,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ],
         ),
         const SizedBox(height: 4),
-        RevenueChart(
-          data: _revenueChartData ?? const {},
-          isArabic: _isArabic,
-          showSummary: false,
+        Flexible(
+          child: SizedBox(
+            height: 200,
+            child: RevenueChart(
+              data: _revenueChartData ?? const {},
+              isArabic: _isArabic,
+              showSummary: false,
+            ),
+          ),
         ),
       ],
     );
@@ -2402,12 +2439,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final completed = _dashboardStats?['completedTrips'] ?? 0;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text('$totalTrips',
                     style: TextStyle(
@@ -2419,6 +2458,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text('$completed',
                     style: TextStyle(
@@ -2432,9 +2472,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ],
         ),
         const SizedBox(height: 4),
-        TripTimeSeriesChart(
-          data: _tripChartData ?? const {},
-          isArabic: _isArabic,
+        Flexible(
+          child: SizedBox(
+            height: 200,
+            child: TripTimeSeriesChart(
+              data: _tripChartData ?? const {},
+              isArabic: _isArabic,
+            ),
+          ),
         ),
       ],
     );

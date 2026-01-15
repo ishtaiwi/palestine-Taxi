@@ -25,6 +25,7 @@ import driverRoutes from './routes/driverRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
 import locationRoutes from './routes/locationRoutes.js';
+import routingRoutes from './routes/routingRoutes.js';
 
 
 
@@ -142,6 +143,7 @@ app.use('/api/schedules', scheduleRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/time', timeRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/routing', routingRoutes);
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

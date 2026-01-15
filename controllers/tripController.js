@@ -8,6 +8,7 @@ import { calculateAvailablePassengerSeats, getTotalPassengerSeats } from '../uti
 import { v4 as uuidv4 } from 'uuid';
 import { TRIP_STATUS } from '../utils/constants.js';
 import { getUtcNow, parseUtcDate, canBookInstant } from '../utils/timeUtils.js';
+import logger from '../utils/logger.js';
 
 
 export const getAllTrips = async (req, res, next) => {
@@ -20,11 +21,11 @@ export const getAllTrips = async (req, res, next) => {
     if (date) filters.date = date;
 
     const allTrips = await Trip.findAll(filters);
-    
+
     // Group trips by deptime and show only the first trip for each time
     // This ensures frontend shows one trip per time, even though backend may have multiple
     const tripsByTime = new Map();
-    
+
     for (const trip of allTrips) {
       const deptime = trip.deptime;
       if (!tripsByTime.has(deptime)) {
@@ -34,21 +35,21 @@ export const getAllTrips = async (req, res, next) => {
         const existingTrip = tripsByTime.get(deptime);
         const existingBookings = existingTrip.totalbookings || 0;
         const currentBookings = trip.totalbookings || 0;
-        
+
         // Prefer trip with more bookings, or if equal, keep the existing one (first found)
         if (currentBookings > existingBookings) {
           tripsByTime.set(deptime, trip);
         }
       }
     }
-    
+
     // Convert map values back to array and sort by deptime
     const uniqueTrips = Array.from(tripsByTime.values()).sort((a, b) => {
       const timeA = new Date(a.deptime).getTime();
       const timeB = new Date(b.deptime).getTime();
       return timeA - timeB;
     });
-    
+
     res.json(uniqueTrips);
   } catch (error) {
     next(error);
@@ -66,11 +67,11 @@ export const getUpcomingTrips = async (req, res, next) => {
     if (date) filters.date = date;
 
     const allTrips = await Trip.findUpcoming(filters);
-    
+
     // Group trips by deptime and show only the first trip for each time
     // This ensures frontend shows one trip per time, even though backend may have multiple
     const tripsByTime = new Map();
-    
+
     for (const trip of allTrips) {
       const deptime = trip.deptime;
       if (!tripsByTime.has(deptime)) {
@@ -80,21 +81,21 @@ export const getUpcomingTrips = async (req, res, next) => {
         const existingTrip = tripsByTime.get(deptime);
         const existingBookings = existingTrip.totalbookings || 0;
         const currentBookings = trip.totalbookings || 0;
-        
+
         // Prefer trip with more bookings, or if equal, keep the existing one (first found)
         if (currentBookings > existingBookings) {
           tripsByTime.set(deptime, trip);
         }
       }
     }
-    
+
     // Convert map values back to array and sort by deptime
     const uniqueTrips = Array.from(tripsByTime.values()).sort((a, b) => {
       const timeA = new Date(a.deptime).getTime();
       const timeB = new Date(b.deptime).getTime();
       return timeA - timeB;
     });
-    
+
     res.json(uniqueTrips);
   } catch (error) {
     next(error);
@@ -183,6 +184,25 @@ export const createTrip = async (req, res, next) => {
     };
 
     const trip = await Trip.create(tripData);
+
+    // Assign any existing future bookings to this newly created trip
+    try {
+      const { distributeFutureBookings } = await import('../services/matchingService.js');
+      const futureResult = await distributeFutureBookings(deptime, lineid, trip.tripid);
+      if (futureResult.distributed > 0) {
+        logger.info(`[TripController] ✅ Assigned ${futureResult.distributed} existing future booking(s) to newly created trip ${trip.tripid}`);
+        // Refresh trip to get updated stats
+        const updatedTrip = await Trip.findById(trip.tripid);
+        if (updatedTrip) {
+          trip.totalbookings = updatedTrip.totalbookings;
+          trip.availableseats = updatedTrip.availableseats;
+        }
+      }
+    } catch (error) {
+      logger.warn(`[TripController] ⚠️ Error assigning future bookings to new trip ${trip.tripid}:`, error);
+      // Don't fail trip creation if booking assignment fails
+    }
+
     res.status(201).json({
       message: req.t('trip.created') || 'Trip created successfully',
       trip,
@@ -352,7 +372,7 @@ export const checkInstantBookingAvailability = async (req, res, next) => {
       // Trip has driver, check available seats on this trip using real-time calculation
       const { getAvailableSeats, findTripsAtSameTime } = await import('../services/matchingService.js');
       const Vehicle = (await import('../models/Vehicle.js')).default;
-      
+
       let availableSeats = 0;
       if (trip.vehicleid) {
         const vehicle = await Vehicle.findById(trip.vehicleid);
@@ -360,19 +380,19 @@ export const checkInstantBookingAvailability = async (req, res, next) => {
           availableSeats = await getAvailableSeats(vehicle, trip.tripid);
         }
       }
-      
+
       // If this trip is full, check if there are other trips at the same time with capacity
       // OR if there are drivers in queue that can be assigned
       if (availableSeats <= 0) {
         // Check other trips at the same time
         const tripsAtSameTime = await findTripsAtSameTime(trip.deptime, trip.lineid);
-        const otherTripsWithCapacity = tripsAtSameTime.filter(t => 
-          t.tripid !== trip.tripid && 
-          t.vehicleid && 
+        const otherTripsWithCapacity = tripsAtSameTime.filter(t =>
+          t.tripid !== trip.tripid &&
+          t.vehicleid &&
           t.assigned_driverid &&
           (t.status === 'scheduled' || t.status === 'open' || t.status === 'delayed')
         );
-        
+
         let totalAvailableSeats = 0;
         for (const otherTrip of otherTripsWithCapacity) {
           const vehicle = await Vehicle.findById(otherTrip.vehicleid);
@@ -381,16 +401,16 @@ export const checkInstantBookingAvailability = async (req, res, next) => {
             totalAvailableSeats += seats;
           }
         }
-        
+
         // Check if there are drivers in queue
         const DriverQueue = (await import('../models/DriverQueue.js')).default;
         const queueCheck = await DriverQueue.canAcceptInstantBooking(trip.lineid);
-        
+
         // Booking is available if:
         // 1. Other trips at same time have capacity, OR
         // 2. There are drivers in queue (can create new trip or assign to existing unassigned trips)
         const stillAvailable = totalAvailableSeats > 0 || (queueCheck.allowed && queueCheck.driversAvailable > 0);
-        
+
         return res.json({
           available: stillAvailable,
           reason: stillAvailable ? 'other_trips_or_drivers_available' : 'no_seats',
@@ -406,7 +426,7 @@ export const checkInstantBookingAvailability = async (req, res, next) => {
           driversInQueue: queueCheck.allowed ? queueCheck.driversAvailable : 0,
         });
       }
-      
+
       // Trip has seats available
       return res.json({
         available: true,
@@ -472,7 +492,7 @@ export const checkLineBookingAvailability = async (req, res, next) => {
       lineName: line.linename,
       instantBookingAvailable: queueCheck.allowed,
       driversInQueue: queueCheck.driversAvailable,
-      message: queueCheck.allowed 
+      message: queueCheck.allowed
         ? 'Instant booking is available'
         : req.t('reservation.no_drivers_available') || 'No drivers available. Instant booking is temporarily unavailable.',
     });

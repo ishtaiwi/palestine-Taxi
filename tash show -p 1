@@ -1,0 +1,345 @@
+[1mdiff --git a/controllers/scheduleController.js b/controllers/scheduleController.js[m
+[1mindex 4a8b53d..95038f5 100644[m
+[1m--- a/controllers/scheduleController.js[m
+[1m+++ b/controllers/scheduleController.js[m
+[36m@@ -6,11 +6,12 @@[m [mimport logger from '../utils/logger.js';[m
+ [m
+ export const getAllSchedules = async (req, res, next) => {[m
+   try {[m
+[31m-    const { lineid, active } = req.query;[m
+[32m+[m[32m    const { lineid, active, direction } = req.query;[m
+     [m
+     const filters = {};[m
+     if (lineid) filters.lineid = lineid;[m
+     if (active !== undefined) filters.active = active === 'true';[m
+[32m+[m[32m    if (direction) filters.direction = direction;[m
+     [m
+     const schedules = await ScheduleTemplate.findAll(filters);[m
+     [m
+[36m@@ -47,7 +48,7 @@[m [mexport const getScheduleById = async (req, res, next) => {[m
+ [m
+ export const createSchedule = async (req, res, next) => {[m
+   try {[m
+[31m-    const { lineid, start_hour, end_hour, interval_minutes, active, auto_departure_enabled, scheduled_departure_enforced } = req.body;[m
+[32m+[m[32m    const { lineid, start_hour, end_hour, interval_minutes, active, auto_departure_enabled, scheduled_departure_enforced, direction } = req.body;[m
+     [m
+     [m
+     if (!lineid) {[m
+[36m@@ -56,6 +57,14 @@[m [mexport const createSchedule = async (req, res, next) => {[m
+       });[m
+     }[m
+     [m
+[32m+[m[32m    // Validate direction[m
+[32m+[m[32m    const scheduleDirection = direction || 'going'; // Default to 'going' for backward compatibility[m
+[32m+[m[32m    if (scheduleDirection !== 'going' && scheduleDirection !== 'return') {[m
+[32m+[m[32m      return res.status(400).json({[m
+[32m+[m[32m        message: req.t('schedule.invalid_direction') || 'direction must be either "going" or "return"',[m
+[32m+[m[32m      });[m
+[32m+[m[32m    }[m
+[32m+[m[41m    [m
+     if (start_hour === undefined || start_hour < 0 || start_hour > 23) {[m
+       return res.status(400).json({[m
+         message: req.t('schedule.invalid_start_hour') || 'start_hour must be between 0 and 23',[m
+[36m@@ -100,12 +109,15 @@[m [mexport const createSchedule = async (req, res, next) => {[m
+       });[m
+     }[m
+     [m
+[31m-    // Check if a schedule already exists for this line[m
+[31m-    const scheduleExists = await ScheduleTemplate.existsForLine(lineid);[m
+[32m+[m[32m    // Check if a schedule already exists for this line and direction combination[m
+[32m+[m[32m    const scheduleExists = await ScheduleTemplate.existsForLine(lineid, scheduleDirection);[m
+     if (scheduleExists) {[m
+[32m+[m[32m      const directionLabel = scheduleDirection === 'going'[m[41m [m
+[32m+[m[32m        ? (req.t('schedule.going') || 'going')[m[41m [m
+[32m+[m[32m        : (req.t('schedule.return') || 'return');[m
+       return res.status(400).json({[m
+         success: false,[m
+[31m-        message: req.t('schedule.duplicate_line') || 'A schedule already exists for this line. Only one schedule per line is allowed.',[m
+[32m+[m[32m        message: req.t('schedule.duplicate_line_direction') || `A ${directionLabel} schedule already exists for this line. Each line can have one going and one returning schedule.`,[m
+       });[m
+     }[m
+     [m
+[36m@@ -117,6 +129,7 @@[m [mexport const createSchedule = async (req, res, next) => {[m
+       active: active !== undefined ? active : true,[m
+       auto_departure_enabled: auto_departure_enabled !== undefined ? auto_departure_enabled : false,[m
+       scheduled_departure_enforced: scheduled_departure_enforced !== undefined ? scheduled_departure_enforced : false,[m
+[32m+[m[32m      direction: scheduleDirection,[m
+     };[m
+     [m
+     const schedule = await ScheduleTemplate.create(scheduleData);[m
+[36m@@ -136,6 +149,29 @@[m [mexport const updateSchedule = async (req, res, next) => {[m
+     const { templateid } = req.params;[m
+     const updates = req.body;[m
+     [m
+[32m+[m[32m    // Validate direction if provided[m
+[32m+[m[32m    if (updates.direction !== undefined) {[m
+[32m+[m[32m      if (updates.direction !== 'going' && updates.direction !== 'return') {[m
+[32m+[m[32m        return res.status(400).json({[m
+[32m+[m[32m          message: req.t('schedule.invalid_direction') || 'direction must be either "going" or "return"',[m
+[32m+[m[32m        });[m
+[32m+[m[32m      }[m
+[32m+[m[41m      [m
+[32m+[m[32m      // Check if changing direction would cause a conflict[m
+[32m+[m[32m      const oldSchedule = await ScheduleTemplate.findById(templateid);[m
+[32m+[m[32m      if (oldSchedule && oldSchedule.direction !== updates.direction) {[m
+[32m+[m[32m        const conflictExists = await ScheduleTemplate.existsForLine(oldSchedule.lineid, updates.direction);[m
+[32m+[m[32m        if (conflictExists) {[m
+[32m+[m[32m          const directionLabel = updates.direction === 'going'[m[41m [m
+[32m+[m[32m            ? (req.t('schedule.going') || 'going')[m[41m [m
+[32m+[m[32m            : (req.t('schedule.return') || 'return');[m
+[32m+[m[32m          return res.status(400).json({[m
+[32m+[m[32m            success: false,[m
+[32m+[m[32m            message: req.t('schedule.duplicate_line_direction') || `A ${directionLabel} schedule already exists for this line. Cannot change direction.`,[m
+[32m+[m[32m          });[m
+[32m+[m[32m        }[m
+[32m+[m[32m      }[m
+[32m+[m[32m    }[m
+     [m
+     if (updates.start_hour !== undefined && (updates.start_hour < 0 || updates.start_hour > 23)) {[m
+       return res.status(400).json({[m
+[1mdiff --git a/frontend/lib/pages/admin/admin_schedules_page.dart b/frontend/lib/pages/admin/admin_schedules_page.dart[m
+[1mindex 874833a..3db2c1c 100644[m
+[1m--- a/frontend/lib/pages/admin/admin_schedules_page.dart[m
+[1m+++ b/frontend/lib/pages/admin/admin_schedules_page.dart[m
+[36m@@ -30,6 +30,7 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+   bool _autoDepartureEnabled = false;[m
+   bool _scheduledDepartureEnforced = false;[m
+   String? _editingTemplateId;[m
+[32m+[m[32m  String _selectedDirection = 'going'; // 'going' or 'return'[m
+ [m
+   final Map<String, Map<String, String>> _texts = {[m
+     'ar': {[m
+[36m@@ -83,6 +84,14 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+       'duplicateSchedule': 'جدول موجود بالفعل لهذا الخط',[m
+       'allLinesHaveSchedules': 'جميع الخطوط لديها جداول بالفعل',[m
+       'hasTrips': 'لا يمكن حذف الجدول. يوجد رحلات مرتبطة بهذا الجدول',[m
+[32m+[m[32m      'direction': 'الاتجاه',[m
+[32m+[m[32m      'going': 'ذهاب',[m
+[32m+[m[32m      'return': 'عودة',[m
+[32m+[m[32m      'selectDirection': 'اختر الاتجاه',[m
+[32m+[m[32m      'goingSchedule': 'جدول الذهاب',[m
+[32m+[m[32m      'returningSchedule': 'جدول العودة',[m
+[32m+[m[32m      'lineHasGoingSchedule': 'هذا الخط لديه جدول ذهاب بالفعل',[m
+[32m+[m[32m      'lineHasReturningSchedule': 'هذا الخط لديه جدول عودة بالفعل',[m
+     },[m
+     'en': {[m
+       'title': 'Daily Schedules',[m
+[36m@@ -135,6 +144,14 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+       'duplicateSchedule': 'A schedule already exists for this line',[m
+       'allLinesHaveSchedules': 'All lines already have schedules',[m
+       'hasTrips': 'Cannot delete schedule. There are trips associated with this schedule',[m
+[32m+[m[32m      'direction': 'Direction',[m
+[32m+[m[32m      'going': 'Going',[m
+[32m+[m[32m      'return': 'Return',[m
+[32m+[m[32m      'selectDirection': 'Select Direction',[m
+[32m+[m[32m      'goingSchedule': 'Going Schedule',[m
+[32m+[m[32m      'returningSchedule': 'Returning Schedule',[m
+[32m+[m[32m      'lineHasGoingSchedule': 'This line already has a going schedule',[m
+[32m+[m[32m      'lineHasReturningSchedule': 'This line already has a returning schedule',[m
+     },[m
+   };[m
+ [m
+[36m@@ -210,18 +227,35 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+     return _lines;[m
+   }[m
+ [m
+[31m-  bool _lineHasSchedule(String? lineId) {[m
+[32m+[m[32m  bool _lineHasSchedule(String? lineId, {String? direction}) {[m
+     if (lineId == null) return false;[m
+[31m-    // When editing, don't consider the current schedule as blocking[m
+[31m-    if (_editingTemplateId != null) {[m
+[31m-      final currentSchedule = _schedules.firstWhere([m
+[31m-        (s) => s['templateid']?.toString() == _editingTemplateId,[m
+[31m-        orElse: () => {},[m
+[31m-      );[m
+[31m-      final currentLineId = currentSchedule['lineid']?.toString();[m
+[31m-      if (currentLineId == lineId) return false;[m
+[32m+[m[41m    [m
+[32m+[m[32m    // Use the explicitly passed direction, or fall back to selected direction[m
+[32m+[m[32m    final checkDirection = (direction ?? _selectedDirection).toLowerCase().trim();[m
+[32m+[m[41m    [m
+[32m+[m[32m    for (final s in _schedules) {[m
+[32m+[m[32m      final scheduleLineId = s['lineid']?.toString() ??[m[41m [m
+[32m+[m[32m                            ((s['line'] is Map<String, dynamic>) ? (s['line'] as Map<String, dynamic>)['lineid']?.toString() : null);[m
+[32m+[m[32m      final scheduleDirection = (s['direction']?.toString() ?? 'going').toLowerCase().trim();[m
+[32m+[m[32m      final isActive = s['active'] ?? true;[m
+[32m+[m[41m      [m
+[32m+[m[32m      // Skip if editing this schedule[m
+[32m+[m[32m      if (_editingTemplateId != null && s['templateid']?.toString() == _editingTemplateId) {[m
+[32m+[m[32m        continue;[m
+[32m+[m[32m      }[m
+[32m+[m[41m      [m
+[32m+[m[32m      // Skip inactive schedules[m
+[32m+[m[32m      if (!isActive) {[m
+[32m+[m[32m        continue;[m
+[32m+[m[32m      }[m
+[32m+[m[41m      [m
+[32m+[m[32m      // Check if this schedule matches the line and direction[m
+[32m+[m[32m      if (scheduleLineId == lineId && scheduleDirection == checkDirection) {[m
+[32m+[m[32m        return true;[m
+[32m+[m[32m      }[m
+     }[m
+[31m-    return _schedules.any((s) => s['lineid']?.toString() == lineId);[m
+[32m+[m[41m    [m
+[32m+[m[32m    return false;[m
+   }[m
+ [m
+   void _showSnackBar(String message, {bool isError = false}) {[m
+[36m@@ -243,9 +277,12 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+       return;[m
+     }[m
+ [m
+[31m-    // Check if line already has a schedule (only when creating new schedule)[m
+[31m-    if (_editingTemplateId == null && _lineHasSchedule(_selectedLineId)) {[m
+[31m-      _showSnackBar(t('duplicateSchedule'), isError: true);[m
+[32m+[m[32m    // Check if line already has a schedule for the selected direction (only when creating new schedule)[m
+[32m+[m[32m    if (_editingTemplateId == null && _lineHasSchedule(_selectedLineId, direction: _selectedDirection)) {[m
+[32m+[m[32m      final errorMsg = _selectedDirection == 'going'[m[41m [m
+[32m+[m[32m        ? t('lineHasGoingSchedule')[m
+[32m+[m[32m        : t('lineHasReturningSchedule');[m
+[32m+[m[32m      _showSnackBar(errorMsg, isError: true);[m
+       return;[m
+     }[m
+ [m
+[36m@@ -263,6 +300,7 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+           active: _active,[m
+           autoDepartureEnabled: _autoDepartureEnabled,[m
+           scheduledDepartureEnforced: _scheduledDepartureEnforced,[m
+[32m+[m[32m          direction: _selectedDirection,[m
+         );[m
+       } else {[m
+         result = await ApiService.createSchedule([m
+[36m@@ -273,6 +311,7 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+           active: _active,[m
+           autoDepartureEnabled: _autoDepartureEnabled,[m
+           scheduledDepartureEnforced: _scheduledDepartureEnforced,[m
+[32m+[m[32m          direction: _selectedDirection,[m
+         );[m
+       }[m
+ [m
+[36m@@ -424,6 +463,7 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+         _active = schedule['active'] ?? true;[m
+         _autoDepartureEnabled = schedule['auto_departure_enabled'] ?? false;[m
+         _scheduledDepartureEnforced = schedule['scheduled_departure_enforced'] ?? false;[m
+[32m+[m[32m        _selectedDirection = schedule['direction']?.toString() ?? 'going';[m
+       });[m
+     } else {[m
+       setState(() {[m
+[36m@@ -435,6 +475,7 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+         _active = true;[m
+         _autoDepartureEnabled = false;[m
+         _scheduledDepartureEnforced = false;[m
+[32m+[m[32m        _selectedDirection = 'going';[m
+       });[m
+     }[m
+ [m
+[36m@@ -447,18 +488,19 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+           top: Radius.circular(isSmallScreen ? 20.0 : 24.0)[m
+         ),[m
+       ),[m
+[31m-      builder: (context) => Padding([m
+[31m-        padding: EdgeInsets.only([m
+[31m-          bottom: MediaQuery.of(context).viewInsets.bottom,[m
+[31m-          left: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),[m
+[31m-          right: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),[m
+[31m-          top: isSmallScreen ? 20.0 : 24.0,[m
+[31m-        ),[m
+[31m-        child: SingleChildScrollView([m
+[31m-          child: Column([m
+[31m-            mainAxisSize: MainAxisSize.min,[m
+[31m-            crossAxisAlignment: CrossAxisAlignment.stretch,[m
+[31m-            children: [[m
+[32m+[m[32m      builder: (bottomSheetContext) => StatefulBuilder([m
+[32m+[m[32m        builder: (context, setModalState) => Padding([m
+[32m+[m[32m          padding: EdgeInsets.only([m
+[32m+[m[32m            bottom: MediaQuery.of(context).viewInsets.bottom,[m
+[32m+[m[32m            left: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),[m
+[32m+[m[32m            right: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),[m
+[32m+[m[32m            top: isSmallScreen ? 20.0 : 24.0,[m
+[32m+[m[32m          ),[m
+[32m+[m[32m          child: SingleChildScrollView([m
+[32m+[m[32m            child: Column([m
+[32m+[m[32m              mainAxisSize: MainAxisSize.min,[m
+[32m+[m[32m              crossAxisAlignment: CrossAxisAlignment.stretch,[m
+[32m+[m[32m              children: [[m
+               Row([m
+                 mainAxisAlignment: MainAxisAlignment.spaceBetween,[m
+                 children: [[m
+[36m@@ -506,8 +548,8 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+                             Expanded([m
+                               child: Text([m
+                                 _isArabic[m
+[31m-                                    ? 'الخطوط التي لديها جدول بالفعل معطلة ولا يمكن اختيارها'[m
+[31m-                                    : 'Lines with existing schedules are disabled and cannot be selected',[m
+[32m+[m[32m                                    ? 'الخطوط التي لديها جدول للاتجاه المحدد معطلة ولا يمكن اختيارها'[m
+[32m+[m[32m                                    : 'Lines with existing schedules for the selected direction are disabled',[m
+                                 style: TextStyle([m
+                                   color: AppTheme.isDarkMode ? Colors.blueAccent : Colors.blue.shade800,[m
+                                   fontSize: isSmallScreen ? 12.0 : 13.0,[m
+[36m@@ -517,130 +559,244 @@[m [mclass _AdminSchedulesPageState extends State<AdminSchedulesPage> {[m
+                           ],[m
+                         ),[m
+                       ),[m
+[31m-                    _buildDropdown([m
+[31m-                      label: t('line'),[m
+[31m-                      value: _selectedLineId,[m
+[31m-                      items: _getAvailableLines().map((line) {[m
+[31m-                        final lineId = line['lineid']?.toString();[m
+[31m-                        final name = _isArabic[m
+[31m-                            ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? 'Unknown')[m
+[31m-                            : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? 'Unknown');[m
+[31m-                        final isDisabled = _editingTemplateId == null && _lineHasSchedule(lineId);[m
+[31m-                        return DropdownMenuItem<String>([m
+[31m-                          value: lineId,[m
+[31m-                          enabled: !isDisabled,[m
+[31m-                          child: Container([m
+[31m-                            width: double.infinity,[m
+[31m-                            margin: EdgeInsets.symmetric(vertical: isSmallScreen ? 3.0 : 4.0),[m
+[31m-                            padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),[m
+[31m-                            decoration: BoxDecoration([m
+[31m-                              color: isDisabled[m
+[31m-                                  ? (AppTheme.isDarkMode[m
+[31m-                                      ? Colors.white.withOpacity(0.02)[m
+[31m-                                      : Colors.grey.shade100)[m
+[31m-                                  : (AppTheme.isDarkMode[m
+[31m-                                      ? Colors.white.withOpacity(0.05)[m
+[31m-                                      : Colors.grey.shade50),[m
+[31m-                              borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),[m
+[31m-                              border: Border.all([m
+[31m-                                color: isDisabled[m
+[31m-                                    ? (AppTheme.isDarkMode[m
+[31m-                                        ? Colors.white.withOpacity(0.05)[m
+[31m-                                        : Colors.grey.shade300)[m
+[31m-                                    : (AppTheme.isDarkMode[m
+[31m-                                        ? Colors.white.withOpacity(0.1)[m
+[31m-                                        : Colors.grey.shade200),[m
+[31m-                              ),[m
+[31m-                            ),[m
+[32m+[m[32m                    // Direction selector (only for creating new schedules, disabled when editing)[m
+[32m+[m[32m                    if (_editingTemplateId == null)[m
+[32m+[m[32m                      _buildDropdown([m
+[32m+[m[32m                        label: t('direction'),[m
+[32m+[m[32m                        value: _selectedDirection,[m
+[32m+[m[32m                        items: [[m
+[32m+[m[32m                          DropdownMenuItem<String>([m
+[32m+[m[32m                            value: 'going',[m
+                             child: Row([m
+                               children: [[m
+[31m-                                Container([m
+[31m-                                  padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),[m
+[31m-                                  decoration: BoxDecoration([m
+[31m-                                    color: isDisabled[m
+[31m-                                        ? (AppTheme.isDarkMode[m
+[31m-                                            ? Colors.grey.withOpacity(0.1)[m
+[31m-                                            : Colors.grey.shade200)[m
+[31m-                                        : (AppTheme.isDarkMode[m
+[31m-                                            ? Colors.blueAccent.withOpacity(0.2)[m
+[31m-                                            : AppTheme.appBarColor.withOpacity(0.1)),[m
+[31m-                                    shape: BoxShape.circle,[m
+[31m-                                  ),[m
+[31m-                                  child: Icon([m
+[31m-                                    Icons.directions_bus_rounded,[m
+[31m-                                    size: isSmallScreen ? 16.0 : 18.0,[m
+[31m-                                    color: isDisabled[m
+[31m-                                        ? (AppTheme.isDarkMode[m
+[31m-                                           

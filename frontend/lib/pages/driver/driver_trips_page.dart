@@ -87,6 +87,70 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
 
   String t(String key) => _texts[_isArabic ? 'ar' : 'en']![key]!;
 
+  // Get direction label with station names from line name
+  // Line name format: "station1-station2" (e.g., "nablus-beit iba")
+  String _getDirectionLabel(String direction, Map<String, dynamic>? line) {
+    if (line == null) {
+      // Fallback to default labels if line not available
+      return direction == 'going'
+          ? (_isArabic ? 'ذهاب' : 'Going')
+          : (_isArabic ? 'عودة' : 'Return');
+    }
+
+    // Get line name (prefer name_ar for Arabic, name_en for English, fallback to linename)
+    String? lineName;
+    if (_isArabic) {
+      lineName = line['name_ar']?.toString() ??
+          line['linename']?.toString() ??
+          line['name_en']?.toString();
+    } else {
+      lineName = line['name_en']?.toString() ??
+          line['linename']?.toString() ??
+          line['name_ar']?.toString();
+    }
+
+    if (lineName == null || lineName.isEmpty) {
+      // Fallback to default labels if line name not available
+      return direction == 'going'
+          ? (_isArabic ? 'ذهاب' : 'Going')
+          : (_isArabic ? 'عودة' : 'Return');
+    }
+
+    // Split line name by "-" to get station names
+    final parts = lineName
+        .split('-')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    if (parts.length < 2) {
+      // If line name doesn't have "-" separator, fallback to default labels
+      return direction == 'going'
+          ? (_isArabic ? 'ذهاب' : 'Going')
+          : (_isArabic ? 'عودة' : 'Return');
+    }
+
+    // First part is the first station, second part is the second station
+    final firstStation = parts[0];
+    final secondStation = parts[1];
+
+    String fromStation, toStation;
+    if (direction == 'going') {
+      // Going: From first station to second station
+      fromStation = firstStation;
+      toStation = secondStation;
+    } else {
+      // Returning: From second station to first station
+      fromStation = secondStation;
+      toStation = firstStation;
+    }
+
+    // Format: "From [station1] to [station2]"
+    return _isArabic
+        ? 'من $fromStation إلى $toStation'
+        : 'From $fromStation to $toStation';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -238,13 +302,15 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
-    
+
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E3A5F),
-        titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
-        contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        titlePadding: EdgeInsets.all(
+            isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        contentPadding: EdgeInsets.all(
+            isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
         actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
         title: Text(
           t('checkin'),
@@ -327,13 +393,15 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
-    
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E3A5F),
-        titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
-        contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        titlePadding: EdgeInsets.all(
+            isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        contentPadding: EdgeInsets.all(
+            isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
         actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
         title: Text(
           t('startTrip'),
@@ -393,14 +461,20 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               backgroundColor: Colors.green,
             ),
           );
-          
+
           // Navigate to navigation page
           final line = trip['line'] as Map<String, dynamic>? ?? {};
           final lineId = line['lineid']?.toString() ?? '';
           final lineName = _isArabic
-              ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '')
-              : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '');
-          
+              ? (line['name_ar']?.toString() ??
+                  line['linename']?.toString() ??
+                  line['name_en']?.toString() ??
+                  '')
+              : (line['name_en']?.toString() ??
+                  line['linename']?.toString() ??
+                  line['name_ar']?.toString() ??
+                  '');
+
           if (lineId.isNotEmpty) {
             Navigator.push(
               context,
@@ -440,13 +514,15 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
-    
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E3A5F),
-        titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
-        contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        titlePadding: EdgeInsets.all(
+            isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        contentPadding: EdgeInsets.all(
+            isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
         actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
         title: Text(
           t('endTrip'),
@@ -531,12 +607,12 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
-    
+
     // Responsive design variables
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
-    
+
     // Theme-aware colors
     final backgroundColor = _isDarkMode
         ? const Color(0xFF0A0E21)
@@ -601,7 +677,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
-                  fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
+                  fontSize:
+                      isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
                   letterSpacing: 0.5,
                 ),
               ),
@@ -619,7 +696,10 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: IconButton(
-                    icon: Icon(Icons.refresh_rounded, size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 22.0)),
+                    icon: Icon(Icons.refresh_rounded,
+                        size: isSmallScreen
+                            ? 20.0
+                            : (isMediumScreen ? 21.0 : 22.0)),
                     onPressed: _loadTrips,
                     tooltip: t('refresh'),
                   ),
@@ -644,36 +724,35 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
   Widget _buildBody() {
     // Responsive design variables
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     // Web-specific responsive breakpoints
     final isWeb = kIsWeb;
     final isDesktop = isWeb && screenWidth >= 1200;
     final isTablet = screenWidth >= 600 && screenWidth < 1200;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
-    final double basePadding = isWeb 
+    final double basePadding = isWeb
         ? (isDesktop ? 32.0 : (isTablet ? 24.0 : 20.0))
         : (isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0));
-    
+
     // Max width for web to prevent content from stretching too wide
     final double maxContentWidth = isWeb ? 1400.0 : double.infinity;
-    
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     // Theme-aware colors
-    final textPrimaryColor = _isDarkMode
-        ? Colors.white
-        : const Color(0xFF1E3A5F);
-    final textSecondaryColor = _isDarkMode
-        ? const Color(0xFFB0BEC5)
-        : const Color(0xFF546E7A);
+    final textPrimaryColor =
+        _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
+    final textSecondaryColor =
+        _isDarkMode ? const Color(0xFFB0BEC5) : const Color(0xFF546E7A);
 
     if (_error != null) {
       return Center(
         child: Padding(
-          padding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
+          padding: EdgeInsets.all(
+              isSmallScreen ? 16.0 : (isMediumScreen ? 20.0 : 24.0)),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -682,7 +761,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: textPrimaryColor,
-                  fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0),
+                  fontSize:
+                      isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0),
                 ),
               ),
               SizedBox(height: isSmallScreen ? 12.0 : 16.0),
@@ -724,19 +804,28 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                         t('subtitle'),
                         style: TextStyle(
                           color: textSecondaryColor,
-                          fontSize: isWeb ? (isDesktop ? 16.0 : 15.0) : (isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0)),
+                          fontSize: isWeb
+                              ? (isDesktop ? 16.0 : 15.0)
+                              : (isSmallScreen
+                                  ? 12.0
+                                  : (isMediumScreen ? 13.0 : 14.0)),
                         ),
                       ),
                       SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                       Wrap(
                         spacing: 16.0,
                         runSpacing: 16.0,
-                        children: _trips.map((trip) => 
-                          SizedBox(
-                            width: isDesktop ? (maxContentWidth - 64) / 2 : double.infinity,
-                            child: _buildTripTile(trip, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen, isWeb: isWeb),
-                          )
-                        ).toList(),
+                        children: _trips
+                            .map((trip) => SizedBox(
+                                  width: isDesktop
+                                      ? (maxContentWidth - 64) / 2
+                                      : double.infinity,
+                                  child: _buildTripTile(trip,
+                                      isSmallScreen: isSmallScreen,
+                                      isMediumScreen: isMediumScreen,
+                                      isWeb: isWeb),
+                                ))
+                            .toList(),
                       ),
                     ],
                   ),
@@ -748,11 +837,16 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                       t('subtitle'),
                       style: TextStyle(
                         color: textSecondaryColor,
-                        fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
+                        fontSize: isSmallScreen
+                            ? 12.0
+                            : (isMediumScreen ? 13.0 : 14.0),
                       ),
                     ),
                     SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                    ..._trips.map((trip) => _buildTripTile(trip, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen, isWeb: isWeb)),
+                    ..._trips.map((trip) => _buildTripTile(trip,
+                        isSmallScreen: isSmallScreen,
+                        isMediumScreen: isMediumScreen,
+                        isWeb: isWeb)),
                   ],
                 ),
         ),
@@ -760,31 +854,27 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     );
   }
 
-  Widget _buildTripTile(Map<String, dynamic> trip, {bool isSmallScreen = false, bool isMediumScreen = false, bool isWeb = false}) {
+  Widget _buildTripTile(Map<String, dynamic> trip,
+      {bool isSmallScreen = false,
+      bool isMediumScreen = false,
+      bool isWeb = false}) {
     final tripId = trip['tripid']?.toString() ?? '';
     final line = trip['line'] as Map<String, dynamic>? ?? {};
     final departureTime = _formatDateTime(trip['deptime']);
     final status = trip['status']?.toString() ?? 'scheduled';
-    
-    final cardColor = _isDarkMode
-        ? const Color(0xFF1C2541)
-        : const Color(0xFFFAFBFC);
-    final textPrimaryColor = _isDarkMode
-        ? Colors.white
-        : const Color(0xFF1E3A5F);
-    final textSecondaryColor = _isDarkMode
-        ? const Color(0xFFB0BEC5)
-        : const Color(0xFF546E7A);
-    final borderColor = _isDarkMode
-        ? Colors.white24
-        : Colors.grey.shade300;
+
+    final cardColor =
+        _isDarkMode ? const Color(0xFF1C2541) : const Color(0xFFFAFBFC);
+    final textPrimaryColor =
+        _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
+    final textSecondaryColor =
+        _isDarkMode ? const Color(0xFFB0BEC5) : const Color(0xFF546E7A);
+    final borderColor = _isDarkMode ? Colors.white24 : Colors.grey.shade300;
 
     return Container(
       margin: EdgeInsets.only(bottom: isSmallScreen ? 10.0 : 12.0),
       decoration: BoxDecoration(
-        color: _isDarkMode
-            ? Colors.white.withOpacity(0.04)
-            : cardColor,
+        color: _isDarkMode ? Colors.white.withOpacity(0.04) : cardColor,
         borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
         border: Border.all(color: borderColor),
       ),
@@ -799,75 +889,36 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _isArabic
-                        ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '---')
-                        : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '---'),
-                    style: TextStyle(
-                      color: textPrimaryColor,
-                      fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                if (trip['direction'] != null)
-                  Container(
-                    margin: EdgeInsets.only(left: isSmallScreen ? 6.0 : 8.0),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isSmallScreen ? 6.0 : 8.0,
-                      vertical: isSmallScreen ? 3.0 : 4.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: (trip['direction'] == 'going'
-                          ? Colors.blue
-                          : Colors.purple).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
-                      border: Border.all(
-                        color: trip['direction'] == 'going'
-                            ? Colors.blue
-                            : Colors.purple,
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      trip['direction'] == 'going'
-                          ? (_isArabic ? 'ذهاب' : 'Going')
-                          : (_isArabic ? 'عودة' : 'Return'),
-                      style: TextStyle(
-                        color: trip['direction'] == 'going'
-                            ? Colors.blue
-                            : Colors.purple,
-                        fontSize: isSmallScreen ? 9.0 : 10.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-              ],
+            Text(
+              _getDirectionLabel(
+                  trip['direction']?.toString() ?? 'going', line),
+              style: TextStyle(
+                color: textPrimaryColor,
+                fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
+                fontWeight: FontWeight.bold,
+              ),
             ),
             SizedBox(height: isSmallScreen ? 2.0 : 4.0),
             Text(
               '${t('departure')}: $departureTime',
               style: TextStyle(
-                color: textSecondaryColor, 
-                fontSize: isSmallScreen ? 11.0 : 12.0
-              ),
+                  color: textSecondaryColor,
+                  fontSize: isSmallScreen ? 11.0 : 12.0),
             ),
             SizedBox(height: isSmallScreen ? 1.0 : 2.0),
             Text(
               '${t('status')}: $status',
               style: TextStyle(
-                color: textSecondaryColor, 
-                fontSize: isSmallScreen ? 11.0 : 12.0
-              ),
+                  color: textSecondaryColor,
+                  fontSize: isSmallScreen ? 11.0 : 12.0),
             ),
           ],
         ),
-        childrenPadding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
+        childrenPadding: EdgeInsets.all(
+            isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
         children: [
-          _buildTripStatsRow(trip, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+          _buildTripStatsRow(trip,
+              isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
           // Assigned Driver Info
           if (trip['assigned_driverid'] != null) ...[
             SizedBox(height: isSmallScreen ? 10.0 : 12.0),
@@ -880,17 +931,16 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.person, 
-                    color: Colors.blue, 
-                    size: isSmallScreen ? 18.0 : 20.0
-                  ),
+                  Icon(Icons.person,
+                      color: Colors.blue, size: isSmallScreen ? 18.0 : 20.0),
                   SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                   Text(
                     t('assignedDriver'),
                     style: TextStyle(
-                      color: _isDarkMode ? Colors.white : const Color(0xFF1E3A5F),
-                      fontSize: isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
+                      color:
+                          _isDarkMode ? Colors.white : const Color(0xFF1E3A5F),
+                      fontSize:
+                          isSmallScreen ? 12.0 : (isMediumScreen ? 13.0 : 14.0),
                     ),
                   ),
                 ],
@@ -930,7 +980,9 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                 ),
               ),
               SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-              if (status == 'open' || status == 'scheduled' || status == 'delayed')
+              if (status == 'open' ||
+                  status == 'scheduled' ||
+                  status == 'delayed')
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: () => _startTrip(tripId, trip),
@@ -956,12 +1008,19 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: () {
-                      final lineData = trip['line'] as Map<String, dynamic>? ?? {};
+                      final lineData =
+                          trip['line'] as Map<String, dynamic>? ?? {};
                       final lineId = lineData['lineid']?.toString() ?? '';
                       final lineName = _isArabic
-                          ? (lineData['name_ar']?.toString() ?? lineData['linename']?.toString() ?? lineData['name_en']?.toString() ?? '')
-                          : (lineData['name_en']?.toString() ?? lineData['linename']?.toString() ?? lineData['name_ar']?.toString() ?? '');
-                      
+                          ? (lineData['name_ar']?.toString() ??
+                              lineData['linename']?.toString() ??
+                              lineData['name_en']?.toString() ??
+                              '')
+                          : (lineData['name_en']?.toString() ??
+                              lineData['linename']?.toString() ??
+                              lineData['name_ar']?.toString() ??
+                              '');
+
                       if (lineId.isNotEmpty) {
                         Navigator.push(
                           context,
@@ -1019,25 +1078,23 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             ],
           ),
           SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-          _buildReservationsSection(tripId, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+          _buildReservationsSection(tripId,
+              isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
         ],
       ),
     );
   }
 
-  Widget _buildTripStatsRow(Map<String, dynamic> trip, {bool isSmallScreen = false, bool isMediumScreen = false}) {
+  Widget _buildTripStatsRow(Map<String, dynamic> trip,
+      {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final availSeats = trip['availableseats']?.toString() ?? '--';
     final totalBookings = trip['totalbookings']?.toString() ?? '0';
-    
-    final textSecondaryColor = _isDarkMode
-        ? const Color(0xFFB0BEC5)
-        : const Color(0xFF546E7A);
-    final cardBgColor = _isDarkMode
-        ? Colors.white.withOpacity(0.05)
-        : Colors.grey.shade100;
-    final borderColor = _isDarkMode
-        ? Colors.white10
-        : Colors.grey.shade300;
+
+    final textSecondaryColor =
+        _isDarkMode ? const Color(0xFFB0BEC5) : const Color(0xFF546E7A);
+    final cardBgColor =
+        _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade100;
+    final borderColor = _isDarkMode ? Colors.white10 : Colors.grey.shade300;
 
     Widget buildStat(String label, String value) {
       return Expanded(
@@ -1063,7 +1120,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                 value,
                 style: TextStyle(
                   color: Colors.orange,
-                  fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
+                  fontSize:
+                      isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1082,7 +1140,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     );
   }
 
-  Widget _buildReservationsSection(String tripId, {bool isSmallScreen = false, bool isMediumScreen = false}) {
+  Widget _buildReservationsSection(String tripId,
+      {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final loading = _loadingReservations.contains(tripId);
     final reservations = _reservations[tripId];
 
@@ -1126,7 +1185,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
         else
           Column(
             children: reservations.map((reservation) {
-              return _buildReservationCard(tripId, reservation, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen);
+              return _buildReservationCard(tripId, reservation,
+                  isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen);
             }).toList(),
           ),
       ],
@@ -1165,22 +1225,18 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
 
     final isCheckedIn = status == 'checked_in';
 
-    final cardBgColor = _isDarkMode
-        ? Colors.white.withOpacity(0.05)
-        : Colors.grey.shade50;
-    final textPrimaryColor = _isDarkMode
-        ? Colors.white
-        : const Color(0xFF1E3A5F);
-    final textSecondaryColor = _isDarkMode
-        ? const Color(0xFFB0BEC5)
-        : const Color(0xFF546E7A);
-    final borderColor = _isDarkMode
-        ? Colors.white12
-        : Colors.grey.shade300;
+    final cardBgColor =
+        _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50;
+    final textPrimaryColor =
+        _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
+    final textSecondaryColor =
+        _isDarkMode ? const Color(0xFFB0BEC5) : const Color(0xFF546E7A);
+    final borderColor = _isDarkMode ? Colors.white12 : Colors.grey.shade300;
 
     return Container(
       margin: EdgeInsets.only(bottom: isSmallScreen ? 10.0 : 12.0),
-      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
+      padding:
+          EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
       decoration: BoxDecoration(
         color: cardBgColor,
         borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
@@ -1200,7 +1256,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                       : '?',
                   style: TextStyle(
                     color: Colors.orange,
-                    fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 18.0),
+                    fontSize:
+                        isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 18.0),
                   ),
                 ),
               ),
@@ -1213,7 +1270,9 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                       user['fullname']?.toString() ?? t('passenger'),
                       style: TextStyle(
                         color: textPrimaryColor,
-                        fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
+                        fontSize: isSmallScreen
+                            ? 14.0
+                            : (isMediumScreen ? 15.0 : 16.0),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1221,9 +1280,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                     Text(
                       '${t('seat')}: $seat',
                       style: TextStyle(
-                        color: textSecondaryColor, 
-                        fontSize: isSmallScreen ? 11.0 : 12.0
-                      ),
+                          color: textSecondaryColor,
+                          fontSize: isSmallScreen ? 11.0 : 12.0),
                     ),
                   ],
                 ),
@@ -1240,9 +1298,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
           SizedBox(height: isSmallScreen ? 10.0 : 12.0),
           Container(
             padding: EdgeInsets.symmetric(
-              horizontal: isSmallScreen ? 10.0 : 12.0, 
-              vertical: isSmallScreen ? 4.0 : 6.0
-            ),
+                horizontal: isSmallScreen ? 10.0 : 12.0,
+                vertical: isSmallScreen ? 4.0 : 6.0),
             decoration: BoxDecoration(
               color: driverStatusColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0),
@@ -1265,7 +1322,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                 FilledButton.tonal(
                   onPressed: isMutating
                       ? null
-                      : () => _updateReservationStatus(tripId, bookingId, 'reject'),
+                      : () =>
+                          _updateReservationStatus(tripId, bookingId, 'reject'),
                   style: FilledButton.styleFrom(
                     foregroundColor: Colors.redAccent,
                     padding: EdgeInsets.symmetric(
@@ -1281,7 +1339,8 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                         )
                       : Text(
                           t('reject'),
-                          style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                          style:
+                              TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
                         ),
                 ),
               if (driverStatus == 'approved' && status != 'checked_in')
@@ -1315,32 +1374,31 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                         )
                       : Text(
                           t('checkin'),
-                          style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                          style:
+                              TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
                         ),
                 ),
               if (isCheckedIn)
                 Container(
                   padding: EdgeInsets.symmetric(
-                    horizontal: isSmallScreen ? 10.0 : 12.0, 
-                    vertical: isSmallScreen ? 6.0 : 8.0
-                  ),
+                      horizontal: isSmallScreen ? 10.0 : 12.0,
+                      vertical: isSmallScreen ? 6.0 : 8.0),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
+                    borderRadius:
+                        BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.check_circle, 
-                        color: Colors.green, 
-                        size: isSmallScreen ? 14.0 : 16.0
-                      ),
+                      Icon(Icons.check_circle,
+                          color: Colors.green,
+                          size: isSmallScreen ? 14.0 : 16.0),
                       SizedBox(width: isSmallScreen ? 3.0 : 4.0),
                       Text(
                         t('checked_in'),
                         style: TextStyle(
-                          color: Colors.green, 
+                          color: Colors.green,
                           fontWeight: FontWeight.bold,
                           fontSize: isSmallScreen ? 11.0 : 12.0,
                         ),
@@ -1368,4 +1426,3 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     }
   }
 }
-

@@ -15,12 +15,10 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   List<Map<String, dynamic>> _lines = [];
   bool _isLoading = true;
   bool _isArabic = true;
-  
-  
+
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  
   final _formKey = GlobalKey<FormState>();
   String? _selectedLineId;
   int _startHour = 7;
@@ -47,8 +45,10 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'inactive': 'غير نشط',
       'autoDepartureEnabled': 'تفعيل المغادرة التلقائية',
       'scheduledDepartureEnforced': 'فرض وقت المغادرة المجدول',
-      'autoDepartureDescription': 'تفعيل المغادرة التلقائية للرحلات المبنية من هذا الجدول',
-      'scheduledDepartureDescription': 'فرض وقت المغادرة المجدول للرحلات المبنية من هذا الجدول',
+      'autoDepartureDescription':
+          'تفعيل المغادرة التلقائية للرحلات المبنية من هذا الجدول',
+      'scheduledDepartureDescription':
+          'فرض وقت المغادرة المجدول للرحلات المبنية من هذا الجدول',
       'save': 'حفظ',
       'cancel': 'إلغاء',
       'edit': 'تعديل',
@@ -107,8 +107,10 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'inactive': 'Inactive',
       'autoDepartureEnabled': 'Auto Departure Enabled',
       'scheduledDepartureEnforced': 'Scheduled Departure Enforced',
-      'autoDepartureDescription': 'Enable automatic departure for trips created from this schedule',
-      'scheduledDepartureDescription': 'Enforce scheduled departure time for trips created from this schedule',
+      'autoDepartureDescription':
+          'Enable automatic departure for trips created from this schedule',
+      'scheduledDepartureDescription':
+          'Enforce scheduled departure time for trips created from this schedule',
       'save': 'Save',
       'cancel': 'Cancel',
       'edit': 'Edit',
@@ -143,7 +145,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'search': 'Search schedules...',
       'duplicateSchedule': 'A schedule already exists for this line',
       'allLinesHaveSchedules': 'All lines already have schedules',
-      'hasTrips': 'Cannot delete schedule. There are trips associated with this schedule',
+      'hasTrips':
+          'Cannot delete schedule. There are trips associated with this schedule',
       'direction': 'Direction',
       'going': 'Going',
       'return': 'Return',
@@ -227,34 +230,97 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     return _lines;
   }
 
+  // Get direction label with station names from line name
+  // Line name format: "station1-station2" (e.g., "nablus-beit iba")
+  String _getDirectionLabel(String direction, Map<String, dynamic>? line) {
+    if (line == null) {
+      // Fallback to default labels if line not available
+      return direction == 'going' ? t('going') : t('return');
+    }
+
+    // Get line name (prefer name_ar for Arabic, name_en for English, fallback to linename)
+    String? lineName;
+    if (_isArabic) {
+      lineName = line['name_ar']?.toString() ??
+          line['linename']?.toString() ??
+          line['name_en']?.toString();
+    } else {
+      lineName = line['name_en']?.toString() ??
+          line['linename']?.toString() ??
+          line['name_ar']?.toString();
+    }
+
+    if (lineName == null || lineName.isEmpty) {
+      // Fallback to default labels if line name not available
+      return direction == 'going' ? t('going') : t('return');
+    }
+
+    // Split line name by "-" to get station names
+    final parts = lineName
+        .split('-')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    if (parts.length < 2) {
+      // If line name doesn't have "-" separator, fallback to default labels
+      return direction == 'going' ? t('going') : t('return');
+    }
+
+    // First part is the first station, second part is the second station
+    final firstStation = parts[0];
+    final secondStation = parts[1];
+
+    String fromStation, toStation;
+    if (direction == 'going') {
+      // Going: From first station to second station
+      fromStation = firstStation;
+      toStation = secondStation;
+    } else {
+      // Returning: From second station to first station
+      fromStation = secondStation;
+      toStation = firstStation;
+    }
+
+    // Format: "From [station1] to [station2]"
+    return _isArabic
+        ? 'من $fromStation إلى $toStation'
+        : 'From $fromStation to $toStation';
+  }
+
   bool _lineHasSchedule(String? lineId, {String? direction}) {
     if (lineId == null) return false;
-    
+
     // Use the explicitly passed direction, or fall back to selected direction
-    final checkDirection = (direction ?? _selectedDirection).toLowerCase().trim();
-    
+    final checkDirection =
+        (direction ?? _selectedDirection).toLowerCase().trim();
+
     for (final s in _schedules) {
-      final scheduleLineId = s['lineid']?.toString() ?? 
-                            ((s['line'] is Map<String, dynamic>) ? (s['line'] as Map<String, dynamic>)['lineid']?.toString() : null);
-      final scheduleDirection = (s['direction']?.toString() ?? 'going').toLowerCase().trim();
+      final scheduleLineId = s['lineid']?.toString() ??
+          ((s['line'] is Map<String, dynamic>)
+              ? (s['line'] as Map<String, dynamic>)['lineid']?.toString()
+              : null);
+      final scheduleDirection =
+          (s['direction']?.toString() ?? 'going').toLowerCase().trim();
       final isActive = s['active'] ?? true;
-      
+
       // Skip if editing this schedule
-      if (_editingTemplateId != null && s['templateid']?.toString() == _editingTemplateId) {
+      if (_editingTemplateId != null &&
+          s['templateid']?.toString() == _editingTemplateId) {
         continue;
       }
-      
+
       // Skip inactive schedules
       if (!isActive) {
         continue;
       }
-      
+
       // Check if this schedule matches the line and direction
       if (scheduleLineId == lineId && scheduleDirection == checkDirection) {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -278,15 +344,16 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     }
 
     // Check if line already has a schedule for the selected direction (only when creating new schedule)
-    if (_editingTemplateId == null && _lineHasSchedule(_selectedLineId, direction: _selectedDirection)) {
-      final errorMsg = _selectedDirection == 'going' 
-        ? t('lineHasGoingSchedule')
-        : t('lineHasReturningSchedule');
+    if (_editingTemplateId == null &&
+        _lineHasSchedule(_selectedLineId, direction: _selectedDirection)) {
+      final errorMsg = _selectedDirection == 'going'
+          ? t('lineHasGoingSchedule')
+          : t('lineHasReturningSchedule');
       _showSnackBar(errorMsg, isError: true);
       return;
     }
 
-    Navigator.pop(context); 
+    Navigator.pop(context);
     setState(() => _isLoading = true);
 
     try {
@@ -315,8 +382,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       }
 
       if (result['success'] == true) {
-        _showSnackBar(_editingTemplateId != null 
-            ? t('scheduleUpdated') 
+        _showSnackBar(_editingTemplateId != null
+            ? t('scheduleUpdated')
             : t('scheduleCreated'));
         _loadData();
       } else {
@@ -333,28 +400,32 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
-    
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
+        backgroundColor: AppTheme.isDarkMode
+            ? const Color(0xFF1C2541)
+            : AppTheme.cardBackground,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(isSmallScreen ? 14.0 : 16.0)
-        ),
-        titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
-        contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 14.0 : 16.0)),
+        titlePadding: EdgeInsets.all(
+            isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        contentPadding: EdgeInsets.all(
+            isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
         actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
         title: Text(
-          t('confirmDelete'), 
+          t('confirmDelete'),
           style: TextStyle(
             color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
             fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 22.0),
           ),
         ),
         content: Text(
-          t('deleteWarning'), 
+          t('deleteWarning'),
           style: TextStyle(
-            color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+            color:
+                AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
             fontSize: isSmallScreen ? 13.0 : 14.0,
           ),
         ),
@@ -362,9 +433,11 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
-              t('no'), 
+              t('no'),
               style: TextStyle(
-                color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                color: AppTheme.isDarkMode
+                    ? Colors.white70
+                    : AppTheme.textSecondary,
                 fontSize: isSmallScreen ? 13.0 : 14.0,
               ),
             ),
@@ -375,8 +448,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
               backgroundColor: Colors.red.shade600,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0)
-              ),
+                  borderRadius:
+                      BorderRadius.circular(isSmallScreen ? 6.0 : 8.0)),
               padding: EdgeInsets.symmetric(
                 horizontal: isSmallScreen ? 20.0 : 24.0,
                 vertical: isSmallScreen ? 10.0 : 12.0,
@@ -443,16 +516,17 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     }
   }
 
-  void _openScheduleForm(BuildContext context, {Map<String, dynamic>? schedule}) {
+  void _openScheduleForm(BuildContext context,
+      {Map<String, dynamic>? schedule}) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
-    
+
     if (schedule != null) {
       final interval = schedule['interval_minutes'] ?? 60;
       // Ensure interval is either 30 or 60, default to 60 if invalid
       final validInterval = (interval == 30 || interval == 60) ? interval : 60;
-      
+
       setState(() {
         _editingTemplateId = schedule['templateid'] as String;
         _selectedLineId = schedule['lineid'];
@@ -461,7 +535,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         _intervalMinutes = validInterval;
         _active = schedule['active'] ?? true;
         _autoDepartureEnabled = schedule['auto_departure_enabled'] ?? false;
-        _scheduledDepartureEnforced = schedule['scheduled_departure_enforced'] ?? false;
+        _scheduledDepartureEnforced =
+            schedule['scheduled_departure_enforced'] ?? false;
         _selectedDirection = schedule['direction']?.toString() ?? 'going';
       });
     } else {
@@ -481,11 +556,11 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+      backgroundColor:
+          AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
-          top: Radius.circular(isSmallScreen ? 20.0 : 24.0)
-        ),
+            top: Radius.circular(isSmallScreen ? 20.0 : 24.0)),
       ),
       builder: (bottomSheetContext) => StatefulBuilder(
         builder: (context, setModalState) => Padding(
@@ -500,428 +575,486 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _editingTemplateId != null ? t('updateSchedule') : t('createSchedule'),
-                    style: TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(
-                      Icons.close, 
-                      color: AppTheme.textSecondary,
-                      size: isSmallScreen ? 20.0 : 24.0,
-                    ),
-                  ),
-                ],
-              ),
-              Divider(height: isSmallScreen ? 0.5 : 1.0),
-              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-              Form(
-                key: _formKey,
-                child: Column(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if (_editingTemplateId == null)
-                      Container(
-                        padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
-                        margin: EdgeInsets.only(bottom: isSmallScreen ? 12.0 : 16.0),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
-                          border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              color: Colors.blue,
-                              size: isSmallScreen ? 18.0 : 20.0,
-                            ),
-                            SizedBox(width: isSmallScreen ? 8.0 : 12.0),
-                            Expanded(
-                              child: Text(
-                                _isArabic
-                                    ? 'الخطوط التي لديها جدول للاتجاه المحدد معطلة ولا يمكن اختيارها'
-                                    : 'Lines with existing schedules for the selected direction are disabled',
-                                style: TextStyle(
-                                  color: AppTheme.isDarkMode ? Colors.blueAccent : Colors.blue.shade800,
-                                  fontSize: isSmallScreen ? 12.0 : 13.0,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                    Text(
+                      _editingTemplateId != null
+                          ? t('updateSchedule')
+                          : t('createSchedule'),
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: isSmallScreen
+                            ? 18.0
+                            : (isMediumScreen ? 19.0 : 20.0),
+                        fontWeight: FontWeight.bold,
                       ),
-                    // Direction selector (only for creating new schedules, disabled when editing)
-                    if (_editingTemplateId == null)
-                      _buildDropdown(
-                        label: t('direction'),
-                        value: _selectedDirection,
-                        items: [
-                          DropdownMenuItem<String>(
-                            value: 'going',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: isSmallScreen ? 16.0 : 18.0,
-                                  color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
-                                ),
-                                SizedBox(width: isSmallScreen ? 10.0 : 12.0),
-                                Text(
-                                  t('going'),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(
+                        Icons.close,
+                        color: AppTheme.textSecondary,
+                        size: isSmallScreen ? 20.0 : 24.0,
+                      ),
+                    ),
+                  ],
+                ),
+                Divider(height: isSmallScreen ? 0.5 : 1.0),
+                SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      if (_editingTemplateId == null)
+                        Container(
+                          padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+                          margin: EdgeInsets.only(
+                              bottom: isSmallScreen ? 12.0 : 16.0),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(
+                                isSmallScreen ? 10.0 : 12.0),
+                            border:
+                                Border.all(color: Colors.blue.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Colors.blue,
+                                size: isSmallScreen ? 18.0 : 20.0,
+                              ),
+                              SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                              Expanded(
+                                child: Text(
+                                  _isArabic
+                                      ? 'الخطوط التي لديها جدول للاتجاه المحدد معطلة ولا يمكن اختيارها'
+                                      : 'Lines with existing schedules for the selected direction are disabled',
                                   style: TextStyle(
-                                    color: AppTheme.textPrimary,
-                                    fontSize: isSmallScreen ? 14.0 : 15.0,
+                                    color: AppTheme.isDarkMode
+                                        ? Colors.blueAccent
+                                        : Colors.blue.shade800,
+                                    fontSize: isSmallScreen ? 12.0 : 13.0,
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          DropdownMenuItem<String>(
-                            value: 'return',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.arrow_back_ios,
-                                  size: isSmallScreen ? 16.0 : 18.0,
-                                  color: AppTheme.isDarkMode ? Colors.orangeAccent : Colors.orange.shade700,
-                                ),
-                                SizedBox(width: isSmallScreen ? 10.0 : 12.0),
-                                Text(
-                                  t('return'),
-                                  style: TextStyle(
-                                    color: AppTheme.textPrimary,
-                                    fontSize: isSmallScreen ? 14.0 : 15.0,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        onChanged: (val) {
-                          if (val != null && val != _selectedDirection) {
-                            setModalState(() {
-                              _selectedDirection = val;
-                              // Reset line selection when direction changes to re-check availability
-                              _selectedLineId = null;
-                            });
-                          }
-                        },
-                        icon: Icons.compare_arrows_rounded,
-                        isSmallScreen: isSmallScreen,
-                        isMediumScreen: isMediumScreen,
-                      ),
-                    if (_editingTemplateId == null)
-                      SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                    // Show direction as read-only when editing
-                    if (_editingTemplateId != null)
-                      Container(
-                        padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
-                        decoration: BoxDecoration(
-                          color: AppTheme.isDarkMode 
-                            ? Colors.white.withOpacity(0.05) 
-                            : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
-                          border: Border.all(
-                            color: AppTheme.isDarkMode 
-                              ? Colors.white.withOpacity(0.1) 
-                              : Colors.grey.shade300,
+                              ),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _selectedDirection == 'going' 
-                                ? Icons.arrow_forward_ios 
-                                : Icons.arrow_back_ios,
-                              size: isSmallScreen ? 16.0 : 18.0,
-                              color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
-                            ),
-                            SizedBox(width: isSmallScreen ? 10.0 : 12.0),
-                            Text(
-                              '${t('direction')}: ${_selectedDirection == 'going' ? t('going') : t('return')}',
-                              style: TextStyle(
-                                color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
-                                fontSize: isSmallScreen ? 13.0 : 14.0,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    if (_editingTemplateId != null)
-                      SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                    // Line dropdown rebuilds when direction changes via setModalState
-                    Builder(
-                      builder: (context) {
-                        // Recalculate items based on current direction
-                        final availableLines = _getAvailableLines();
-                        final currentDirection = _selectedDirection;
-                        final lineItems = availableLines.map((line) {
-                          final lineId = line['lineid']?.toString();
-                          final name = _isArabic
-                              ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? 'Unknown')
-                              : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? 'Unknown');
-                          final isDisabled = _editingTemplateId == null && _lineHasSchedule(lineId, direction: currentDirection);
-                          return DropdownMenuItem<String>(
-                            value: lineId,
-                            enabled: !isDisabled,
-                            child: Container(
-                              width: double.infinity,
-                              margin: EdgeInsets.symmetric(vertical: isSmallScreen ? 3.0 : 4.0),
-                              padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
-                              decoration: BoxDecoration(
-                                color: isDisabled
-                                    ? (AppTheme.isDarkMode
-                                        ? Colors.white.withOpacity(0.02)
-                                        : Colors.grey.shade100)
-                                    : (AppTheme.isDarkMode
-                                        ? Colors.white.withOpacity(0.05)
-                                        : Colors.grey.shade50),
-                                borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
-                                border: Border.all(
-                                  color: isDisabled
-                                      ? (AppTheme.isDarkMode
-                                          ? Colors.white.withOpacity(0.05)
-                                          : Colors.grey.shade300)
-                                      : (AppTheme.isDarkMode
-                                          ? Colors.white.withOpacity(0.1)
-                                          : Colors.grey.shade200),
-                                ),
-                              ),
+                      // Direction selector (only for creating new schedules, disabled when editing)
+                      if (_editingTemplateId == null)
+                        _buildDropdown(
+                          label: t('direction'),
+                          value: _selectedDirection,
+                          items: [
+                            DropdownMenuItem<String>(
+                              value: 'going',
                               child: Row(
                                 children: [
-                                  Container(
-                                    padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
-                                    decoration: BoxDecoration(
-                                      color: isDisabled
-                                          ? (AppTheme.isDarkMode
-                                              ? Colors.grey.withOpacity(0.1)
-                                              : Colors.grey.shade200)
-                                          : (AppTheme.isDarkMode
-                                              ? Colors.blueAccent.withOpacity(0.2)
-                                              : AppTheme.appBarColor.withOpacity(0.1)),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      Icons.directions_bus_rounded,
-                                      size: isSmallScreen ? 16.0 : 18.0,
-                                      color: isDisabled
-                                          ? (AppTheme.isDarkMode
-                                              ? Colors.grey
-                                              : Colors.grey.shade600)
-                                          : (AppTheme.isDarkMode
-                                              ? Colors.blueAccent
-                                              : AppTheme.appBarColor),
-                                    ),
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: isSmallScreen ? 16.0 : 18.0,
+                                    color: AppTheme.isDarkMode
+                                        ? Colors.blueAccent
+                                        : AppTheme.appBarColor,
                                   ),
                                   SizedBox(width: isSmallScreen ? 10.0 : 12.0),
-                                  Expanded(
-                                    child: Text(
-                                      name.toString(),
-                                      style: TextStyle(
-                                        color: isDisabled
-                                            ? (AppTheme.isDarkMode
-                                                ? Colors.white38
-                                                : Colors.grey.shade500)
-                                            : AppTheme.textPrimary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: isSmallScreen ? 13.0 : 14.0,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                                  Text(
+                                    t('going'),
+                                    style: TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontSize: isSmallScreen ? 14.0 : 15.0,
                                     ),
                                   ),
-                                  if (isDisabled)
-                                    Padding(
-                                      padding: EdgeInsets.only(left: isSmallScreen ? 6.0 : 8.0),
-                                      child: Icon(
-                                        Icons.check_circle,
-                                        size: isSmallScreen ? 14.0 : 16.0,
-                                        color: AppTheme.isDarkMode
-                                            ? Colors.orangeAccent
-                                            : Colors.orange.shade700,
-                                      ),
-                                    ),
                                 ],
                               ),
                             ),
-                          );
-                        }).toList();
-                        
-                        return _buildDropdown(
-                          label: t('line'),
-                          value: _selectedLineId,
-                          items: lineItems,
-                          selectedItemBuilder: (context) {
-                            return availableLines.map((line) {
-                              final lineId = line['lineid']?.toString();
-                              final name = _isArabic
-                                  ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? 'Unknown')
-                                  : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? 'Unknown');
-                              final isDisabled = _editingTemplateId == null && _lineHasSchedule(lineId, direction: currentDirection);
-                              return Text(
-                                name.toString(),
-                                style: TextStyle(
-                                  color: isDisabled
-                                      ? (AppTheme.isDarkMode
-                                          ? Colors.white38
-                                          : Colors.grey.shade500)
-                                      : AppTheme.textPrimary,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: isSmallScreen ? 14.0 : 15.0,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              );
-                            }).toList();
-                          },
+                            DropdownMenuItem<String>(
+                              value: 'return',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.arrow_back_ios,
+                                    size: isSmallScreen ? 16.0 : 18.0,
+                                    color: AppTheme.isDarkMode
+                                        ? Colors.orangeAccent
+                                        : Colors.orange.shade700,
+                                  ),
+                                  SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+                                  Text(
+                                    t('return'),
+                                    style: TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontSize: isSmallScreen ? 14.0 : 15.0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           onChanged: (val) {
-                            if (val != null && _editingTemplateId == null && _lineHasSchedule(val, direction: currentDirection)) {
-                              final errorMsg = currentDirection == 'going' 
-                                ? t('lineHasGoingSchedule')
-                                : t('lineHasReturningSchedule');
-                              _showSnackBar(errorMsg, isError: true);
-                              return;
+                            if (val != null && val != _selectedDirection) {
+                              setModalState(() {
+                                _selectedDirection = val;
+                                // Reset line selection when direction changes to re-check availability
+                                _selectedLineId = null;
+                              });
                             }
-                            setModalState(() => _selectedLineId = val);
                           },
+                          icon: Icons.compare_arrows_rounded,
                           isSmallScreen: isSmallScreen,
                           isMediumScreen: isMediumScreen,
-                        );
-                      },
-                    ),
-                    SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildNumberInput(
-                            label: t('startHour'),
-                            value: _startHour,
-                            onChanged: (val) => _startHour = val,
-                            max: 23,
-                            isSmallScreen: isSmallScreen,
-                            isMediumScreen: isMediumScreen,
+                        ),
+                      if (_editingTemplateId == null)
+                        SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                      // Show direction as read-only when editing
+                      if (_editingTemplateId != null)
+                        Container(
+                          padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+                          decoration: BoxDecoration(
+                            color: AppTheme.isDarkMode
+                                ? Colors.white.withOpacity(0.05)
+                                : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(
+                                isSmallScreen ? 10.0 : 12.0),
+                            border: Border.all(
+                              color: AppTheme.isDarkMode
+                                  ? Colors.white.withOpacity(0.1)
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _selectedDirection == 'going'
+                                    ? Icons.arrow_forward_ios
+                                    : Icons.arrow_back_ios,
+                                size: isSmallScreen ? 16.0 : 18.0,
+                                color: AppTheme.isDarkMode
+                                    ? Colors.white70
+                                    : AppTheme.textSecondary,
+                              ),
+                              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+                              Text(
+                                '${t('direction')}: ${_selectedDirection == 'going' ? t('going') : t('return')}',
+                                style: TextStyle(
+                                  color: AppTheme.isDarkMode
+                                      ? Colors.white70
+                                      : AppTheme.textSecondary,
+                                  fontSize: isSmallScreen ? 13.0 : 14.0,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        SizedBox(width: isSmallScreen ? 12.0 : 16.0),
-                        Expanded(
-                          child: _buildNumberInput(
-                            label: t('endHour'),
-                            value: _endHour,
-                            onChanged: (val) => _endHour = val,
-                            validator: (val) {
-                              if (val != null && val < _startHour) return t('endBeforeStart');
-                              return null;
+                      if (_editingTemplateId != null)
+                        SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                      // Line dropdown rebuilds when direction changes via setModalState
+                      Builder(
+                        builder: (context) {
+                          // Recalculate items based on current direction
+                          final availableLines = _getAvailableLines();
+                          final currentDirection = _selectedDirection;
+                          final lineItems = availableLines.map((line) {
+                            final lineId = line['lineid']?.toString();
+                            final name = _isArabic
+                                ? (line['name_ar'] ??
+                                    line['linename'] ??
+                                    line['name_en'] ??
+                                    'Unknown')
+                                : (line['name_en'] ??
+                                    line['linename'] ??
+                                    line['name_ar'] ??
+                                    'Unknown');
+                            final isDisabled = _editingTemplateId == null &&
+                                _lineHasSchedule(lineId,
+                                    direction: currentDirection);
+                            return DropdownMenuItem<String>(
+                              value: lineId,
+                              enabled: !isDisabled,
+                              child: Container(
+                                width: double.infinity,
+                                margin: EdgeInsets.symmetric(
+                                    vertical: isSmallScreen ? 3.0 : 4.0),
+                                padding:
+                                    EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
+                                decoration: BoxDecoration(
+                                  color: isDisabled
+                                      ? (AppTheme.isDarkMode
+                                          ? Colors.white.withOpacity(0.02)
+                                          : Colors.grey.shade100)
+                                      : (AppTheme.isDarkMode
+                                          ? Colors.white.withOpacity(0.05)
+                                          : Colors.grey.shade50),
+                                  borderRadius: BorderRadius.circular(
+                                      isSmallScreen ? 10.0 : 12.0),
+                                  border: Border.all(
+                                    color: isDisabled
+                                        ? (AppTheme.isDarkMode
+                                            ? Colors.white.withOpacity(0.05)
+                                            : Colors.grey.shade300)
+                                        : (AppTheme.isDarkMode
+                                            ? Colors.white.withOpacity(0.1)
+                                            : Colors.grey.shade200),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(
+                                          isSmallScreen ? 6.0 : 8.0),
+                                      decoration: BoxDecoration(
+                                        color: isDisabled
+                                            ? (AppTheme.isDarkMode
+                                                ? Colors.grey.withOpacity(0.1)
+                                                : Colors.grey.shade200)
+                                            : (AppTheme.isDarkMode
+                                                ? Colors.blueAccent
+                                                    .withOpacity(0.2)
+                                                : AppTheme.appBarColor
+                                                    .withOpacity(0.1)),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.directions_bus_rounded,
+                                        size: isSmallScreen ? 16.0 : 18.0,
+                                        color: isDisabled
+                                            ? (AppTheme.isDarkMode
+                                                ? Colors.grey
+                                                : Colors.grey.shade600)
+                                            : (AppTheme.isDarkMode
+                                                ? Colors.blueAccent
+                                                : AppTheme.appBarColor),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                        width: isSmallScreen ? 10.0 : 12.0),
+                                    Expanded(
+                                      child: Text(
+                                        name.toString(),
+                                        style: TextStyle(
+                                          color: isDisabled
+                                              ? (AppTheme.isDarkMode
+                                                  ? Colors.white38
+                                                  : Colors.grey.shade500)
+                                              : AppTheme.textPrimary,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: isSmallScreen ? 13.0 : 14.0,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (isDisabled)
+                                      Padding(
+                                        padding: EdgeInsets.only(
+                                            left: isSmallScreen ? 6.0 : 8.0),
+                                        child: Icon(
+                                          Icons.check_circle,
+                                          size: isSmallScreen ? 14.0 : 16.0,
+                                          color: AppTheme.isDarkMode
+                                              ? Colors.orangeAccent
+                                              : Colors.orange.shade700,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList();
+
+                          return _buildDropdown(
+                            label: t('line'),
+                            value: _selectedLineId,
+                            items: lineItems,
+                            selectedItemBuilder: (context) {
+                              return availableLines.map((line) {
+                                final lineId = line['lineid']?.toString();
+                                final name = _isArabic
+                                    ? (line['name_ar'] ??
+                                        line['linename'] ??
+                                        line['name_en'] ??
+                                        'Unknown')
+                                    : (line['name_en'] ??
+                                        line['linename'] ??
+                                        line['name_ar'] ??
+                                        'Unknown');
+                                final isDisabled = _editingTemplateId == null &&
+                                    _lineHasSchedule(lineId,
+                                        direction: currentDirection);
+                                return Text(
+                                  name.toString(),
+                                  style: TextStyle(
+                                    color: isDisabled
+                                        ? (AppTheme.isDarkMode
+                                            ? Colors.white38
+                                            : Colors.grey.shade500)
+                                        : AppTheme.textPrimary,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: isSmallScreen ? 14.0 : 15.0,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                );
+                              }).toList();
                             },
-                            max: 23,
+                            onChanged: (val) {
+                              if (val != null &&
+                                  _editingTemplateId == null &&
+                                  _lineHasSchedule(val,
+                                      direction: currentDirection)) {
+                                final errorMsg = currentDirection == 'going'
+                                    ? t('lineHasGoingSchedule')
+                                    : t('lineHasReturningSchedule');
+                                _showSnackBar(errorMsg, isError: true);
+                                return;
+                              }
+                              setModalState(() => _selectedLineId = val);
+                            },
                             isSmallScreen: isSmallScreen,
                             isMediumScreen: isMediumScreen,
+                          );
+                        },
+                      ),
+                      SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildNumberInput(
+                              label: t('startHour'),
+                              value: _startHour,
+                              onChanged: (val) => _startHour = val,
+                              max: 23,
+                              isSmallScreen: isSmallScreen,
+                              isMediumScreen: isMediumScreen,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                    _buildIntervalDropdown(
-                      label: t('interval'),
-                      value: _intervalMinutes,
-                      onChanged: (val) => setModalState(() => _intervalMinutes = val!),
-                      isSmallScreen: isSmallScreen,
-                      isMediumScreen: isMediumScreen,
-                    ),
-                    SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        t('active'), 
-                        style: TextStyle(
-                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
-                          fontSize: isSmallScreen ? 14.0 : 15.0,
-                        ),
-                      ),
-                      value: _active,
-                      activeColor: Colors.blue.shade600,
-                      onChanged: (val) => setModalState(() => _active = val),
-                    ),
-                    SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        t('autoDepartureEnabled'), 
-                        style: TextStyle(
-                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
-                          fontSize: isSmallScreen ? 14.0 : 15.0,
-                        ),
-                      ),
-                      subtitle: Text(
-                        t('autoDepartureDescription'), 
-                        style: TextStyle(
-                          color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary, 
-                          fontSize: isSmallScreen ? 11.0 : 12.0
-                        ),
-                      ),
-                      value: _autoDepartureEnabled,
-                      activeColor: Colors.blue.shade600,
-                      onChanged: (val) => setModalState(() => _autoDepartureEnabled = val),
-                    ),
-                    SizedBox(height: isSmallScreen ? 6.0 : 8.0),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        t('scheduledDepartureEnforced'), 
-                        style: TextStyle(
-                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
-                          fontSize: isSmallScreen ? 14.0 : 15.0,
-                        ),
-                      ),
-                      subtitle: Text(
-                        t('scheduledDepartureDescription'), 
-                        style: TextStyle(
-                          color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary, 
-                          fontSize: isSmallScreen ? 11.0 : 12.0
-                        ),
-                      ),
-                      value: _scheduledDepartureEnforced,
-                      activeColor: Colors.blue.shade600,
-                      onChanged: (val) => setModalState(() => _scheduledDepartureEnforced = val),
-                    ),
-                    SizedBox(height: isSmallScreen ? 20.0 : 24.0),
-                    SizedBox(
-                      width: double.infinity,
-                      height: isSmallScreen ? 44.0 : (isMediumScreen ? 47.0 : 50.0),
-                      child: ElevatedButton(
-                        onPressed: _handleSave,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.appBarColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
+                          SizedBox(width: isSmallScreen ? 12.0 : 16.0),
+                          Expanded(
+                            child: _buildNumberInput(
+                              label: t('endHour'),
+                              value: _endHour,
+                              onChanged: (val) => _endHour = val,
+                              validator: (val) {
+                                if (val != null && val < _startHour)
+                                  return t('endBeforeStart');
+                                return null;
+                              },
+                              max: 23,
+                              isSmallScreen: isSmallScreen,
+                              isMediumScreen: isMediumScreen,
+                            ),
                           ),
-                          elevation: 2,
-                        ),
-                        child: Text(
-                          t('save'),
+                        ],
+                      ),
+                      SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                      _buildIntervalDropdown(
+                        label: t('interval'),
+                        value: _intervalMinutes,
+                        onChanged: (val) =>
+                            setModalState(() => _intervalMinutes = val!),
+                        isSmallScreen: isSmallScreen,
+                        isMediumScreen: isMediumScreen,
+                      ),
+                      SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          t('active'),
                           style: TextStyle(
-                            fontSize: isSmallScreen ? 14.0 : 16.0, 
-                            fontWeight: FontWeight.bold
+                            color: AppTheme.isDarkMode
+                                ? Colors.white
+                                : AppTheme.textPrimary,
+                            fontSize: isSmallScreen ? 14.0 : 15.0,
+                          ),
+                        ),
+                        value: _active,
+                        activeColor: Colors.blue.shade600,
+                        onChanged: (val) => setModalState(() => _active = val),
+                      ),
+                      SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          t('autoDepartureEnabled'),
+                          style: TextStyle(
+                            color: AppTheme.isDarkMode
+                                ? Colors.white
+                                : AppTheme.textPrimary,
+                            fontSize: isSmallScreen ? 14.0 : 15.0,
+                          ),
+                        ),
+                        subtitle: Text(
+                          t('autoDepartureDescription'),
+                          style: TextStyle(
+                              color: AppTheme.isDarkMode
+                                  ? Colors.white70
+                                  : AppTheme.textSecondary,
+                              fontSize: isSmallScreen ? 11.0 : 12.0),
+                        ),
+                        value: _autoDepartureEnabled,
+                        activeColor: Colors.blue.shade600,
+                        onChanged: (val) =>
+                            setModalState(() => _autoDepartureEnabled = val),
+                      ),
+                      SizedBox(height: isSmallScreen ? 6.0 : 8.0),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          t('scheduledDepartureEnforced'),
+                          style: TextStyle(
+                            color: AppTheme.isDarkMode
+                                ? Colors.white
+                                : AppTheme.textPrimary,
+                            fontSize: isSmallScreen ? 14.0 : 15.0,
+                          ),
+                        ),
+                        subtitle: Text(
+                          t('scheduledDepartureDescription'),
+                          style: TextStyle(
+                              color: AppTheme.isDarkMode
+                                  ? Colors.white70
+                                  : AppTheme.textSecondary,
+                              fontSize: isSmallScreen ? 11.0 : 12.0),
+                        ),
+                        value: _scheduledDepartureEnforced,
+                        activeColor: Colors.blue.shade600,
+                        onChanged: (val) => setModalState(
+                            () => _scheduledDepartureEnforced = val),
+                      ),
+                      SizedBox(height: isSmallScreen ? 20.0 : 24.0),
+                      SizedBox(
+                        width: double.infinity,
+                        height: isSmallScreen
+                            ? 44.0
+                            : (isMediumScreen ? 47.0 : 50.0),
+                        child: ElevatedButton(
+                          onPressed: _handleSave,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.appBarColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                    isSmallScreen ? 10.0 : 12.0)),
+                            elevation: 2,
+                          ),
+                          child: Text(
+                            t('save'),
+                            style: TextStyle(
+                                fontSize: isSmallScreen ? 14.0 : 16.0,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: isSmallScreen ? 20.0 : 24.0),
-                  ],
+                      SizedBox(height: isSmallScreen ? 20.0 : 24.0),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
     );
   }
 
@@ -949,14 +1082,17 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           fontSize: isSmallScreen ? 13.0 : 14.0,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
-        ),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
-          borderSide: BorderSide(color: AppTheme.isDarkMode ? Colors.white12 : AppTheme.borderColor),
+          borderSide: BorderSide(
+              color:
+                  AppTheme.isDarkMode ? Colors.white12 : AppTheme.borderColor),
         ),
         filled: true,
-        fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : AppTheme.backgroundColor,
+        fillColor: AppTheme.isDarkMode
+            ? Colors.white.withOpacity(0.05)
+            : AppTheme.backgroundColor,
         contentPadding: EdgeInsets.symmetric(
           horizontal: isSmallScreen ? 16.0 : 20.0,
           vertical: isSmallScreen ? 12.0 : 16.0,
@@ -990,7 +1126,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       onChanged: onChanged,
       isExpanded: true,
       itemHeight: null, // Allow variable height for card items
-      dropdownColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+      dropdownColor:
+          AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
       borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
       style: TextStyle(
         color: AppTheme.textPrimary,
@@ -1024,7 +1161,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
           borderSide: BorderSide(
-            color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+            color:
+                AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
             width: 2,
           ),
         ),
@@ -1033,9 +1171,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
             ? Colors.white.withOpacity(0.05)
             : Colors.grey.shade100,
         contentPadding: EdgeInsets.symmetric(
-          horizontal: isSmallScreen ? 16.0 : 20.0, 
-          vertical: isSmallScreen ? 12.0 : 16.0
-        ),
+            horizontal: isSmallScreen ? 16.0 : 20.0,
+            vertical: isSmallScreen ? 12.0 : 16.0),
       ),
       validator: (val) => val == null ? t('required') : null,
     );
@@ -1050,7 +1187,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   }) {
     // Ensure value is either 30 or 60, default to 60 if invalid
     final validValue = (value == 30 || value == 60) ? value : 60;
-    
+
     return DropdownButtonFormField<int>(
       value: validValue,
       items: [
@@ -1061,7 +1198,9 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
               Icon(
                 Icons.timer_rounded,
                 size: isSmallScreen ? 18.0 : 20.0,
-                color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+                color: AppTheme.isDarkMode
+                    ? Colors.blueAccent
+                    : AppTheme.appBarColor,
               ),
               SizedBox(width: isSmallScreen ? 10.0 : 12.0),
               Text(
@@ -1081,7 +1220,9 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
               Icon(
                 Icons.timer_rounded,
                 size: isSmallScreen ? 18.0 : 20.0,
-                color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+                color: AppTheme.isDarkMode
+                    ? Colors.blueAccent
+                    : AppTheme.appBarColor,
               ),
               SizedBox(width: isSmallScreen ? 10.0 : 12.0),
               Text(
@@ -1097,7 +1238,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       ],
       onChanged: onChanged,
       isExpanded: true,
-      dropdownColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+      dropdownColor:
+          AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
       borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
       style: TextStyle(
         color: AppTheme.textPrimary,
@@ -1131,7 +1273,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
           borderSide: BorderSide(
-            color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+            color:
+                AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
             width: 2,
           ),
         ),
@@ -1140,9 +1283,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
             ? Colors.white.withOpacity(0.05)
             : Colors.grey.shade100,
         contentPadding: EdgeInsets.symmetric(
-          horizontal: isSmallScreen ? 16.0 : 20.0, 
-          vertical: isSmallScreen ? 12.0 : 16.0
-        ),
+            horizontal: isSmallScreen ? 16.0 : 20.0,
+            vertical: isSmallScreen ? 12.0 : 16.0),
       ),
       validator: (val) => val == null ? t('required') : null,
     );
@@ -1151,12 +1293,13 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
-    
+
     // Responsive design variables
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
-    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
+    final double basePadding =
+        isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
 
     return Directionality(
       textDirection: textDirection,
@@ -1165,7 +1308,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         appBar: _buildAppBar(context),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _openScheduleForm(context),
-          backgroundColor: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+          backgroundColor:
+              AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
           foregroundColor: Colors.white,
           icon: Icon(
             Icons.add,
@@ -1177,25 +1321,30 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           ),
         ),
         body: _isLoading
-            ? Center(child: CircularProgressIndicator(color: AppTheme.appBarColor))
+            ? Center(
+                child: CircularProgressIndicator(color: AppTheme.appBarColor))
             : RefreshIndicator(
                 onRefresh: _loadData,
                 color: AppTheme.appBarColor,
                 child: Column(
                   children: [
-                    _buildSearchBar(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                    _buildSearchBar(
+                        isSmallScreen: isSmallScreen,
+                        isMediumScreen: isMediumScreen),
                     Expanded(
                       child: _filteredSchedules.isEmpty
-                          ? _buildEmptyState(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen)
+                          ? _buildEmptyState(
+                              isSmallScreen: isSmallScreen,
+                              isMediumScreen: isMediumScreen)
                           : ListView.builder(
                               padding: EdgeInsets.fromLTRB(
-                                basePadding, 
-                                basePadding, 
-                                basePadding, 
-                                isSmallScreen ? 70.0 : 80.0
-                              ),
+                                  basePadding,
+                                  basePadding,
+                                  basePadding,
+                                  isSmallScreen ? 70.0 : 80.0),
                               itemCount: _filteredSchedules.length,
-                              itemBuilder: (context, index) => _buildScheduleCard(
+                              itemBuilder: (context, index) =>
+                                  _buildScheduleCard(
                                 _filteredSchedules[index],
                                 isSmallScreen: isSmallScreen,
                                 isMediumScreen: isMediumScreen,
@@ -1213,7 +1362,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
-    
+
     return AppBar(
       backgroundColor: AppTheme.isDarkMode
           ? const Color(0xFF1C2541) // Dark card color for better integration
@@ -1222,7 +1371,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       centerTitle: true,
       leading: IconButton(
         icon: Icon(
-          Icons.arrow_back_ios_new_rounded, 
+          Icons.arrow_back_ios_new_rounded,
           color: Colors.white,
           size: isSmallScreen ? 18.0 : 20.0,
         ),
@@ -1252,7 +1401,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         ),
         PopupMenuButton(
           icon: Icon(
-            Icons.more_vert_rounded, 
+            Icons.more_vert_rounded,
             color: Colors.white,
             size: isSmallScreen ? 20.0 : (isMediumScreen ? 21.0 : 24.0),
           ),
@@ -1262,14 +1411,12 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
               value: 'createAll',
               child: Row(
                 children: [
-                  Icon(
-                    Icons.calendar_today_rounded, 
-                    color: AppTheme.textPrimary, 
-                    size: isSmallScreen ? 18.0 : 20.0
-                  ),
+                  Icon(Icons.calendar_today_rounded,
+                      color: AppTheme.textPrimary,
+                      size: isSmallScreen ? 18.0 : 20.0),
                   SizedBox(width: isSmallScreen ? 10.0 : 12.0),
                   Text(
-                    t('createAllTrips'), 
+                    t('createAllTrips'),
                     style: TextStyle(
                       color: AppTheme.textPrimary,
                       fontSize: isSmallScreen ? 13.0 : 14.0,
@@ -1293,14 +1440,14 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     );
   }
 
-  Widget _buildSearchBar({bool isSmallScreen = false, bool isMediumScreen = false}) {
+  Widget _buildSearchBar(
+      {bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
       margin: EdgeInsets.fromLTRB(
-        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
-        isSmallScreen ? 16.0 : 20.0, 
-        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
-        0
-      ),
+          isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),
+          isSmallScreen ? 16.0 : 20.0,
+          isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),
+          0),
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
         borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 15.0),
@@ -1321,24 +1468,27 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         decoration: InputDecoration(
           hintText: t('search'),
           hintStyle: TextStyle(
-            color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+            color:
+                AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
             fontSize: isSmallScreen ? 14.0 : 16.0,
           ),
           prefixIcon: Icon(
-            Icons.search_rounded, 
-            color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+            Icons.search_rounded,
+            color:
+                AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
             size: isSmallScreen ? 20.0 : 24.0,
           ),
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(
-            horizontal: isSmallScreen ? 16.0 : 20.0, 
-            vertical: isSmallScreen ? 12.0 : 15.0
-          ),
+              horizontal: isSmallScreen ? 16.0 : 20.0,
+              vertical: isSmallScreen ? 12.0 : 15.0),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   icon: Icon(
-                    Icons.close_rounded, 
-                    color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                    Icons.close_rounded,
+                    color: AppTheme.isDarkMode
+                        ? Colors.white70
+                        : AppTheme.textSecondary,
                     size: isSmallScreen ? 20.0 : 24.0,
                   ),
                   onPressed: () {
@@ -1352,7 +1502,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     );
   }
 
-  Widget _buildEmptyState({bool isSmallScreen = false, bool isMediumScreen = false}) {
+  Widget _buildEmptyState(
+      {bool isSmallScreen = false, bool isMediumScreen = false}) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       child: Container(
@@ -1361,25 +1512,28 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.schedule_outlined, 
-              size: isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0), 
-              color: AppTheme.isDarkMode ? Colors.white24 : AppTheme.textSecondary.withOpacity(0.5)
-            ),
+            Icon(Icons.schedule_outlined,
+                size: isSmallScreen ? 60.0 : (isMediumScreen ? 70.0 : 80.0),
+                color: AppTheme.isDarkMode
+                    ? Colors.white24
+                    : AppTheme.textSecondary.withOpacity(0.5)),
             SizedBox(height: isSmallScreen ? 12.0 : 16.0),
             Text(
               t('noSchedules'),
               style: TextStyle(
                 fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
                 fontWeight: FontWeight.bold,
-                color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                color:
+                    AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
               ),
             ),
             SizedBox(height: isSmallScreen ? 6.0 : 8.0),
             Text(
               t('noSchedulesSub'),
               style: TextStyle(
-                color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                color: AppTheme.isDarkMode
+                    ? Colors.white70
+                    : AppTheme.textSecondary,
                 fontSize: isSmallScreen ? 13.0 : 14.0,
               ),
             ),
@@ -1389,11 +1543,9 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     );
   }
 
-  Widget _buildScheduleCard(Map<String, dynamic> schedule, {bool isSmallScreen = false, bool isMediumScreen = false}) {
+  Widget _buildScheduleCard(Map<String, dynamic> schedule,
+      {bool isSmallScreen = false, bool isMediumScreen = false}) {
     final line = schedule['line'] as Map<String, dynamic>?;
-    final lineName = _isArabic
-        ? (line?['name_ar'] ?? line?['linename'] ?? line?['name_en'] ?? 'Unknown')
-        : (line?['name_en'] ?? line?['linename'] ?? line?['name_ar'] ?? 'Unknown');
     final startHour = schedule['start_hour'] ?? 0;
     final endHour = schedule['end_hour'] ?? 23;
     final interval = schedule['interval_minutes'] ?? 60;
@@ -1415,7 +1567,9 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           ),
         ],
         border: Border.all(
-          color: active ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+          color: active
+              ? Colors.green.withOpacity(0.3)
+              : Colors.red.withOpacity(0.3),
           width: 1,
         ),
       ),
@@ -1424,7 +1578,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         child: Material(
           color: Colors.transparent,
           child: Padding(
-            padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
+            padding: EdgeInsets.all(
+                isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1434,16 +1589,24 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                       padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
                       decoration: BoxDecoration(
                         color: active
-                            ? (isDark ? Colors.greenAccent.withOpacity(0.1) : Colors.green.shade50)
-                            : (isDark ? Colors.redAccent.withOpacity(0.1) : Colors.red.shade50),
+                            ? (isDark
+                                ? Colors.greenAccent.withOpacity(0.1)
+                                : Colors.green.shade50)
+                            : (isDark
+                                ? Colors.redAccent.withOpacity(0.1)
+                                : Colors.red.shade50),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.schedule_rounded,
                         color: active
-                            ? (isDark ? Colors.greenAccent : Colors.green.shade700)
+                            ? (isDark
+                                ? Colors.greenAccent
+                                : Colors.green.shade700)
                             : (isDark ? Colors.redAccent : Colors.red.shade700),
-                        size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
+                        size: isSmallScreen
+                            ? 20.0
+                            : (isMediumScreen ? 22.0 : 24.0),
                       ),
                     ),
                     SizedBox(width: isSmallScreen ? 10.0 : 12.0),
@@ -1452,70 +1615,45 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            lineName.toString(),
+                            _getDirectionLabel(direction, line),
                             style: TextStyle(
-                              color: isDark ? Colors.white : AppTheme.textPrimary,
-                              fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
+                              color:
+                                  isDark ? Colors.white : AppTheme.textPrimary,
+                              fontSize: isSmallScreen
+                                  ? 16.0
+                                  : (isMediumScreen ? 17.0 : 18.0),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                           Container(
                             padding: EdgeInsets.symmetric(
-                              horizontal: isSmallScreen ? 6.0 : 8.0, 
-                              vertical: isSmallScreen ? 1.0 : 2.0
-                            ),
+                                horizontal: isSmallScreen ? 6.0 : 8.0,
+                                vertical: isSmallScreen ? 1.0 : 2.0),
                             decoration: BoxDecoration(
                               color: active
-                                  ? (isDark ? Colors.greenAccent.withOpacity(0.1) : Colors.green.shade100)
-                                  : (isDark ? Colors.redAccent.withOpacity(0.1) : Colors.red.shade100),
-                              borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
+                                  ? (isDark
+                                      ? Colors.greenAccent.withOpacity(0.1)
+                                      : Colors.green.shade100)
+                                  : (isDark
+                                      ? Colors.redAccent.withOpacity(0.1)
+                                      : Colors.red.shade100),
+                              borderRadius: BorderRadius.circular(
+                                  isSmallScreen ? 6.0 : 8.0),
                             ),
                             child: Text(
                               active ? t('active') : t('inactive'),
                               style: TextStyle(
                                 color: active
-                                    ? (isDark ? Colors.greenAccent : Colors.green.shade800)
-                                    : (isDark ? Colors.redAccent : Colors.red.shade800),
+                                    ? (isDark
+                                        ? Colors.greenAccent
+                                        : Colors.green.shade800)
+                                    : (isDark
+                                        ? Colors.redAccent
+                                        : Colors.red.shade800),
                                 fontSize: isSmallScreen ? 10.0 : 11.0,
                                 fontWeight: FontWeight.bold,
                               ),
-                            ),
-                          ),
-                          SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isSmallScreen ? 6.0 : 8.0, 
-                              vertical: isSmallScreen ? 1.0 : 2.0
-                            ),
-                            decoration: BoxDecoration(
-                              color: direction == 'going'
-                                  ? (isDark ? Colors.blueAccent.withOpacity(0.1) : Colors.blue.shade100)
-                                  : (isDark ? Colors.orangeAccent.withOpacity(0.1) : Colors.orange.shade100),
-                              borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  direction == 'going' ? Icons.arrow_forward_ios : Icons.arrow_back_ios,
-                                  size: isSmallScreen ? 10.0 : 11.0,
-                                  color: direction == 'going'
-                                      ? (isDark ? Colors.blueAccent : Colors.blue.shade800)
-                                      : (isDark ? Colors.orangeAccent : Colors.orange.shade800),
-                                ),
-                                SizedBox(width: isSmallScreen ? 2.0 : 4.0),
-                                Text(
-                                  direction == 'going' ? t('going') : t('return'),
-                                  style: TextStyle(
-                                    color: direction == 'going'
-                                        ? (isDark ? Colors.blueAccent : Colors.blue.shade800)
-                                        : (isDark ? Colors.orangeAccent : Colors.orange.shade800),
-                                    fontSize: isSmallScreen ? 10.0 : 11.0,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
                         ],
@@ -1524,29 +1662,32 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                   ],
                 ),
                 SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                Divider(color: isDark ? Colors.white12 : AppTheme.borderColor.withOpacity(0.5)),
+                Divider(
+                    color: isDark
+                        ? Colors.white12
+                        : AppTheme.borderColor.withOpacity(0.5)),
                 SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                 Row(
                   children: [
                     _buildInfoItem(
-                      Icons.start_rounded, 
-                      t('startHour'), 
+                      Icons.start_rounded,
+                      t('startHour'),
                       '$startHour:00',
                       isDark,
                       isSmallScreen: isSmallScreen,
                       isMediumScreen: isMediumScreen,
                     ),
                     _buildInfoItem(
-                      Icons.last_page_rounded, 
-                      t('endHour'), 
+                      Icons.last_page_rounded,
+                      t('endHour'),
                       '$endHour:00',
                       isDark,
                       isSmallScreen: isSmallScreen,
                       isMediumScreen: isMediumScreen,
                     ),
                     _buildInfoItem(
-                      Icons.timer_rounded, 
-                      t('interval'), 
+                      Icons.timer_rounded,
+                      t('interval'),
                       '$interval ${t('minutes')}',
                       isDark,
                       isSmallScreen: isSmallScreen,
@@ -1555,7 +1696,10 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                   ],
                 ),
                 SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                Divider(color: isDark ? Colors.white12 : AppTheme.borderColor.withOpacity(0.5)),
+                Divider(
+                    color: isDark
+                        ? Colors.white12
+                        : AppTheme.borderColor.withOpacity(0.5)),
                 SizedBox(height: isSmallScreen ? 6.0 : 8.0),
                 Row(
                   children: [
@@ -1564,25 +1708,29 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                         onPressed: () => _handleCreateTrips(templateid),
                         icon: Icon(
                           Icons.add_task_rounded,
-                          color: isDark ? Colors.blueAccent : AppTheme.appBarColor,
+                          color:
+                              isDark ? Colors.blueAccent : AppTheme.appBarColor,
                           size: isSmallScreen ? 18.0 : 20.0,
                         ),
                         label: Text(
                           t('createTrips'),
                           style: TextStyle(
-                            color: isDark ? Colors.blueAccent : AppTheme.appBarColor,
+                            color: isDark
+                                ? Colors.blueAccent
+                                : AppTheme.appBarColor,
                             fontWeight: FontWeight.bold,
                             fontSize: isSmallScreen ? 12.0 : 13.0,
                           ),
                         ),
                         style: TextButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 12.0),
-                          backgroundColor: isDark 
-                              ? Colors.blueAccent.withOpacity(0.1) 
+                          padding: EdgeInsets.symmetric(
+                              vertical: isSmallScreen ? 10.0 : 12.0),
+                          backgroundColor: isDark
+                              ? Colors.blueAccent.withOpacity(0.1)
                               : AppTheme.appBarColor.withOpacity(0.05),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0)
-                          ),
+                              borderRadius: BorderRadius.circular(
+                                  isSmallScreen ? 6.0 : 8.0)),
                         ),
                       ),
                     ),
@@ -1592,7 +1740,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                       color: Colors.blueAccent,
                       isSmallScreen: isSmallScreen,
                       isMediumScreen: isMediumScreen,
-                      onTap: () => _openScheduleForm(context, schedule: schedule),
+                      onTap: () =>
+                          _openScheduleForm(context, schedule: schedule),
                     ),
                     SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                     _buildActionButton(
@@ -1612,15 +1761,14 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     );
   }
 
-  Widget _buildInfoItem(IconData icon, String label, String value, bool isDark, {bool isSmallScreen = false, bool isMediumScreen = false}) {
+  Widget _buildInfoItem(IconData icon, String label, String value, bool isDark,
+      {bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Expanded(
       child: Column(
         children: [
-          Icon(
-            icon, 
-            size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0), 
-            color: isDark ? Colors.blueAccent : AppTheme.textSecondary
-          ),
+          Icon(icon,
+              size: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
+              color: isDark ? Colors.blueAccent : AppTheme.textSecondary),
           SizedBox(height: isSmallScreen ? 4.0 : 6.0),
           Text(
             value,
@@ -1634,7 +1782,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           Text(
             label,
             style: TextStyle(
-              color: isDark ? Colors.white70 : AppTheme.textSecondary, 
+              color: isDark ? Colors.white70 : AppTheme.textSecondary,
               fontSize: isSmallScreen ? 10.0 : 11.0,
             ),
             textAlign: TextAlign.center,
@@ -1652,7 +1800,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     bool isMediumScreen = false,
   }) {
     return Material(
-      color: AppTheme.isDarkMode ? color.withOpacity(0.2) : color.withOpacity(0.1),
+      color:
+          AppTheme.isDarkMode ? color.withOpacity(0.2) : color.withOpacity(0.1),
       borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
       child: InkWell(
         onTap: onTap,

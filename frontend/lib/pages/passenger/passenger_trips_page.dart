@@ -192,6 +192,67 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     }
   }
 
+  // Get direction label with station names from line name
+  // Line name format: "station1-station2" (e.g., "nablus-beit iba")
+  String _getDirectionLabel(String? direction, Map<String, dynamic>? line) {
+    // Handle null or empty direction
+    final dir = direction ?? 'going';
+
+    if (line == null || line.isEmpty) {
+      // Fallback to default labels if line not available
+      return dir == 'going' ? t('going') : t('return');
+    }
+
+    // Get line name (prefer name_ar for Arabic, name_en for English, fallback to linename)
+    String? lineName;
+    if (_isArabic) {
+      lineName = line['name_ar']?.toString() ??
+          line['linename']?.toString() ??
+          line['name_en']?.toString();
+    } else {
+      lineName = line['name_en']?.toString() ??
+          line['linename']?.toString() ??
+          line['name_ar']?.toString();
+    }
+
+    if (lineName == null || lineName.isEmpty) {
+      // Fallback to default labels if line name not available
+      return direction == 'going' ? t('going') : t('return');
+    }
+
+    // Split line name by "-" to get station names
+    final parts = lineName
+        .split('-')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    if (parts.length < 2) {
+      // If line name doesn't have "-" separator, fallback to default labels
+      return direction == 'going' ? t('going') : t('return');
+    }
+
+    // First part is the first station, second part is the second station
+    final firstStation = parts[0];
+    final secondStation = parts[1];
+
+    String fromStation, toStation;
+    if (dir == 'going') {
+      // Going: From first station to second station
+      fromStation = firstStation;
+      toStation = secondStation;
+    } else {
+      // Returning: From second station to first station
+      fromStation = secondStation;
+      toStation = firstStation;
+    }
+
+    // Format: "From [station1] to [station2]"
+    return _isArabic
+        ? 'من $fromStation إلى $toStation'
+        : 'From $fromStation to $toStation';
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
@@ -838,17 +899,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
   Widget _buildTripCard(Map<String, dynamic> trip, bool isSmallScreen,
       bool isMediumScreen, bool isWeb) {
     final line = trip['line'] as Map<String, dynamic>? ?? {};
-    final lineName = _isArabic
-        ? (line['name_ar']?.toString() ??
-            line['linename']?.toString() ??
-            line['name_en']?.toString() ??
-            '')
-        : (line['name_en']?.toString() ??
-            line['linename']?.toString() ??
-            line['name_ar']?.toString() ??
-            '');
     final deptime = trip['deptime']?.toString() ?? '';
-    final availableseats = trip['availableseats'] ?? 0;
     final baseprice = line['baseprice'] ?? 0.0;
     final tripid = trip['tripid']?.toString() ?? '';
     final status = trip['status']?.toString() ?? '';
@@ -972,7 +1023,9 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                             SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                             Expanded(
                               child: Text(
-                                lineName,
+                                _getDirectionLabel(
+                                    trip['direction']?.toString(),
+                                    line.isNotEmpty ? line : null),
                                 style: TextStyle(
                                   color: textPrimary,
                                   fontSize: isSmallScreen
@@ -983,41 +1036,6 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                                 ),
                               ),
                             ),
-                            if (trip['direction'] != null)
-                              Container(
-                                margin: EdgeInsets.only(
-                                    left: isSmallScreen ? 6.0 : 8.0),
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: isSmallScreen ? 6.0 : 8.0,
-                                  vertical: isSmallScreen ? 3.0 : 4.0,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: (trip['direction'] == 'going'
-                                          ? Colors.blue
-                                          : Colors.purple)
-                                      .withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(
-                                      isSmallScreen ? 6.0 : 8.0),
-                                  border: Border.all(
-                                    color: trip['direction'] == 'going'
-                                        ? Colors.blue
-                                        : Colors.purple,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Text(
-                                  trip['direction'] == 'going'
-                                      ? t('going')
-                                      : t('return'),
-                                  style: TextStyle(
-                                    color: trip['direction'] == 'going'
-                                        ? Colors.blue
-                                        : Colors.purple,
-                                    fontSize: isSmallScreen ? 9.0 : 10.0,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -1301,44 +1319,104 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
   }
 
   Widget _buildDirectionFilter(Color textPrimary) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _isDarkMode
-            ? const Color(0xFF1E3A5F).withAlpha(77)
-            : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _isDarkMode ? const Color(0xFF2C5F8D) : Colors.grey.shade300,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.swap_horiz, color: textPrimary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _selectedDirection == null
-                  ? t('filterByDirection')
-                  : (_selectedDirection == 'going' ? t('going') : t('return')),
-              style: TextStyle(
-                color: textPrimary,
-                fontWeight: FontWeight.w500,
-              ),
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(t('filterByDirection')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: Text(t('allDirections')),
+                  leading: Radio<String?>(
+                    value: null,
+                    groupValue: _selectedDirection,
+                    onChanged: (value) {
+                      Navigator.pop(context);
+                      setState(() {
+                        _selectedDirection = value;
+                      });
+                      _loadTrips();
+                    },
+                  ),
+                ),
+                ListTile(
+                  title: Text(t('going')),
+                  leading: Radio<String?>(
+                    value: 'going',
+                    groupValue: _selectedDirection,
+                    onChanged: (value) {
+                      Navigator.pop(context);
+                      setState(() {
+                        _selectedDirection = value;
+                      });
+                      _loadTrips();
+                    },
+                  ),
+                ),
+                ListTile(
+                  title: Text(t('return')),
+                  leading: Radio<String?>(
+                    value: 'return',
+                    groupValue: _selectedDirection,
+                    onChanged: (value) {
+                      Navigator.pop(context);
+                      setState(() {
+                        _selectedDirection = value;
+                      });
+                      _loadTrips();
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
-          if (_selectedDirection != null)
-            IconButton(
-              icon: const Icon(Icons.clear, size: 20),
-              color: textPrimary,
-              onPressed: () {
-                setState(() {
-                  _selectedDirection = null;
-                });
-                _loadTrips();
-              },
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _isDarkMode
+              ? const Color(0xFF1E3A5F).withAlpha(77)
+              : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _isDarkMode ? const Color(0xFF2C5F8D) : Colors.grey.shade300,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.swap_horiz, color: textPrimary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _selectedDirection == null
+                    ? t('filterByDirection')
+                    : (_selectedDirection == 'going'
+                        ? t('going')
+                        : t('return')),
+                style: TextStyle(
+                  color: textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
-        ],
+            if (_selectedDirection != null)
+              IconButton(
+                icon: const Icon(Icons.clear, size: 20),
+                color: textPrimary,
+                onPressed: () {
+                  setState(() {
+                    _selectedDirection = null;
+                  });
+                  _loadTrips();
+                },
+              ),
+            Icon(Icons.arrow_drop_down, color: textPrimary),
+          ],
+        ),
       ),
     );
   }

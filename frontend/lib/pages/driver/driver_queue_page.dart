@@ -141,8 +141,13 @@ class DriverQueuePageState extends State<DriverQueuePage> {
       _error = null;
     });
 
-    // Get current direction from queue data if available, otherwise use selected direction
-    final direction = _queueData?['direction']?.toString() ?? _selectedDirection;
+    // If driver is in queue, use their current direction from queue data
+    // Otherwise, use the selected direction
+    final isInQueue = _queueData?['currentEntry'] != null;
+    final direction = isInQueue 
+        ? (_queueData?['currentDirection']?.toString() ?? _queueData?['direction']?.toString() ?? _selectedDirection)
+        : _selectedDirection;
+    
     final result = await ApiService.fetchDriverQueue(direction: direction);
     if (!mounted) return;
 
@@ -150,9 +155,12 @@ class DriverQueuePageState extends State<DriverQueuePage> {
       _isLoading = false;
       if (result['success'] == true) {
         _queueData = result;
-        // Update selected direction from response if available
-        if (result['direction'] != null) {
+        // Update selected direction from response when not in queue
+        // When in queue, the direction is already fixed
+        if (!isInQueue && result['direction'] != null) {
           _selectedDirection = result['direction'].toString();
+        } else if (isInQueue && result['currentDirection'] != null) {
+          _selectedDirection = result['currentDirection'].toString();
         }
       } else {
         _error = result['message']?.toString() ?? 'Failed to load queue';
@@ -212,6 +220,58 @@ class DriverQueuePageState extends State<DriverQueuePage> {
 
   bool get _isInQueue => _queueData?['currentEntry'] != null;
 
+  // Get direction label with station names from line name
+  // Line name format: "station1-station2" (e.g., "nablus-beit iba")
+  String _getDirectionLabel(String direction) {
+    final line = _queueData?['line'] as Map<String, dynamic>?;
+    
+    if (line == null) {
+      // Fallback to default labels if line not available
+      return direction == 'going' ? t('going') : t('returning');
+    }
+
+    // Get line name (prefer name_ar for Arabic, name_en for English, fallback to linename)
+    String? lineName;
+    if (_isArabic) {
+      lineName = line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString();
+    } else {
+      lineName = line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString();
+    }
+
+    if (lineName == null || lineName.isEmpty) {
+      // Fallback to default labels if line name not available
+      return direction == 'going' ? t('going') : t('returning');
+    }
+
+    // Split line name by "-" to get station names
+    final parts = lineName.split('-').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    
+    if (parts.length < 2) {
+      // If line name doesn't have "-" separator, fallback to default labels
+      return direction == 'going' ? t('going') : t('returning');
+    }
+
+    // First part is the first station, second part is the second station
+    final firstStation = parts[0];
+    final secondStation = parts[1];
+
+    String fromStation, toStation;
+    if (direction == 'going') {
+      // Going: From first station to second station
+      fromStation = firstStation;
+      toStation = secondStation;
+    } else {
+      // Returning: From second station to first station
+      fromStation = secondStation;
+      toStation = firstStation;
+    }
+
+    // Format: "From [station1] to [station2]"
+    return _isArabic 
+        ? 'من $fromStation إلى $toStation'
+        : 'From $fromStation to $toStation';
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
@@ -221,8 +281,6 @@ class DriverQueuePageState extends State<DriverQueuePage> {
     
     // Web-specific responsive breakpoints
     final isWeb = kIsWeb;
-    final isDesktop = isWeb && screenWidth >= 1200;
-    final isTablet = screenWidth >= 600 && screenWidth < 1200;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
     
@@ -406,6 +464,17 @@ class DriverQueuePageState extends State<DriverQueuePage> {
   Widget _buildQueueContent({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final queue = (_queueData?['queue'] as List?) ?? [];
     
+    // Filter queue by direction when not in queue
+    // This ensures only drivers in the selected direction are shown
+    List<dynamic> filteredQueue = queue;
+    if (!_isInQueue) {
+      final currentDirection = _queueData?['direction']?.toString() ?? _selectedDirection;
+      filteredQueue = queue.where((entry) {
+        final entryDirection = (entry as Map<String, dynamic>)['direction']?.toString();
+        return entryDirection == currentDirection;
+      }).toList();
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -413,7 +482,7 @@ class DriverQueuePageState extends State<DriverQueuePage> {
           _buildLineCard(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
           SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
         ],
-        _buildStatsRow(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+        _buildStatsRow(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen, filteredQueue: filteredQueue),
         SizedBox(height: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 24.0)),
         if (!_isInQueue) _buildDirectionSelector(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
         if (!_isInQueue) SizedBox(height: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
@@ -436,7 +505,7 @@ class DriverQueuePageState extends State<DriverQueuePage> {
             ),
           ),
         
-        _buildQueueList(queue, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+        _buildQueueList(filteredQueue, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
       ],
     );
   }
@@ -495,6 +564,7 @@ class DriverQueuePageState extends State<DriverQueuePage> {
           Row(
             children: [
               Expanded(
+                flex: 2,
                 child: Text(
                   lineName,
                   style: TextStyle(
@@ -505,27 +575,37 @@ class DriverQueuePageState extends State<DriverQueuePage> {
                   ),
                 ),
               ),
-              if (_queueData?['direction'] != null || _isInQueue)
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isSmallScreen ? 8.0 : 10.0,
-                    vertical: isSmallScreen ? 4.0 : 6.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
-                  ),
-                  child: Text(
-                    (_queueData?['direction']?.toString() ?? _selectedDirection) == 'going'
-                        ? t('going')
-                        : t('returning'),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
-                      fontWeight: FontWeight.bold,
+              if (_queueData?['direction'] != null || _isInQueue) ...[
+                SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                Flexible(
+                  flex: 3,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 6.0 : 8.0,
+                      vertical: isSmallScreen ? 4.0 : 6.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
+                    ),
+                    child: Text(
+                      _getDirectionLabel(
+                        _queueData?['direction']?.toString() ?? 
+                         _queueData?['currentDirection']?.toString() ?? 
+                         _selectedDirection
+                      ),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isSmallScreen ? 9.0 : (isMediumScreen ? 10.0 : 11.0),
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),
+              ],
             ],
           ),
         ],
@@ -533,9 +613,39 @@ class DriverQueuePageState extends State<DriverQueuePage> {
     );
   }
 
-  Widget _buildStatsRow({bool isSmallScreen = false, bool isMediumScreen = false}) {
-    final ahead = (_queueData?['aheadCount'] as num?)?.toInt() ?? 0;
-    final behind = (_queueData?['behindCount'] as num?)?.toInt() ?? 0;
+  Widget _buildStatsRow({bool isSmallScreen = false, bool isMediumScreen = false, List<dynamic>? filteredQueue}) {
+    // Calculate ahead and behind counts from filtered queue
+    int ahead = 0;
+    int behind = 0;
+    
+    if (_isInQueue) {
+      // Use backend counts when in queue (they're already correct)
+      ahead = (_queueData?['aheadCount'] as num?)?.toInt() ?? 0;
+      behind = (_queueData?['behindCount'] as num?)?.toInt() ?? 0;
+    } else if (filteredQueue != null) {
+      // Calculate counts from filtered queue when not in queue
+      final currentEntry = _queueData?['currentEntry'] as Map<String, dynamic>?;
+      if (currentEntry != null) {
+        final currentIndex = filteredQueue.indexWhere((entry) {
+          final entryMap = entry as Map<String, dynamic>;
+          return entryMap['queueid'] == currentEntry['queueid'];
+        });
+        if (currentIndex >= 0) {
+          ahead = currentIndex;
+          behind = filteredQueue.length - currentIndex - 1;
+        } else {
+          ahead = filteredQueue.length;
+          behind = 0;
+        }
+      } else {
+        ahead = filteredQueue.length;
+        behind = 0;
+      }
+    } else {
+      // Fallback to backend counts
+      ahead = (_queueData?['aheadCount'] as num?)?.toInt() ?? 0;
+      behind = (_queueData?['behindCount'] as num?)?.toInt() ?? 0;
+    }
 
     return Row(
       children: [
@@ -845,30 +955,38 @@ class DriverQueuePageState extends State<DriverQueuePage> {
                         width: _selectedDirection == 'going' ? 2 : 1,
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.arrow_forward,
-                          color: _selectedDirection == 'going'
-                              ? selectedColor
-                              : textColor.withOpacity(0.7),
-                          size: isSmallScreen ? 18.0 : 20.0,
-                        ),
-                        SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-                        Text(
-                          t('going'),
-                          style: TextStyle(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 4.0 : 6.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.arrow_forward,
                             color: _selectedDirection == 'going'
                                 ? selectedColor
-                                : textColor,
-                            fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0),
-                            fontWeight: _selectedDirection == 'going'
-                                ? FontWeight.bold
-                                : FontWeight.w500,
+                                : textColor.withOpacity(0.7),
+                            size: isSmallScreen ? 16.0 : 18.0,
                           ),
-                        ),
-                      ],
+                          SizedBox(width: isSmallScreen ? 4.0 : 6.0),
+                          Expanded(
+                            child: Text(
+                              _getDirectionLabel('going'),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: _selectedDirection == 'going'
+                                    ? selectedColor
+                                    : textColor,
+                                fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                                fontWeight: _selectedDirection == 'going'
+                                    ? FontWeight.bold
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -899,30 +1017,38 @@ class DriverQueuePageState extends State<DriverQueuePage> {
                         width: _selectedDirection == 'returning' ? 2 : 1,
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.arrow_back,
-                          color: _selectedDirection == 'returning'
-                              ? selectedColor
-                              : textColor.withOpacity(0.7),
-                          size: isSmallScreen ? 18.0 : 20.0,
-                        ),
-                        SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-                        Text(
-                          t('returning'),
-                          style: TextStyle(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 4.0 : 6.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.arrow_back,
                             color: _selectedDirection == 'returning'
                                 ? selectedColor
-                                : textColor,
-                            fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0),
-                            fontWeight: _selectedDirection == 'returning'
-                                ? FontWeight.bold
-                                : FontWeight.w500,
+                                : textColor.withOpacity(0.7),
+                            size: isSmallScreen ? 16.0 : 18.0,
                           ),
-                        ),
-                      ],
+                          SizedBox(width: isSmallScreen ? 4.0 : 6.0),
+                          Expanded(
+                            child: Text(
+                              _getDirectionLabel('returning'),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: _selectedDirection == 'returning'
+                                    ? selectedColor
+                                    : textColor,
+                                fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                                fontWeight: _selectedDirection == 'returning'
+                                    ? FontWeight.bold
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

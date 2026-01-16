@@ -77,16 +77,36 @@ export const getDriverQueue = async (req, res, next) => {
       });
     }
 
+    // Get station information for the line
+    const BaseStation = (await import('../models/BaseStation.js')).default;
+    const mainStation = line.main_stationid ? await BaseStation.findById(line.main_stationid) : null;
+    const returnStation = line.return_stationid ? await BaseStation.findById(line.return_stationid) : null;
+
     // Get current queue entry to determine direction
     const currentEntry = await DriverQueue.findActiveByDriver(driverRecord.driverid);
-    const direction = currentEntry?.direction || null;
+    const driverDirection = currentEntry?.direction || null;
 
-    // Get queue for current direction if driver is in queue, otherwise get both
+    // Get direction from query parameter if driver is not in queue
+    // If driver is in queue, always use their current direction (ignore requested direction)
+    const requestedDirection = req.query.direction;
+    const direction = driverDirection || requestedDirection || null;
+
+    // Validate direction if provided
+    if (direction && direction !== 'going' && direction !== 'returning') {
+      return res.status(400).json({
+        message: req.t('driver.invalid_direction') || 'Invalid direction. Must be "going" or "returning"',
+      });
+    }
+
+    // Get queue for the specified direction
+    // When driver is in queue, only show drivers in their direction
+    // When driver is not in queue, show drivers in the requested direction (or both if none requested)
     let queue = [];
     if (direction) {
+      // Filter by direction: either driver's current direction or requested direction
       queue = await DriverQueue.getActiveByLine(driverRecord.lineid, direction);
     } else {
-      // If not in queue, return both directions for display
+      // If no direction specified and driver not in queue, return both directions for display
       const goingQueue = await DriverQueue.getActiveByLine(driverRecord.lineid, 'going');
       const returningQueue = await DriverQueue.getActiveByLine(driverRecord.lineid, 'returning');
       queue = [...goingQueue, ...returningQueue];
@@ -96,7 +116,10 @@ export const getDriverQueue = async (req, res, next) => {
 
     res.json({
       line: line,
-      currentDirection: direction,
+      direction: direction, // Send back the direction used for filtering
+      currentDirection: driverDirection,
+      mainStation: mainStation,
+      returnStation: returnStation,
       ...response,
     });
   } catch (error) {

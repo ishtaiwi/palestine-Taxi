@@ -30,6 +30,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
   bool _autoDepartureEnabled = false;
   bool _scheduledDepartureEnforced = false;
   String? _editingTemplateId;
+  String _selectedDirection = 'going'; // 'going' or 'return'
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -83,6 +84,14 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'duplicateSchedule': 'جدول موجود بالفعل لهذا الخط',
       'allLinesHaveSchedules': 'جميع الخطوط لديها جداول بالفعل',
       'hasTrips': 'لا يمكن حذف الجدول. يوجد رحلات مرتبطة بهذا الجدول',
+      'direction': 'الاتجاه',
+      'going': 'ذهاب',
+      'return': 'عودة',
+      'selectDirection': 'اختر الاتجاه',
+      'goingSchedule': 'جدول الذهاب',
+      'returningSchedule': 'جدول العودة',
+      'lineHasGoingSchedule': 'هذا الخط لديه جدول ذهاب بالفعل',
+      'lineHasReturningSchedule': 'هذا الخط لديه جدول عودة بالفعل',
     },
     'en': {
       'title': 'Daily Schedules',
@@ -135,6 +144,14 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       'duplicateSchedule': 'A schedule already exists for this line',
       'allLinesHaveSchedules': 'All lines already have schedules',
       'hasTrips': 'Cannot delete schedule. There are trips associated with this schedule',
+      'direction': 'Direction',
+      'going': 'Going',
+      'return': 'Return',
+      'selectDirection': 'Select Direction',
+      'goingSchedule': 'Going Schedule',
+      'returningSchedule': 'Returning Schedule',
+      'lineHasGoingSchedule': 'This line already has a going schedule',
+      'lineHasReturningSchedule': 'This line already has a returning schedule',
     },
   };
 
@@ -210,18 +227,35 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     return _lines;
   }
 
-  bool _lineHasSchedule(String? lineId) {
+  bool _lineHasSchedule(String? lineId, {String? direction}) {
     if (lineId == null) return false;
-    // When editing, don't consider the current schedule as blocking
-    if (_editingTemplateId != null) {
-      final currentSchedule = _schedules.firstWhere(
-        (s) => s['templateid']?.toString() == _editingTemplateId,
-        orElse: () => {},
-      );
-      final currentLineId = currentSchedule['lineid']?.toString();
-      if (currentLineId == lineId) return false;
+    
+    // Use the explicitly passed direction, or fall back to selected direction
+    final checkDirection = (direction ?? _selectedDirection).toLowerCase().trim();
+    
+    for (final s in _schedules) {
+      final scheduleLineId = s['lineid']?.toString() ?? 
+                            ((s['line'] is Map<String, dynamic>) ? (s['line'] as Map<String, dynamic>)['lineid']?.toString() : null);
+      final scheduleDirection = (s['direction']?.toString() ?? 'going').toLowerCase().trim();
+      final isActive = s['active'] ?? true;
+      
+      // Skip if editing this schedule
+      if (_editingTemplateId != null && s['templateid']?.toString() == _editingTemplateId) {
+        continue;
+      }
+      
+      // Skip inactive schedules
+      if (!isActive) {
+        continue;
+      }
+      
+      // Check if this schedule matches the line and direction
+      if (scheduleLineId == lineId && scheduleDirection == checkDirection) {
+        return true;
+      }
     }
-    return _schedules.any((s) => s['lineid']?.toString() == lineId);
+    
+    return false;
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
@@ -243,9 +277,12 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
       return;
     }
 
-    // Check if line already has a schedule (only when creating new schedule)
-    if (_editingTemplateId == null && _lineHasSchedule(_selectedLineId)) {
-      _showSnackBar(t('duplicateSchedule'), isError: true);
+    // Check if line already has a schedule for the selected direction (only when creating new schedule)
+    if (_editingTemplateId == null && _lineHasSchedule(_selectedLineId, direction: _selectedDirection)) {
+      final errorMsg = _selectedDirection == 'going' 
+        ? t('lineHasGoingSchedule')
+        : t('lineHasReturningSchedule');
+      _showSnackBar(errorMsg, isError: true);
       return;
     }
 
@@ -273,6 +310,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           active: _active,
           autoDepartureEnabled: _autoDepartureEnabled,
           scheduledDepartureEnforced: _scheduledDepartureEnforced,
+          direction: _selectedDirection,
         );
       }
 
@@ -424,6 +462,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         _active = schedule['active'] ?? true;
         _autoDepartureEnabled = schedule['auto_departure_enabled'] ?? false;
         _scheduledDepartureEnforced = schedule['scheduled_departure_enforced'] ?? false;
+        _selectedDirection = schedule['direction']?.toString() ?? 'going';
       });
     } else {
       setState(() {
@@ -435,6 +474,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
         _active = true;
         _autoDepartureEnabled = false;
         _scheduledDepartureEnforced = false;
+        _selectedDirection = 'going';
       });
     }
 
@@ -447,18 +487,19 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           top: Radius.circular(isSmallScreen ? 20.0 : 24.0)
         ),
       ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),
-          right: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),
-          top: isSmallScreen ? 20.0 : 24.0,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+      builder: (bottomSheetContext) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),
+            right: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0),
+            top: isSmallScreen ? 20.0 : 24.0,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -506,8 +547,8 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                             Expanded(
                               child: Text(
                                 _isArabic
-                                    ? 'الخطوط التي لديها جدول بالفعل معطلة ولا يمكن اختيارها'
-                                    : 'Lines with existing schedules are disabled and cannot be selected',
+                                    ? 'الخطوط التي لديها جدول للاتجاه المحدد معطلة ولا يمكن اختيارها'
+                                    : 'Lines with existing schedules for the selected direction are disabled',
                                 style: TextStyle(
                                   color: AppTheme.isDarkMode ? Colors.blueAccent : Colors.blue.shade800,
                                   fontSize: isSmallScreen ? 12.0 : 13.0,
@@ -517,130 +558,243 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                           ],
                         ),
                       ),
-                    _buildDropdown(
-                      label: t('line'),
-                      value: _selectedLineId,
-                      items: _getAvailableLines().map((line) {
-                        final lineId = line['lineid']?.toString();
-                        final name = _isArabic
-                            ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? 'Unknown')
-                            : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? 'Unknown');
-                        final isDisabled = _editingTemplateId == null && _lineHasSchedule(lineId);
-                        return DropdownMenuItem<String>(
-                          value: lineId,
-                          enabled: !isDisabled,
-                          child: Container(
-                            width: double.infinity,
-                            margin: EdgeInsets.symmetric(vertical: isSmallScreen ? 3.0 : 4.0),
-                            padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
-                            decoration: BoxDecoration(
-                              color: isDisabled
-                                  ? (AppTheme.isDarkMode
-                                      ? Colors.white.withOpacity(0.02)
-                                      : Colors.grey.shade100)
-                                  : (AppTheme.isDarkMode
-                                      ? Colors.white.withOpacity(0.05)
-                                      : Colors.grey.shade50),
-                              borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
-                              border: Border.all(
-                                color: isDisabled
-                                    ? (AppTheme.isDarkMode
-                                        ? Colors.white.withOpacity(0.05)
-                                        : Colors.grey.shade300)
-                                    : (AppTheme.isDarkMode
-                                        ? Colors.white.withOpacity(0.1)
-                                        : Colors.grey.shade200),
-                              ),
-                            ),
+                    // Direction selector (only for creating new schedules, disabled when editing)
+                    if (_editingTemplateId == null)
+                      _buildDropdown(
+                        label: t('direction'),
+                        value: _selectedDirection,
+                        items: [
+                          DropdownMenuItem<String>(
+                            value: 'going',
                             child: Row(
                               children: [
-                                Container(
-                                  padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
-                                  decoration: BoxDecoration(
-                                    color: isDisabled
-                                        ? (AppTheme.isDarkMode
-                                            ? Colors.grey.withOpacity(0.1)
-                                            : Colors.grey.shade200)
-                                        : (AppTheme.isDarkMode
-                                            ? Colors.blueAccent.withOpacity(0.2)
-                                            : AppTheme.appBarColor.withOpacity(0.1)),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.directions_bus_rounded,
-                                    size: isSmallScreen ? 16.0 : 18.0,
-                                    color: isDisabled
-                                        ? (AppTheme.isDarkMode
-                                            ? Colors.grey
-                                            : Colors.grey.shade600)
-                                        : (AppTheme.isDarkMode
-                                            ? Colors.blueAccent
-                                            : AppTheme.appBarColor),
-                                  ),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: isSmallScreen ? 16.0 : 18.0,
+                                  color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
                                 ),
                                 SizedBox(width: isSmallScreen ? 10.0 : 12.0),
-                                Expanded(
-                                  child: Text(
-                                    name.toString(),
-                                    style: TextStyle(
-                                      color: isDisabled
-                                          ? (AppTheme.isDarkMode
-                                              ? Colors.white38
-                                              : Colors.grey.shade500)
-                                          : AppTheme.textPrimary,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: isSmallScreen ? 13.0 : 14.0,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
+                                Text(
+                                  t('going'),
+                                  style: TextStyle(
+                                    color: AppTheme.textPrimary,
+                                    fontSize: isSmallScreen ? 14.0 : 15.0,
                                   ),
                                 ),
-                                if (isDisabled)
-                                  Padding(
-                                    padding: EdgeInsets.only(left: isSmallScreen ? 6.0 : 8.0),
-                                    child: Icon(
-                                      Icons.check_circle,
-                                      size: isSmallScreen ? 14.0 : 16.0,
-                                      color: AppTheme.isDarkMode
-                                          ? Colors.orangeAccent
-                                          : Colors.orange.shade700,
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
-                        );
-                      }).toList(),
-                      selectedItemBuilder: (context) {
-                        return _getAvailableLines().map((line) {
+                          DropdownMenuItem<String>(
+                            value: 'return',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.arrow_back_ios,
+                                  size: isSmallScreen ? 16.0 : 18.0,
+                                  color: AppTheme.isDarkMode ? Colors.orangeAccent : Colors.orange.shade700,
+                                ),
+                                SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+                                Text(
+                                  t('return'),
+                                  style: TextStyle(
+                                    color: AppTheme.textPrimary,
+                                    fontSize: isSmallScreen ? 14.0 : 15.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val != null && val != _selectedDirection) {
+                            setModalState(() {
+                              _selectedDirection = val;
+                              // Reset line selection when direction changes to re-check availability
+                              _selectedLineId = null;
+                            });
+                          }
+                        },
+                        icon: Icons.compare_arrows_rounded,
+                        isSmallScreen: isSmallScreen,
+                        isMediumScreen: isMediumScreen,
+                      ),
+                    if (_editingTemplateId == null)
+                      SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                    // Show direction as read-only when editing
+                    if (_editingTemplateId != null)
+                      Container(
+                        padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+                        decoration: BoxDecoration(
+                          color: AppTheme.isDarkMode 
+                            ? Colors.white.withOpacity(0.05) 
+                            : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                          border: Border.all(
+                            color: AppTheme.isDarkMode 
+                              ? Colors.white.withOpacity(0.1) 
+                              : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _selectedDirection == 'going' 
+                                ? Icons.arrow_forward_ios 
+                                : Icons.arrow_back_ios,
+                              size: isSmallScreen ? 16.0 : 18.0,
+                              color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                            ),
+                            SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+                            Text(
+                              '${t('direction')}: ${_selectedDirection == 'going' ? t('going') : t('return')}',
+                              style: TextStyle(
+                                color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                                fontSize: isSmallScreen ? 13.0 : 14.0,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (_editingTemplateId != null)
+                      SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                    // Line dropdown rebuilds when direction changes via setModalState
+                    Builder(
+                      builder: (context) {
+                        // Recalculate items based on current direction
+                        final availableLines = _getAvailableLines();
+                        final currentDirection = _selectedDirection;
+                        final lineItems = availableLines.map((line) {
                           final lineId = line['lineid']?.toString();
                           final name = _isArabic
                               ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? 'Unknown')
                               : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? 'Unknown');
-                          final isDisabled = _editingTemplateId == null && _lineHasSchedule(lineId);
-                          return Text(
-                            name.toString(),
-                            style: TextStyle(
-                              color: isDisabled
-                                  ? (AppTheme.isDarkMode
-                                      ? Colors.white38
-                                      : Colors.grey.shade500)
-                                  : AppTheme.textPrimary,
-                              fontWeight: FontWeight.w500,
-                              fontSize: isSmallScreen ? 14.0 : 15.0,
+                          final isDisabled = _editingTemplateId == null && _lineHasSchedule(lineId, direction: currentDirection);
+                          return DropdownMenuItem<String>(
+                            value: lineId,
+                            enabled: !isDisabled,
+                            child: Container(
+                              width: double.infinity,
+                              margin: EdgeInsets.symmetric(vertical: isSmallScreen ? 3.0 : 4.0),
+                              padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
+                              decoration: BoxDecoration(
+                                color: isDisabled
+                                    ? (AppTheme.isDarkMode
+                                        ? Colors.white.withOpacity(0.02)
+                                        : Colors.grey.shade100)
+                                    : (AppTheme.isDarkMode
+                                        ? Colors.white.withOpacity(0.05)
+                                        : Colors.grey.shade50),
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                                border: Border.all(
+                                  color: isDisabled
+                                      ? (AppTheme.isDarkMode
+                                          ? Colors.white.withOpacity(0.05)
+                                          : Colors.grey.shade300)
+                                      : (AppTheme.isDarkMode
+                                          ? Colors.white.withOpacity(0.1)
+                                          : Colors.grey.shade200),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: EdgeInsets.all(isSmallScreen ? 6.0 : 8.0),
+                                    decoration: BoxDecoration(
+                                      color: isDisabled
+                                          ? (AppTheme.isDarkMode
+                                              ? Colors.grey.withOpacity(0.1)
+                                              : Colors.grey.shade200)
+                                          : (AppTheme.isDarkMode
+                                              ? Colors.blueAccent.withOpacity(0.2)
+                                              : AppTheme.appBarColor.withOpacity(0.1)),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.directions_bus_rounded,
+                                      size: isSmallScreen ? 16.0 : 18.0,
+                                      color: isDisabled
+                                          ? (AppTheme.isDarkMode
+                                              ? Colors.grey
+                                              : Colors.grey.shade600)
+                                          : (AppTheme.isDarkMode
+                                              ? Colors.blueAccent
+                                              : AppTheme.appBarColor),
+                                    ),
+                                  ),
+                                  SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+                                  Expanded(
+                                    child: Text(
+                                      name.toString(),
+                                      style: TextStyle(
+                                        color: isDisabled
+                                            ? (AppTheme.isDarkMode
+                                                ? Colors.white38
+                                                : Colors.grey.shade500)
+                                            : AppTheme.textPrimary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: isSmallScreen ? 13.0 : 14.0,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (isDisabled)
+                                    Padding(
+                                      padding: EdgeInsets.only(left: isSmallScreen ? 6.0 : 8.0),
+                                      child: Icon(
+                                        Icons.check_circle,
+                                        size: isSmallScreen ? 14.0 : 16.0,
+                                        color: AppTheme.isDarkMode
+                                            ? Colors.orangeAccent
+                                            : Colors.orange.shade700,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
-                            overflow: TextOverflow.ellipsis,
                           );
                         }).toList();
+                        
+                        return _buildDropdown(
+                          label: t('line'),
+                          value: _selectedLineId,
+                          items: lineItems,
+                          selectedItemBuilder: (context) {
+                            return availableLines.map((line) {
+                              final lineId = line['lineid']?.toString();
+                              final name = _isArabic
+                                  ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? 'Unknown')
+                                  : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? 'Unknown');
+                              final isDisabled = _editingTemplateId == null && _lineHasSchedule(lineId, direction: currentDirection);
+                              return Text(
+                                name.toString(),
+                                style: TextStyle(
+                                  color: isDisabled
+                                      ? (AppTheme.isDarkMode
+                                          ? Colors.white38
+                                          : Colors.grey.shade500)
+                                      : AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: isSmallScreen ? 14.0 : 15.0,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              );
+                            }).toList();
+                          },
+                          onChanged: (val) {
+                            if (val != null && _editingTemplateId == null && _lineHasSchedule(val, direction: currentDirection)) {
+                              final errorMsg = currentDirection == 'going' 
+                                ? t('lineHasGoingSchedule')
+                                : t('lineHasReturningSchedule');
+                              _showSnackBar(errorMsg, isError: true);
+                              return;
+                            }
+                            setModalState(() => _selectedLineId = val);
+                          },
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                        );
                       },
-                      onChanged: (val) {
-                        if (val != null && _editingTemplateId == null && _lineHasSchedule(val)) {
-                          _showSnackBar(t('duplicateSchedule'), isError: true);
-                          return;
-                        }
-                        setState(() => _selectedLineId = val);
-                      },
-                      isSmallScreen: isSmallScreen,
-                      isMediumScreen: isMediumScreen,
                     ),
                     SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                     Row(
@@ -676,7 +830,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                     _buildIntervalDropdown(
                       label: t('interval'),
                       value: _intervalMinutes,
-                      onChanged: (val) => setState(() => _intervalMinutes = val!),
+                      onChanged: (val) => setModalState(() => _intervalMinutes = val!),
                       isSmallScreen: isSmallScreen,
                       isMediumScreen: isMediumScreen,
                     ),
@@ -692,7 +846,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                       ),
                       value: _active,
                       activeColor: Colors.blue.shade600,
-                      onChanged: (val) => setState(() => _active = val),
+                      onChanged: (val) => setModalState(() => _active = val),
                     ),
                     SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                     SwitchListTile(
@@ -713,7 +867,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                       ),
                       value: _autoDepartureEnabled,
                       activeColor: Colors.blue.shade600,
-                      onChanged: (val) => setState(() => _autoDepartureEnabled = val),
+                      onChanged: (val) => setModalState(() => _autoDepartureEnabled = val),
                     ),
                     SizedBox(height: isSmallScreen ? 6.0 : 8.0),
                     SwitchListTile(
@@ -734,7 +888,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                       ),
                       value: _scheduledDepartureEnforced,
                       activeColor: Colors.blue.shade600,
-                      onChanged: (val) => setState(() => _scheduledDepartureEnforced = val),
+                      onChanged: (val) => setModalState(() => _scheduledDepartureEnforced = val),
                     ),
                     SizedBox(height: isSmallScreen ? 20.0 : 24.0),
                     SizedBox(
@@ -767,6 +921,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -1244,6 +1399,7 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
     final interval = schedule['interval_minutes'] ?? 60;
     final active = schedule['active'] ?? true;
     final templateid = schedule['templateid'] as String;
+    final direction = schedule['direction']?.toString() ?? 'going';
     final isDark = AppTheme.isDarkMode;
 
     return Container(
@@ -1324,6 +1480,42 @@ class _AdminSchedulesPageState extends State<AdminSchedulesPage> {
                                 fontSize: isSmallScreen ? 10.0 : 11.0,
                                 fontWeight: FontWeight.bold,
                               ),
+                            ),
+                          ),
+                          SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isSmallScreen ? 6.0 : 8.0, 
+                              vertical: isSmallScreen ? 1.0 : 2.0
+                            ),
+                            decoration: BoxDecoration(
+                              color: direction == 'going'
+                                  ? (isDark ? Colors.blueAccent.withOpacity(0.1) : Colors.blue.shade100)
+                                  : (isDark ? Colors.orangeAccent.withOpacity(0.1) : Colors.orange.shade100),
+                              borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  direction == 'going' ? Icons.arrow_forward_ios : Icons.arrow_back_ios,
+                                  size: isSmallScreen ? 10.0 : 11.0,
+                                  color: direction == 'going'
+                                      ? (isDark ? Colors.blueAccent : Colors.blue.shade800)
+                                      : (isDark ? Colors.orangeAccent : Colors.orange.shade800),
+                                ),
+                                SizedBox(width: isSmallScreen ? 2.0 : 4.0),
+                                Text(
+                                  direction == 'going' ? t('going') : t('return'),
+                                  style: TextStyle(
+                                    color: direction == 'going'
+                                        ? (isDark ? Colors.blueAccent : Colors.blue.shade800)
+                                        : (isDark ? Colors.orangeAccent : Colors.orange.shade800),
+                                    fontSize: isSmallScreen ? 10.0 : 11.0,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],

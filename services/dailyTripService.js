@@ -96,7 +96,8 @@ async function getVehicleForLine(lineid) {
  * @returns {Object} Result with created trips count and errors
  */
 async function createTripsForDate(template, targetDate) {
-  const { templateid, lineid, start_hour, end_hour, interval_minutes } = template;
+  const { templateid, lineid, start_hour, end_hour, interval_minutes, direction } = template;
+  const tripDirection = direction || 'going'; // Use template direction or default to 'going'
 
   try {
 
@@ -173,10 +174,12 @@ async function createTripsForDate(template, targetDate) {
 
 
 
-        // Determine origin_stationid based on direction (default to 'going')
+        // Determine origin_stationid based on direction
         let origin_stationid = null;
-        if (line.main_stationid) {
-          origin_stationid = line.main_stationid; // Default to going direction
+        if (tripDirection === 'going' && line.main_stationid) {
+          origin_stationid = line.main_stationid;
+        } else if (tripDirection === 'return' && line.return_stationid) {
+          origin_stationid = line.return_stationid;
         }
 
         const tripData = {
@@ -192,7 +195,7 @@ async function createTripsForDate(template, targetDate) {
           early_departure_allowed: true,
           scheduled_departure_enforced: template.scheduled_departure_enforced ?? false,
           templateid: templateid,
-          direction: 'going', // Default to going for scheduled trips
+          direction: tripDirection,
           origin_stationid: origin_stationid,
         };
 

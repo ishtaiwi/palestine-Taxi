@@ -1727,7 +1727,7 @@ class ApiService {
   }
 
   static Future<List<Map<String, dynamic>>> fetchSchedules(
-      {String? lineid, bool? active}) async {
+      {String? lineid, bool? active, String? direction}) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -1738,6 +1738,7 @@ class ApiService {
       final queryParams = <String, String>{};
       if (lineid != null) queryParams['lineid'] = lineid;
       if (active != null) queryParams['active'] = active.toString();
+      if (direction != null) queryParams['direction'] = direction;
 
       if (queryParams.isNotEmpty) {
         url += '?${Uri(queryParameters: queryParams).query}';
@@ -1822,6 +1823,7 @@ class ApiService {
     bool active = true,
     bool? autoDepartureEnabled,
     bool? scheduledDepartureEnforced,
+    String? direction,
   }) async {
     try {
       final token = await getToken();
@@ -1850,6 +1852,7 @@ class ApiService {
                 'auto_departure_enabled': autoDepartureEnabled,
               if (scheduledDepartureEnforced != null)
                 'scheduled_departure_enforced': scheduledDepartureEnforced,
+              if (direction != null) 'direction': direction,
             })),
           )
           .timeout(AppConfig.requestTimeout);
@@ -1887,6 +1890,7 @@ class ApiService {
     bool? active,
     bool? autoDepartureEnabled,
     bool? scheduledDepartureEnforced,
+    String? direction,
   }) async {
     try {
       final token = await getToken();
@@ -1907,6 +1911,7 @@ class ApiService {
         body['auto_departure_enabled'] = autoDepartureEnabled;
       if (scheduledDepartureEnforced != null)
         body['scheduled_departure_enforced'] = scheduledDepartureEnforced;
+      if (direction != null) body['direction'] = direction;
 
       final response = await http
           .put(

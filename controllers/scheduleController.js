@@ -6,11 +6,12 @@ import logger from '../utils/logger.js';
 
 export const getAllSchedules = async (req, res, next) => {
   try {
-    const { lineid, active } = req.query;
+    const { lineid, active, direction } = req.query;
     
     const filters = {};
     if (lineid) filters.lineid = lineid;
     if (active !== undefined) filters.active = active === 'true';
+    if (direction) filters.direction = direction;
     
     const schedules = await ScheduleTemplate.findAll(filters);
     
@@ -47,12 +48,20 @@ export const getScheduleById = async (req, res, next) => {
 
 export const createSchedule = async (req, res, next) => {
   try {
-    const { lineid, start_hour, end_hour, interval_minutes, active, auto_departure_enabled, scheduled_departure_enforced } = req.body;
+    const { lineid, start_hour, end_hour, interval_minutes, active, auto_departure_enabled, scheduled_departure_enforced, direction } = req.body;
     
     
     if (!lineid) {
       return res.status(400).json({
         message: req.t('schedule.lineid_required') || 'lineid is required',
+      });
+    }
+    
+    // Validate direction
+    const scheduleDirection = direction || 'going'; // Default to 'going' for backward compatibility
+    if (scheduleDirection !== 'going' && scheduleDirection !== 'return') {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_direction') || 'direction must be either "going" or "return"',
       });
     }
     
@@ -100,12 +109,15 @@ export const createSchedule = async (req, res, next) => {
       });
     }
     
-    // Check if a schedule already exists for this line
-    const scheduleExists = await ScheduleTemplate.existsForLine(lineid);
+    // Check if a schedule already exists for this line and direction combination
+    const scheduleExists = await ScheduleTemplate.existsForLine(lineid, scheduleDirection);
     if (scheduleExists) {
+      const directionLabel = scheduleDirection === 'going' 
+        ? (req.t('schedule.going') || 'going') 
+        : (req.t('schedule.return') || 'return');
       return res.status(400).json({
         success: false,
-        message: req.t('schedule.duplicate_line') || 'A schedule already exists for this line. Only one schedule per line is allowed.',
+        message: req.t('schedule.duplicate_line_direction') || `A ${directionLabel} schedule already exists for this line. Each line can have one going and one returning schedule.`,
       });
     }
     
@@ -117,6 +129,7 @@ export const createSchedule = async (req, res, next) => {
       active: active !== undefined ? active : true,
       auto_departure_enabled: auto_departure_enabled !== undefined ? auto_departure_enabled : false,
       scheduled_departure_enforced: scheduled_departure_enforced !== undefined ? scheduled_departure_enforced : false,
+      direction: scheduleDirection,
     };
     
     const schedule = await ScheduleTemplate.create(scheduleData);

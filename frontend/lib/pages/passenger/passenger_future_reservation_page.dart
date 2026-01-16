@@ -103,19 +103,42 @@ class _PassengerFutureReservationPageState
 
   Future<void> _selectDate() async {
     final now = TimeSyncService.now();
+    
+    // Find the first non-Friday date if the initial date is Friday
+    DateTime initialDate = _selectedDate ?? now;
+    if (initialDate.weekday == 5) {
+      // If it's Friday, move to the next day (Saturday)
+      initialDate = initialDate.add(const Duration(days: 1));
+    }
+    
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate ?? now,
+      initialDate: initialDate,
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
       locale: _isArabic ? const Locale('ar') : const Locale('en'),
       selectableDayPredicate: (DateTime date) {
         // Block Fridays (day 5 in Dart, where Monday = 1, Friday = 5)
+        // Return true for all days except Friday
         return date.weekday != 5;
       },
       helpText: _isArabic ? 'اختر التاريخ' : 'Select Date',
       cancelText: _isArabic ? 'إلغاء' : 'Cancel',
       confirmText: _isArabic ? 'تأكيد' : 'Confirm',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: const Color(0xFFF57C00),
+              onPrimary: Colors.white,
+              surface: _isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+              onSurface: _isDarkMode ? const Color(0xFFE8EAF6) : const Color(0xFF1E3A5F),
+            ),
+            dialogBackgroundColor: _isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (picked != null) {

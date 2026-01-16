@@ -22,8 +22,10 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
 
   
   final _formKey = GlobalKey<FormState>();
-  final _nameArController = TextEditingController();
-  final _nameEnController = TextEditingController();
+  final _nameArFirstController = TextEditingController(); // First station name in Arabic
+  final _nameArSecondController = TextEditingController(); // Second station name in Arabic
+  final _nameEnFirstController = TextEditingController(); // First station name in English
+  final _nameEnSecondController = TextEditingController(); // Second station name in English
   final _basePriceController = TextEditingController();
   final _additionalPriceController = TextEditingController();
   final _durationController = TextEditingController();
@@ -42,6 +44,10 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'lineName': 'اسم الخط',
       'lineNameAr': 'الاسم بالعربية',
       'lineNameEn': 'الاسم بالإنجليزية',
+      'firstStationAr': 'المحطة الأولى (عربي)',
+      'secondStationAr': 'المحطة الثانية (عربي)',
+      'firstStationEn': 'First Station (English)',
+      'secondStationEn': 'Second Station (English)',
       'basePrice': 'السعر الأساسي',
       'additionalPrice': 'السعر الإضافي',
       'duration': 'المدة (دقيقة)',
@@ -78,6 +84,10 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'lineName': 'Line Name',
       'lineNameAr': 'Arabic Name',
       'lineNameEn': 'English Name',
+      'firstStationAr': 'First Station (Arabic)',
+      'secondStationAr': 'Second Station (Arabic)',
+      'firstStationEn': 'First Station (English)',
+      'secondStationEn': 'Second Station (English)',
       'basePrice': 'Base Price',
       'additionalPrice': 'Additional Price',
       'duration': 'Duration (minutes)',
@@ -109,7 +119,14 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     },
   };
 
-  String t(String key) => _texts[_isArabic ? 'ar' : 'en']![key]!;
+  String t(String key) {
+    final language = _isArabic ? 'ar' : 'en';
+    final languageMap = _texts[language];
+    if (languageMap == null) {
+      return key; // Return key as fallback
+    }
+    return languageMap[key] ?? key; // Return key as fallback if not found
+  }
 
   @override
   void initState() {
@@ -123,8 +140,10 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
   @override
   void dispose() {
     _searchController.dispose();
-    _nameArController.dispose();
-    _nameEnController.dispose();
+    _nameArFirstController.dispose();
+    _nameArSecondController.dispose();
+    _nameEnFirstController.dispose();
+    _nameEnSecondController.dispose();
     _basePriceController.dispose();
     _additionalPriceController.dispose();
     _durationController.dispose();
@@ -207,23 +226,33 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
   }
 
   Future<void> _handleSave() async {
-    if (!_formKey.currentState!.validate()) return;
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) return;
 
-    final nameAr = _nameArController.text.trim();
-    final nameEn = _nameEnController.text.trim();
+    // Combine station names with "-" separator
+    final nameArFirst = _nameArFirstController.text.trim();
+    final nameArSecond = _nameArSecondController.text.trim();
+    final nameEnFirst = _nameEnFirstController.text.trim();
+    final nameEnSecond = _nameEnSecondController.text.trim();
 
-    
-    if (nameAr.isEmpty) {
+    // Validate that both Arabic station names are provided
+    if (nameArFirst.isEmpty || nameArSecond.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              _isArabic ? 'الاسم بالعربية مطلوب' : 'Arabic name is required'),
+              _isArabic ? 'يرجى إدخال اسمي المحطتين بالعربية' : 'Please enter both Arabic station names'),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
+
+    // Combine station names with "-" separator
+    final nameAr = '$nameArFirst-$nameArSecond';
+    final nameEn = (nameEnFirst.isNotEmpty && nameEnSecond.isNotEmpty) 
+        ? '$nameEnFirst-$nameEnSecond' 
+        : '';
 
     
     showDialog(
@@ -308,8 +337,21 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
 
     if (line != null) {
       _editingLineId = line['lineid'];
-      _nameArController.text = line['name_ar'] ?? line['linename'] ?? '';
-      _nameEnController.text = line['name_en'] ?? '';
+      
+      // Split line names by "-" to populate the fields
+      final nameArFull = (line['name_ar'] ?? line['linename'] ?? '').toString();
+      final nameEnFull = (line['name_en'] ?? '').toString();
+      
+      // Split Arabic name
+      final nameArParts = nameArFull.split('-').map((s) => s.trim()).toList();
+      _nameArFirstController.text = nameArParts.isNotEmpty ? nameArParts[0] : '';
+      _nameArSecondController.text = nameArParts.length > 1 ? nameArParts[1] : '';
+      
+      // Split English name
+      final nameEnParts = nameEnFull.split('-').map((s) => s.trim()).toList();
+      _nameEnFirstController.text = nameEnParts.isNotEmpty ? nameEnParts[0] : '';
+      _nameEnSecondController.text = nameEnParts.length > 1 ? nameEnParts[1] : '';
+      
       _basePriceController.text = (line['baseprice'] ?? 0).toString();
       _additionalPriceController.text =
           (line['additionalprice'] ?? 0).toString();
@@ -320,8 +362,10 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       _selectedReturnStationId = line['return_stationid']?.toString();
     } else {
       _editingLineId = null;
-      _nameArController.clear();
-      _nameEnController.clear();
+      _nameArFirstController.clear();
+      _nameArSecondController.clear();
+      _nameEnFirstController.clear();
+      _nameEnSecondController.clear();
       _basePriceController.clear();
       _additionalPriceController.clear();
       _durationController.clear();
@@ -360,22 +404,76 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildTextField(
-                    controller: _nameArController,
-                    label: t('lineNameAr'),
-                    icon: Icons.text_fields_rounded,
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? t('required') : null,
-                    isSmallScreen: isSmallScreen,
-                    isMediumScreen: isMediumScreen,
+                  // Arabic station names
+                  Text(
+                    t('lineNameAr'),
+                    style: TextStyle(
+                      color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: isSmallScreen ? 8.0 : 10.0),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _nameArFirstController,
+                          label: t('firstStationAr'),
+                          icon: Icons.location_on_rounded,
+                          validator: (value) =>
+                              value?.isEmpty ?? true ? t('required') : null,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                        ),
+                      ),
+                      SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _nameArSecondController,
+                          label: t('secondStationAr'),
+                          icon: Icons.location_on_rounded,
+                          validator: (value) =>
+                              value?.isEmpty ?? true ? t('required') : null,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                        ),
+                      ),
+                    ],
                   ),
                   SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                  _buildTextField(
-                    controller: _nameEnController,
-                    label: t('lineNameEn'),
-                    icon: Icons.language_rounded,
-                    isSmallScreen: isSmallScreen,
-                    isMediumScreen: isMediumScreen,
+                  // English station names
+                  Text(
+                    t('lineNameEn'),
+                    style: TextStyle(
+                      color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: isSmallScreen ? 8.0 : 10.0),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _nameEnFirstController,
+                          label: t('firstStationEn'),
+                          icon: Icons.location_on_rounded,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                        ),
+                      ),
+                      SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _nameEnSecondController,
+                          label: t('secondStationEn'),
+                          icon: Icons.location_on_rounded,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                        ),
+                      ),
+                    ],
                   ),
                   SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                   Row(

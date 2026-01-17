@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:responsive_sizer/responsive_sizer.dart';
 import '../../../theme/app_theme.dart';
 import 'chart_legend.dart';
 
@@ -138,32 +137,33 @@ class ResponsiveChartContainer extends StatelessWidget {
   }
 
   double _getChartHeight(ScreenSize screenSize) {
+    // Calculate base height based on preferred size (using fixed percentages)
     double baseHeight;
     switch (preferredSize) {
       case ChartSize.small:
-        baseHeight = Adaptive.h(2);
+        baseHeight = 160;
         break;
       case ChartSize.medium:
-        baseHeight = Adaptive.h(4);
+        baseHeight = 260;
         break;
       case ChartSize.large:
-        baseHeight = Adaptive.h(5);
+        baseHeight = 360;
         break;
       case ChartSize.extraLarge:
-        baseHeight = Adaptive.h(10);
+        baseHeight = 460;
         break;
     }
 
     // Adjust for screen size
     switch (screenSize) {
       case ScreenSize.small:
-        baseHeight *= 0.85;
+        baseHeight *= 0.8;
         break;
       case ScreenSize.medium:
         // Keep base height
         break;
       case ScreenSize.large:
-        baseHeight *= 1.15;
+        baseHeight *= 1.1;
         break;
     }
 
@@ -184,18 +184,23 @@ class ResponsiveChartContainer extends StatelessWidget {
   }
 
   EdgeInsets _getResponsivePadding(ScreenSize screenSize) {
+    // Reduce padding for small charts
+    final effectivePadding = preferredSize == ChartSize.small 
+        ? padding.copyWith(top: padding.top * 0.5, bottom: padding.bottom * 0.5)
+        : padding;
+
     switch (screenSize) {
       case ScreenSize.small:
         return EdgeInsets.symmetric(
-          horizontal: padding.horizontal * 0.5,
-          vertical: padding.vertical * 0.5,
+          horizontal: effectivePadding.horizontal * 0.5,
+          vertical: effectivePadding.vertical * 0.5,
         );
       case ScreenSize.medium:
-        return padding;
+        return effectivePadding;
       case ScreenSize.large:
         return EdgeInsets.symmetric(
-          horizontal: padding.horizontal * 1.25,
-          vertical: padding.vertical,
+          horizontal: effectivePadding.horizontal * 1.25,
+          vertical: effectivePadding.vertical,
         );
     }
   }
@@ -313,7 +318,7 @@ class ResponsiveStatCard extends StatelessWidget {
         return GestureDetector(
           onTap: onTap,
           child: Container(
-            padding: EdgeInsets.all(Adaptive.h(0.8)),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AppTheme.isDarkMode
                   ? color.withOpacity(0.08)
@@ -361,7 +366,7 @@ class ResponsiveStatCard extends StatelessWidget {
                   value,
                   style: TextStyle(
                     color: AppTheme.textPrimary,
-                    fontSize: isCompact ? 10.sp : 16.sp,
+                    fontSize: isCompact ? 14 : 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

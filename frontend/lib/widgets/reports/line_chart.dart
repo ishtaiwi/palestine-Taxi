@@ -76,195 +76,197 @@ class _LinePerformanceChartState extends State<LinePerformanceChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
-        final barColor = _metricColors[widget.metric] ?? Colors.blue;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
+      final barColor = _metricColors[widget.metric] ?? Colors.blue;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Summary stats
-            if (totals != null) ...[
-              _buildSummaryStats(totals, percentageChange, isSmall),
-              SizedBox(height: isSmall ? 12 : 16),
-            ],
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Summary stats
+          if (totals != null) ...[
+            _buildSummaryStats(totals, percentageChange, isSmall),
+            SizedBox(height: isSmall ? 12 : 16),
+          ],
 
-            // Chart
-            ResponsiveChartContainer(
-              preferredSize: ChartSize.large,
-              chart: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: _getMaxValue(displayLines, widget.metric) * 1.2,
-                  barTouchData: BarTouchData(
-                    enabled: true,
-                    touchTooltipData: BarTouchTooltipData(
-                      fitInsideHorizontally: true,
-                      fitInsideVertically: true,
-                      tooltipRoundedRadius: 12,
-                      tooltipPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      getTooltipColor: (group) => AppTheme.isDarkMode
-                          ? const Color(0xFF1A1F35)
-                          : Colors.white,
-                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        final line = displayLines[group.x];
-                        final linename = line['linename'] ?? '';
-                        final revenue = line['revenue'] ?? 0;
-                        final bookings = line['bookings'] ?? 0;
-                        final trips = line['trips'] ?? 0;
-                        final utilization =
-                            ((line['utilization'] as num?)?.toDouble() ?? 0) *
-                                100;
-                        final rank =
-                            line['${widget.metric}Rank'] ?? (group.x + 1);
+          // Chart
+          ResponsiveChartContainer(
+            preferredSize: ChartSize.large,
+            chart: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: _getMaxY(_getMaxValue(displayLines, widget.metric)),
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    tooltipRoundedRadius: 12,
+                    tooltipPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    getTooltipColor: (group) => AppTheme.isDarkMode
+                        ? const Color(0xFF1A1F35)
+                        : Colors.white,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final line = displayLines[group.x];
+                      final linename = line['linename'] ?? '';
+                      final revenue = line['revenue'] ?? 0;
+                      final bookings = line['bookings'] ?? 0;
+                      final trips = line['trips'] ?? 0;
+                      final utilization =
+                          ((line['utilization'] as num?)?.toDouble() ?? 0) *
+                              100;
+                      final rank =
+                          line['${widget.metric}Rank'] ?? (group.x + 1);
 
-                        return BarTooltipItem(
-                          '$linename\n'
-                          '#$rank ${_getMetricLabel(widget.metric)}\n'
-                          '${widget.isArabic ? 'الإيرادات' : 'Revenue'}: ${ReportDataProcessor.formatCurrencyCompact(revenue)}\n'
-                          '${widget.isArabic ? 'الحجوزات' : 'Bookings'}: $bookings\n'
-                          '${widget.isArabic ? 'الرحلات' : 'Trips'}: $trips\n'
-                          '${widget.isArabic ? 'الاستخدام' : 'Utilization'}: ${utilization.toStringAsFixed(1)}%',
-                          TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                      return BarTooltipItem(
+                        '$linename\n'
+                        '#$rank ${_getMetricLabel(widget.metric)}\n'
+                        '${widget.isArabic ? 'الإيرادات' : 'Revenue'}: ${ReportDataProcessor.formatCurrencyCompact(revenue)}\n'
+                        '${widget.isArabic ? 'الحجوزات' : 'Bookings'}: $bookings\n'
+                        '${widget.isArabic ? 'الرحلات' : 'Trips'}: $trips\n'
+                        '${widget.isArabic ? 'الاستخدام' : 'Utilization'}: ${utilization.toStringAsFixed(1)}%',
+                        TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      );
+                    },
+                  ),
+                  touchCallback: (event, response) {
+                    setState(() {
+                      if (event.isInterestedForInteractions &&
+                          response?.spot != null) {
+                        _touchedIndex = response!.spot!.touchedBarGroupIndex;
+                      } else {
+                        _touchedIndex = null;
+                      }
+                    });
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        if (value.toInt() >= 0 &&
+                            value.toInt() < displayLines.length) {
+                          final linename =
+                              displayLines[value.toInt()]['linename'] as String? ??
+                                  '';
+                          final isHighlighted = _touchedIndex == value.toInt();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: RotatedBox(
+                              quarterTurns: isSmall ? 1 : 0,
+                              child: Text(
+                                linename.length > 10
+                                    ? '${linename.substring(0, 10)}...'
+                                    : linename,
+                                style: TextStyle(
+                                  color: isHighlighted
+                                      ? barColor
+                                      : AppTheme.textSecondary,
+                                  fontSize: isSmall ? 9 : 10,
+                                  fontWeight: isHighlighted
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                      reservedSize: isSmall ? 60 : 50,
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isSmall ? 50 : 60,
+                      interval:
+                          _getInterval(_getMaxValue(displayLines, widget.metric)),
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return const Text('');
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Text(
+                            _formatAxisValue(value),
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: isSmall ? 9 : 10,
+                            ),
                           ),
                         );
                       },
                     ),
-                    touchCallback: (event, response) {
-                      setState(() {
-                        if (event.isInterestedForInteractions &&
-                            response?.spot != null) {
-                          _touchedIndex = response!.spot!.touchedBarGroupIndex;
-                        } else {
-                          _touchedIndex = null;
-                        }
-                      });
-                    },
                   ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          if (value.toInt() >= 0 &&
-                              value.toInt() < displayLines.length) {
-                            final linename = displayLines[value.toInt()]
-                                    ['linename'] as String? ??
-                                '';
-                            final isHighlighted =
-                                _touchedIndex == value.toInt();
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: RotatedBox(
-                                quarterTurns: isSmall ? 1 : 0,
-                                child: Text(
-                                  linename.length > 10
-                                      ? '${linename.substring(0, 10)}...'
-                                      : linename,
-                                  style: TextStyle(
-                                    color: isHighlighted
-                                        ? barColor
-                                        : AppTheme.textSecondary,
-                                    fontSize: isSmall ? 9 : 10,
-                                    fontWeight: isHighlighted
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                        reservedSize: isSmall ? 60 : 50,
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: widget.metric == 'revenue' ? 55 : 40,
-                        getTitlesWidget: (value, meta) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: Text(
-                              _formatAxisValue(value),
-                              style: TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: isSmall ? 9 : 10,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
                   ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: AppTheme.getCardBorder(0.15),
-                        strokeWidth: 1,
-                        dashArray: [5, 5],
-                      );
-                    },
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
                   ),
-                  borderData: FlBorderData(show: false),
-                  barGroups: displayLines.asMap().entries.map((entry) {
-                    final value =
-                        (entry.value[widget.metric] as num?)?.toDouble() ?? 0;
-                    final isHighlighted = _touchedIndex == entry.key;
-
-                    // Gradient color based on ranking
-                    final colorOpacity = 1.0 - (entry.key * 0.07);
-
-                    return BarChartGroupData(
-                      x: entry.key,
-                      barRods: [
-                        BarChartRodData(
-                          toY: value,
-                          color: isHighlighted
-                              ? barColor
-                              : barColor
-                                  .withOpacity(colorOpacity.clamp(0.5, 1.0)),
-                          width: isHighlighted ? 24 : 20,
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(6)),
-                          backDrawRodData: BackgroundBarChartRodData(
-                            show: true,
-                            toY:
-                                _getMaxValue(displayLines, widget.metric) * 1.2,
-                            color: AppTheme.getCardBorder(0.05),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
                 ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval:
+                      _getInterval(_getMaxValue(displayLines, widget.metric)),
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: AppTheme.getCardBorder(0.15),
+                      strokeWidth: 1,
+                      dashArray: [5, 5],
+                    );
+                  },
+                ),
+                borderData: FlBorderData(show: false),
+                barGroups: displayLines.asMap().entries.map((entry) {
+                  final value =
+                      (entry.value[widget.metric] as num?)?.toDouble() ?? 0;
+                  final isHighlighted = _touchedIndex == entry.key;
+
+                  // Gradient color based on ranking
+                  final colorOpacity = 1.0 - (entry.key * 0.07);
+
+                  return BarChartGroupData(
+                    x: entry.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: value,
+                        color: isHighlighted
+                            ? barColor
+                            : barColor
+                                .withOpacity(colorOpacity.clamp(0.5, 1.0)),
+                        width: isHighlighted ? 24 : 20,
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(6)),
+                        backDrawRodData: BackgroundBarChartRodData(
+                          show: true,
+                          toY: _getMaxY(_getMaxValue(displayLines, widget.metric)),
+                          color: AppTheme.getCardBorder(0.05),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
               ),
             ),
+          ),
 
-            // Insights
-            if (widget.showInsights && topLines != null) ...[
-              SizedBox(height: isSmall ? 12 : 16),
-              _buildTopLinesInsight(topLines, isSmall),
-            ],
+          // Insights
+          if (widget.showInsights && topLines != null) ...[
+            SizedBox(height: isSmall ? 12 : 16),
+            _buildTopLinesInsight(topLines, isSmall),
           ],
-        );
-      },
-    );
+        ],
+      );
+    });
   }
 
   Widget _buildSummaryStats(
@@ -277,7 +279,7 @@ class _LinePerformanceChartState extends State<LinePerformanceChart> {
       runSpacing: 12,
       children: [
         SizedBox(
-          width: isSmall ? double.infinity : 130,
+          width: isSmall ? double.infinity : 150,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'إجمالي الإيرادات' : 'Total Revenue',
             value: ReportDataProcessor.formatCurrencyCompact(
@@ -288,7 +290,7 @@ class _LinePerformanceChartState extends State<LinePerformanceChart> {
           ),
         ),
         SizedBox(
-          width: isSmall ? double.infinity : 130,
+          width: isSmall ? double.infinity : 150,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'الحجوزات' : 'Bookings',
             value: (totals['bookings'] ?? 0).toString(),
@@ -298,7 +300,7 @@ class _LinePerformanceChartState extends State<LinePerformanceChart> {
           ),
         ),
         SizedBox(
-          width: isSmall ? double.infinity : 130,
+          width: isSmall ? double.infinity : 150,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'الرحلات' : 'Trips',
             value: (totals['trips'] ?? 0).toString(),
@@ -391,13 +393,34 @@ class _LinePerformanceChartState extends State<LinePerformanceChart> {
   }
 
   double _getMaxValue(List<Map<String, dynamic>> lines, String metric) {
-    if (lines.isEmpty) return 100;
+    if (lines.isEmpty) return 0;
     double max = 0;
     for (final line in lines) {
       final value = (line[metric] as num?)?.toDouble() ?? 0;
       if (value > max) max = value;
     }
-    return max > 0 ? max : 100;
+    return max;
+  }
+
+  double _getInterval(double max) {
+    if (max <= 0) {
+      if (widget.metric == 'utilization') return 0.25;
+      return 10;
+    }
+    if (widget.metric == 'utilization') return 0.25;
+    if (max < 10) return 2;
+    if (max < 100) return 25;
+    if (max < 1000) return 250;
+    return (max / 4).ceilToDouble();
+  }
+
+  double _getMaxY(double max) {
+    if (max <= 0) {
+      if (widget.metric == 'utilization') return 1.0;
+      return 20;
+    }
+    if (widget.metric == 'utilization') return 1.0;
+    return (max * 1.2).ceilToDouble();
   }
 }
 

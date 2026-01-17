@@ -10,6 +10,7 @@ class RevenueChart extends StatefulWidget {
   final bool showSummary;
   final bool showInsights;
   final bool showComparison;
+  final ChartSize preferredSize;
 
   const RevenueChart({
     super.key,
@@ -18,6 +19,7 @@ class RevenueChart extends StatefulWidget {
     this.showSummary = true,
     this.showInsights = true,
     this.showComparison = true,
+    this.preferredSize = ChartSize.large,
   });
 
   @override
@@ -58,245 +60,239 @@ class _RevenueChartState extends State<RevenueChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
-        final isMedium = constraints.maxWidth < 700;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Summary statistics with comparison
-            if (widget.showSummary) ...[
-              _buildSummaryStats(
-                totalRevenue: totalRevenue,
-                totalTransactions: totalTransactions,
-                percentageChange: percentageChange,
-                isSmall: isSmall,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Summary statistics with comparison
+          if (widget.showSummary) ...[
+            _buildSummaryStats(
+              totalRevenue: totalRevenue,
+              totalTransactions: totalTransactions,
+              percentageChange: percentageChange,
+              isSmall: isSmall,
+            ),
+            SizedBox(height: isSmall ? 12 : 16),
+          ],
+
+          // Period comparison widget
+          if (widget.showComparison && previousPeriod != null) ...[
+            PeriodComparison(
+              currentLabel: widget.isArabic ? 'الفترة الحالية' : 'Current Period',
+              currentValue:
+                  ReportDataProcessor.formatCurrencyCompact(totalRevenue),
+              previousLabel: widget.isArabic ? 'الفترة السابقة' : 'Previous Period',
+              previousValue: ReportDataProcessor.formatCurrencyCompact(
+                previousPeriod['totalRevenue'] ?? 0,
               ),
-              SizedBox(height: isSmall ? 12 : 16),
-            ],
+              percentageChange: percentageChange?['revenue']?.toDouble(),
+              isArabic: widget.isArabic,
+            ),
+            SizedBox(height: isSmall ? 12 : 16),
+          ],
 
-            // Period comparison widget
-            if (widget.showComparison && previousPeriod != null) ...[
-              PeriodComparison(
-                currentLabel:
-                    widget.isArabic ? 'الفترة الحالية' : 'Current Period',
-                currentValue:
-                    ReportDataProcessor.formatCurrencyCompact(totalRevenue),
-                previousLabel:
-                    widget.isArabic ? 'الفترة السابقة' : 'Previous Period',
-                previousValue: ReportDataProcessor.formatCurrencyCompact(
-                  previousPeriod['totalRevenue'] ?? 0,
-                ),
-                percentageChange: percentageChange?['revenue']?.toDouble(),
-                isArabic: widget.isArabic,
-              ),
-              SizedBox(height: isSmall ? 12 : 16),
-            ],
+          // Chart with responsive height
+          ResponsiveChartContainer(
+            preferredSize: isSmall ? ChartSize.medium : widget.preferredSize,
+            chart: LineChart(
+              LineChartData(
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    tooltipRoundedRadius: 12,
+                    tooltipPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    getTooltipColor: (touchedSpot) => AppTheme.isDarkMode
+                        ? const Color(0xFF1A1F35)
+                        : Colors.white,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        final idx = spot.x.toInt();
+                        if (idx >= 0 && idx < chartData.length) {
+                          final dataPoint = chartData[idx];
+                          final date = dataPoint['date'] as String? ?? '';
+                          final revenue =
+                              (dataPoint['revenue'] as num?)?.toDouble() ?? 0;
+                          final transactions = dataPoint['transactions'] ?? 0;
 
-            // Chart with responsive height
-            ResponsiveChartContainer(
-              preferredSize: isSmall ? ChartSize.medium : ChartSize.large,
-              chart: LineChart(
-                LineChartData(
-                  lineTouchData: LineTouchData(
-                    enabled: true,
-                    touchTooltipData: LineTouchTooltipData(
-                      fitInsideHorizontally: true,
-                      fitInsideVertically: true,
-                      tooltipRoundedRadius: 12,
-                      tooltipPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      getTooltipColor: (touchedSpot) => AppTheme.isDarkMode
-                          ? const Color(0xFF1A1F35)
-                          : Colors.white,
-                      getTooltipItems: (touchedSpots) {
-                        return touchedSpots.map((spot) {
-                          final idx = spot.x.toInt();
-                          if (idx >= 0 && idx < chartData.length) {
-                            final dataPoint = chartData[idx];
-                            final date = dataPoint['date'] as String? ?? '';
-                            final revenue =
-                                (dataPoint['revenue'] as num?)?.toDouble() ?? 0;
-                            final transactions = dataPoint['transactions'] ?? 0;
-
-                            // Calculate change from previous day
-                            String changeText = '';
-                            if (idx > 0) {
-                              final prevRevenue =
-                                  (chartData[idx - 1]['revenue'] as num?)
-                                          ?.toDouble() ??
-                                      0;
-                              if (prevRevenue > 0) {
-                                final change = ((revenue - prevRevenue) /
-                                    prevRevenue *
-                                    100);
-                                changeText =
-                                    '\n${change >= 0 ? '+' : ''}${change.toStringAsFixed(1)}% from prev';
-                              }
+                          // Calculate change from previous day
+                          String changeText = '';
+                          if (idx > 0) {
+                            final prevRevenue =
+                                (chartData[idx - 1]['revenue'] as num?)
+                                        ?.toDouble() ??
+                                    0;
+                            if (prevRevenue > 0) {
+                              final change =
+                                  ((revenue - prevRevenue) / prevRevenue * 100);
+                              changeText =
+                                  '\n${change >= 0 ? '+' : ''}${change.toStringAsFixed(1)}% from prev';
                             }
+                          }
 
-                            return LineTooltipItem(
-                              '${ChartTooltipHelper.formatDate(date)}\n${ReportDataProcessor.formatCurrencyCompact(revenue)}\n$transactions txns$changeText',
-                              TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            );
-                          }
-                          return null;
-                        }).toList();
-                      },
-                    ),
-                    touchCallback: (event, response) {
-                      setState(() {
-                        if (event.isInterestedForInteractions &&
-                            response?.lineBarSpots != null &&
-                            response!.lineBarSpots!.isNotEmpty) {
-                          _touchedIndex =
-                              response.lineBarSpots!.first.x.toInt();
-                        } else {
-                          _touchedIndex = null;
+                          return LineTooltipItem(
+                            '${ChartTooltipHelper.formatDate(date)}\n${ReportDataProcessor.formatCurrencyCompact(revenue)}\n$transactions txns$changeText',
+                            TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
                         }
-                      });
+                        return null;
+                      }).toList();
                     },
                   ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: _getMaxRevenue(chartData) / 5,
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: AppTheme.getCardBorder(0.15),
-                        strokeWidth: 1,
-                        dashArray: [5, 5],
-                      );
-                    },
+                  touchCallback: (event, response) {
+                    setState(() {
+                      if (event.isInterestedForInteractions &&
+                          response?.lineBarSpots != null &&
+                          response!.lineBarSpots!.isNotEmpty) {
+                        _touchedIndex = response.lineBarSpots!.first.x.toInt();
+                      } else {
+                        _touchedIndex = null;
+                      }
+                    });
+                  },
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: _getInterval(_getMaxRevenue(chartData)),
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: AppTheme.getCardBorder(0.15),
+                      strokeWidth: 1,
+                      dashArray: [5, 5],
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
                   ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: isSmall ? 22 : 26,
-                        interval: chartData.length > 10
-                            ? (chartData.length / (isSmall ? 4 : 6))
-                                .ceilToDouble()
-                            : 1,
-                        getTitlesWidget: (value, meta) {
-                          final idx = value.toInt();
-                          if (idx >= 0 && idx < chartData.length) {
-                            final date = chartData[idx]['date'] as String;
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                date.substring(5, 10),
-                                style: TextStyle(
-                                  color: _touchedIndex == idx
-                                      ? Colors.green
-                                      : AppTheme.textSecondary,
-                                  fontSize: isSmall ? 9 : 10,
-                                  fontWeight: _touchedIndex == idx
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: isSmall ? 40 : 45,
-                        interval: _getMaxRevenue(chartData) / 4,
-                        getTitlesWidget: (value, meta) {
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isSmall ? 22 : 26,
+                      interval: chartData.length > 10
+                          ? (chartData.length / (isSmall ? 4 : 6)).ceilToDouble()
+                          : 1,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx >= 0 && idx < chartData.length) {
+                          final date = chartData[idx]['date'] as String;
                           return Padding(
-                            padding: const EdgeInsets.only(right: 4),
+                            padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              ReportDataProcessor.formatCurrencyCompact(value),
+                              date.length >= 10 ? date.substring(5, 10) : date,
                               style: TextStyle(
-                                color: AppTheme.textSecondary,
+                                color: _touchedIndex == idx
+                                    ? Colors.green
+                                    : AppTheme.textSecondary,
                                 fontSize: isSmall ? 9 : 10,
+                                fontWeight: _touchedIndex == idx
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
                           );
-                        },
+                        }
+                        return const Text('');
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isSmall ? 45 : 55,
+                      interval: _getInterval(_getMaxRevenue(chartData)),
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return const Text('');
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Text(
+                            ReportDataProcessor.formatCurrencyCompact(value),
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: isSmall ? 9 : 10,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                minX: 0,
+                maxX: (chartData.length - 1).toDouble(),
+                minY: 0,
+                maxY: _getMaxY(_getMaxRevenue(chartData)),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: chartData.asMap().entries.map((entry) {
+                      return FlSpot(
+                        entry.key.toDouble(),
+                        (entry.value['revenue'] as num).toDouble(),
+                      );
+                    }).toList(),
+                    isCurved: true,
+                    curveSmoothness: 0.25,
+                    color: Colors.green,
+                    barWidth: isSmall ? 2.5 : 3,
+                    isStrokeCapRound: true,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        final isHighlighted = index == _touchedIndex;
+                        return FlDotCirclePainter(
+                          radius: isHighlighted
+                              ? 6
+                              : (chartData.length < 15 ? 3 : 0),
+                          color: Colors.green,
+                          strokeWidth: isHighlighted ? 3 : 2,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.green.withOpacity(0.25),
+                          Colors.green.withOpacity(0.05),
+                        ],
                       ),
                     ),
                   ),
-                  borderData: FlBorderData(show: false),
-                  minX: 0,
-                  maxX: (chartData.length - 1).toDouble(),
-                  minY: 0,
-                  maxY: _getMaxRevenue(chartData) * 1.15,
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: chartData.asMap().entries.map((entry) {
-                        return FlSpot(
-                          entry.key.toDouble(),
-                          (entry.value['revenue'] as num).toDouble(),
-                        );
-                      }).toList(),
-                      isCurved: true,
-                      curveSmoothness: 0.25,
-                      color: Colors.green,
-                      barWidth: isSmall ? 2.5 : 3,
-                      isStrokeCapRound: true,
-                      dotData: FlDotData(
-                        show: true,
-                        getDotPainter: (spot, percent, barData, index) {
-                          final isHighlighted = index == _touchedIndex;
-                          return FlDotCirclePainter(
-                            radius: isHighlighted
-                                ? 6
-                                : (chartData.length < 15 ? 3 : 0),
-                            color: Colors.green,
-                            strokeWidth: isHighlighted ? 3 : 2,
-                            strokeColor: Colors.white,
-                          );
-                        },
-                      ),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.green.withOpacity(0.25),
-                            Colors.green.withOpacity(0.05),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                ],
               ),
             ),
+          ),
 
-            // Insights section
-            if (widget.showInsights && stats != null) ...[
-              SizedBox(height: isSmall ? 12 : 16),
-              ChartDescription(
-                isCompact: isSmall,
-                summary: _generateSummary(chartData, totalRevenue),
-                insights: _generateInsights(chartData, stats),
-              ),
-            ],
+          // Insights section
+          if (widget.showInsights && stats != null) ...[
+            SizedBox(height: isSmall ? 12 : 16),
+            ChartDescription(
+              isCompact: isSmall,
+              summary: _generateSummary(chartData, totalRevenue),
+              insights: _generateInsights(chartData, stats),
+            ),
           ],
-        );
-      },
-    );
+        ],
+      );
+    });
   }
 
   Widget _buildSummaryStats({
@@ -305,9 +301,12 @@ class _RevenueChartState extends State<RevenueChart> {
     Map<String, dynamic>? percentageChange,
     required bool isSmall,
   }) {
-    return Row(
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
       children: [
-        Expanded(
+        SizedBox(
+          width: isSmall ? double.infinity : (percentageChange != null ? 180 : 150),
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'إجمالي الإيرادات' : 'Total Revenue',
             value: ReportDataProcessor.formatCurrencyCompact(totalRevenue),
@@ -316,8 +315,8 @@ class _RevenueChartState extends State<RevenueChart> {
             percentageChange: percentageChange?['revenue']?.toDouble(),
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
+        SizedBox(
+          width: isSmall ? double.infinity : (percentageChange != null ? 180 : 150),
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'المعاملات' : 'Transactions',
             value: totalTransactions.toString(),
@@ -423,13 +422,27 @@ class _RevenueChartState extends State<RevenueChart> {
   }
 
   double _getMaxRevenue(List<dynamic> data) {
-    if (data.isEmpty) return 1000;
+    if (data.isEmpty) return 0;
     double max = 0;
     for (final item in data) {
       final revenue = (item['revenue'] as num?)?.toDouble() ?? 0;
       if (revenue > max) max = revenue;
     }
-    return max > 0 ? max : 1000;
+    return max;
+  }
+
+  double _getInterval(double max) {
+    if (max <= 0) return 250;
+    if (max < 10) return 2.5;
+    if (max < 100) return 25;
+    if (max < 1000) return 250;
+    if (max < 10000) return 2500;
+    return (max / 4).ceilToDouble();
+  }
+
+  double _getMaxY(double max) {
+    if (max <= 0) return 1000;
+    return (max * 1.2).ceilToDouble();
   }
 }
 
@@ -494,211 +507,227 @@ class _RevenueByLineChartState extends State<RevenueByLineChart> {
     final totalRevenue =
         entries.fold<double>(0, (sum, e) => sum + (e.value as num).toDouble());
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
-        final barWidth = isSmall ? 16.0 : 24.0;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
+      final barWidth = isSmall ? 16.0 : 24.0;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Legend
-            if (widget.showLegend && entries.length <= 8) ...[
-              CompactLegend(
-                items: entries.take(8).toList().asMap().entries.map((entry) {
-                  final percentage =
-                      (entry.value.value as num) / totalRevenue * 100;
-                  return LegendItem(
-                    label: entry.value.key.length > 12
-                        ? '${entry.value.key.substring(0, 12)}...'
-                        : entry.value.key,
-                    color: _barColors[entry.key % _barColors.length],
-                    value: '${percentage.toStringAsFixed(1)}%',
-                  );
-                }).toList(),
-              ),
-              SizedBox(height: isSmall ? 12 : 16),
-            ],
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Legend
+          if (widget.showLegend && entries.length <= 8) ...[
+            CompactLegend(
+              items: entries.take(8).toList().asMap().entries.map((entry) {
+                final percentage =
+                    (entry.value.value as num) / totalRevenue * 100;
+                return LegendItem(
+                  label: entry.value.key.length > 12
+                      ? '${entry.value.key.substring(0, 12)}...'
+                      : entry.value.key,
+                  color: _barColors[entry.key % _barColors.length],
+                  value: '${percentage.toStringAsFixed(1)}%',
+                );
+              }).toList(),
+            ),
+            SizedBox(height: isSmall ? 12 : 16),
+          ],
 
-            // Chart
-            ResponsiveChartContainer(
-              preferredSize: ChartSize.large,
-              chart: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: _getMaxRevenue(entries) * 1.15,
-                  barTouchData: BarTouchData(
-                    enabled: true,
-                    touchTooltipData: BarTouchTooltipData(
-                      fitInsideHorizontally: true,
-                      fitInsideVertically: true,
-                      tooltipRoundedRadius: 12,
-                      tooltipPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      getTooltipColor: (group) => AppTheme.isDarkMode
-                          ? const Color(0xFF1A1F35)
-                          : Colors.white,
-                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        final entry = entries[group.x];
-                        final percentage =
-                            (entry.value as num) / totalRevenue * 100;
-                        return BarTooltipItem(
-                          '${entry.key}\n${ReportDataProcessor.formatCurrencyCompact(entry.value)}\n${percentage.toStringAsFixed(1)}% of total',
-                          TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+          // Chart
+          ResponsiveChartContainer(
+            preferredSize: ChartSize.large,
+            chart: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: _getMaxY(_getMaxRevenueByLine(entries)),
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    tooltipRoundedRadius: 12,
+                    tooltipPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    getTooltipColor: (group) => AppTheme.isDarkMode
+                        ? const Color(0xFF1A1F35)
+                        : Colors.white,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final entry = entries[group.x];
+                      final percentage =
+                          (entry.value as num) / totalRevenue * 100;
+                      return BarTooltipItem(
+                        '${entry.key}\n${ReportDataProcessor.formatCurrencyCompact(entry.value)}\n${percentage.toStringAsFixed(1)}% of total',
+                        TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      );
+                    },
+                  ),
+                  touchCallback: (event, response) {
+                    setState(() {
+                      if (event.isInterestedForInteractions &&
+                          response?.spot != null) {
+                        _touchedIndex = response!.spot!.touchedBarGroupIndex;
+                      } else {
+                        _touchedIndex = null;
+                      }
+                    });
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        if (value.toInt() >= 0 &&
+                            value.toInt() < entries.length) {
+                          final lineid = entries[value.toInt()].key;
+                          final isHighlighted = _touchedIndex == value.toInt();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: RotatedBox(
+                              quarterTurns: isSmall ? 1 : 0,
+                              child: Text(
+                                lineid.length > 8
+                                    ? '${lineid.substring(0, 8)}...'
+                                    : lineid,
+                                style: TextStyle(
+                                  color: isHighlighted
+                                      ? _barColors[
+                                          value.toInt() % _barColors.length]
+                                      : AppTheme.textSecondary,
+                                  fontSize: isSmall ? 9 : 10,
+                                  fontWeight: isHighlighted
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                      reservedSize: isSmall ? 50 : 40,
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isSmall ? 50 : 60,
+                      interval: _getInterval(_getMaxRevenueByLine(entries)),
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return const Text('');
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Text(
+                            ReportDataProcessor.formatCurrencyCompact(value),
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: isSmall ? 9 : 10,
+                            ),
                           ),
                         );
                       },
                     ),
-                    touchCallback: (event, response) {
-                      setState(() {
-                        if (event.isInterestedForInteractions &&
-                            response?.spot != null) {
-                          _touchedIndex = response!.spot!.touchedBarGroupIndex;
-                        } else {
-                          _touchedIndex = null;
-                        }
-                      });
-                    },
                   ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          if (value.toInt() >= 0 &&
-                              value.toInt() < entries.length) {
-                            final lineid = entries[value.toInt()].key;
-                            final isHighlighted =
-                                _touchedIndex == value.toInt();
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: RotatedBox(
-                                quarterTurns: isSmall ? 1 : 0,
-                                child: Text(
-                                  lineid.length > 8
-                                      ? '${lineid.substring(0, 8)}...'
-                                      : lineid,
-                                  style: TextStyle(
-                                    color: isHighlighted
-                                        ? _barColors[
-                                            value.toInt() % _barColors.length]
-                                        : AppTheme.textSecondary,
-                                    fontSize: isSmall ? 9 : 10,
-                                    fontWeight: isHighlighted
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                        reservedSize: isSmall ? 50 : 40,
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: isSmall ? 45 : 55,
-                        getTitlesWidget: (value, meta) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: Text(
-                              ReportDataProcessor.formatCurrencyCompact(value),
-                              style: TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: isSmall ? 9 : 10,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
                   ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: AppTheme.getCardBorder(0.15),
-                        strokeWidth: 1,
-                        dashArray: [5, 5],
-                      );
-                    },
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
                   ),
-                  borderData: FlBorderData(show: false),
-                  barGroups: entries.asMap().entries.map((entry) {
-                    final isHighlighted = _touchedIndex == entry.key;
-                    final color = _barColors[entry.key % _barColors.length];
-                    return BarChartGroupData(
-                      x: entry.key,
-                      barRods: [
-                        BarChartRodData(
-                          toY: (entry.value.value as num).toDouble(),
-                          color: isHighlighted ? color : color.withOpacity(0.8),
-                          width: isHighlighted ? barWidth * 1.1 : barWidth,
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(6)),
-                          backDrawRodData: BackgroundBarChartRodData(
-                            show: true,
-                            toY: _getMaxRevenue(entries) * 1.15,
-                            color: AppTheme.getCardBorder(0.05),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
                 ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval:
+                      _getInterval(_getMaxRevenueByLine(entries)),
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: AppTheme.getCardBorder(0.15),
+                      strokeWidth: 1,
+                      dashArray: [5, 5],
+                    );
+                  },
+                ),
+                borderData: FlBorderData(show: false),
+                barGroups: entries.asMap().entries.map((entry) {
+                  final isHighlighted = _touchedIndex == entry.key;
+                  final color = _barColors[entry.key % _barColors.length];
+                  final maxVal = _getMaxRevenueByLine(entries);
+                  return BarChartGroupData(
+                    x: entry.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: (entry.value.value as num).toDouble(),
+                        color: isHighlighted ? color : color.withOpacity(0.8),
+                        width: isHighlighted ? barWidth * 1.1 : barWidth,
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(6)),
+                        backDrawRodData: BackgroundBarChartRodData(
+                          show: true,
+                          toY: _getMaxY(maxVal),
+                          color: AppTheme.getCardBorder(0.05),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
               ),
             ),
+          ),
 
-            // Summary insight
-            SizedBox(height: isSmall ? 12 : 16),
-            ChartDescription(
-              isCompact: isSmall,
-              insights: [
+          // Summary insight
+          SizedBox(height: isSmall ? 12 : 16),
+          ChartDescription(
+            isCompact: isSmall,
+            insights: [
+              ChartInsight(
+                label: widget.isArabic ? 'الإجمالي' : 'Total',
+                value: ReportDataProcessor.formatCurrencyCompact(totalRevenue),
+                color: Colors.green,
+                icon: Icons.attach_money,
+              ),
+              if (entries.isNotEmpty)
                 ChartInsight(
-                  label: widget.isArabic ? 'الإجمالي' : 'Total',
-                  value:
-                      ReportDataProcessor.formatCurrencyCompact(totalRevenue),
-                  color: Colors.green,
-                  icon: Icons.attach_money,
+                  label: widget.isArabic ? 'الأعلى' : 'Top Line',
+                  value: entries.first.key.length > 15
+                      ? '${entries.first.key.substring(0, 15)}...'
+                      : entries.first.key,
+                  color: _barColors[0],
+                  icon: Icons.star,
                 ),
-                if (entries.isNotEmpty)
-                  ChartInsight(
-                    label: widget.isArabic ? 'الأعلى' : 'Top Line',
-                    value: entries.first.key.length > 15
-                        ? '${entries.first.key.substring(0, 15)}...'
-                        : entries.first.key,
-                    color: _barColors[0],
-                    icon: Icons.star,
-                  ),
-              ],
-            ),
-          ],
-        );
-      },
-    );
+            ],
+          ),
+        ],
+      );
+    });
   }
 
-  double _getMaxRevenue(List<MapEntry<String, dynamic>> entries) {
-    if (entries.isEmpty) return 1000;
+  double _getMaxRevenueByLine(List<MapEntry<String, dynamic>> entries) {
+    if (entries.isEmpty) return 0;
     double max = 0;
     for (final entry in entries) {
       final revenue = (entry.value as num).toDouble();
       if (revenue > max) max = revenue;
     }
-    return max > 0 ? max : 1000;
+    return max;
+  }
+
+  double _getInterval(double max) {
+    if (max <= 0) return 250;
+    if (max < 10) return 2.5;
+    if (max < 100) return 25;
+    if (max < 1000) return 250;
+    if (max < 10000) return 2500;
+    return (max / 4).ceilToDouble();
+  }
+
+  double _getMaxY(double max) {
+    if (max <= 0) return 1000;
+    return (max * 1.2).ceilToDouble();
   }
 }

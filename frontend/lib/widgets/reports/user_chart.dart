@@ -42,7 +42,6 @@ class _UserGrowthChartState extends State<UserGrowthChart> {
     final byRole = widget.data['byRole'] as Map<String, dynamic>? ?? {};
     final growthRate = widget.data['growthRate'] as num? ?? 0;
     final active = widget.data['active'] ?? 0;
-    final inactive = widget.data['inactive'] ?? 0;
     final percentageChange =
         widget.data['percentageChange'] as Map<String, dynamic>?;
 
@@ -66,228 +65,224 @@ class _UserGrowthChartState extends State<UserGrowthChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Summary stats
-            _buildSummaryStats(
-              total: total,
-              byRole: byRole,
-              active: active,
-              growthRate: growthRate,
-              percentageChange: percentageChange,
-              isSmall: isSmall,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Summary stats
+          _buildSummaryStats(
+            total: total,
+            byRole: byRole,
+            active: active,
+            growthRate: growthRate,
+            percentageChange: percentageChange,
+            isSmall: isSmall,
+          ),
+          SizedBox(height: isSmall ? 12 : 16),
+
+          // Interactive legend
+          if (widget.showLegend) ...[
+            ChartLegend(
+              items: [
+                LegendItem(
+                  label: widget.isArabic ? 'الإجمالي' : 'Total',
+                  color: _seriesColors['total']!,
+                  shape: LegendShape.line,
+                  isVisible: _seriesVisibility['total']!,
+                ),
+                LegendItem(
+                  label: widget.isArabic ? 'السائقين' : 'Drivers',
+                  color: _seriesColors['drivers']!,
+                  shape: LegendShape.line,
+                  isVisible: _seriesVisibility['drivers']!,
+                ),
+                LegendItem(
+                  label: widget.isArabic ? 'الركاب' : 'Passengers',
+                  color: _seriesColors['passengers']!,
+                  shape: LegendShape.line,
+                  isVisible: _seriesVisibility['passengers']!,
+                ),
+              ],
+              onToggle: (index, isVisible) {
+                setState(() {
+                  final keys = ['total', 'drivers', 'passengers'];
+                  if (index < keys.length) {
+                    _seriesVisibility[keys[index]] = isVisible;
+                  }
+                });
+              },
             ),
             SizedBox(height: isSmall ? 12 : 16),
+          ],
 
-            // Interactive legend
-            if (widget.showLegend) ...[
-              ChartLegend(
-                items: [
-                  LegendItem(
-                    label: widget.isArabic ? 'الإجمالي' : 'Total',
-                    color: _seriesColors['total']!,
-                    shape: LegendShape.line,
-                    isVisible: _seriesVisibility['total']!,
-                  ),
-                  LegendItem(
-                    label: widget.isArabic ? 'السائقين' : 'Drivers',
-                    color: _seriesColors['drivers']!,
-                    shape: LegendShape.line,
-                    isVisible: _seriesVisibility['drivers']!,
-                  ),
-                  LegendItem(
-                    label: widget.isArabic ? 'الركاب' : 'Passengers',
-                    color: _seriesColors['passengers']!,
-                    shape: LegendShape.line,
-                    isVisible: _seriesVisibility['passengers']!,
-                  ),
-                ],
-                onToggle: (index, isVisible) {
-                  setState(() {
-                    final keys = ['total', 'drivers', 'passengers'];
-                    if (index < keys.length) {
-                      _seriesVisibility[keys[index]] = isVisible;
-                    }
-                  });
-                },
-              ),
-              SizedBox(height: isSmall ? 12 : 16),
-            ],
+          // Chart
+          ResponsiveChartContainer(
+            preferredSize: isSmall ? ChartSize.medium : ChartSize.large,
+            chart: LineChart(
+              LineChartData(
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    tooltipRoundedRadius: 12,
+                    tooltipPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    getTooltipColor: (touchedSpot) => AppTheme.isDarkMode
+                        ? const Color(0xFF1A1F35)
+                        : Colors.white,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        final idx = spot.x.toInt();
+                        if (idx >= 0 && idx < chartData.length) {
+                          final dataPoint = chartData[idx];
+                          final date = dataPoint['date'] as String? ?? '';
+                          final totalVal = dataPoint['total'] ?? 0;
+                          final driversVal = dataPoint['drivers'] ?? 0;
+                          final passengersVal = dataPoint['passengers'] ?? 0;
 
-            // Chart
-            ResponsiveChartContainer(
-              preferredSize: isSmall ? ChartSize.medium : ChartSize.large,
-              chart: LineChart(
-                LineChartData(
-                  lineTouchData: LineTouchData(
-                    enabled: true,
-                    touchTooltipData: LineTouchTooltipData(
-                      fitInsideHorizontally: true,
-                      fitInsideVertically: true,
-                      tooltipRoundedRadius: 12,
-                      tooltipPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      getTooltipColor: (touchedSpot) => AppTheme.isDarkMode
-                          ? const Color(0xFF1A1F35)
-                          : Colors.white,
-                      getTooltipItems: (touchedSpots) {
-                        return touchedSpots.map((spot) {
-                          final idx = spot.x.toInt();
-                          if (idx >= 0 && idx < chartData.length) {
-                            final dataPoint = chartData[idx];
-                            final date = dataPoint['date'] as String? ?? '';
-                            final totalVal = dataPoint['total'] ?? 0;
-                            final driversVal = dataPoint['drivers'] ?? 0;
-                            final passengersVal = dataPoint['passengers'] ?? 0;
-
-                            return LineTooltipItem(
-                              '${ChartTooltipHelper.formatDate(date)}\n'
-                              '${widget.isArabic ? 'الإجمالي' : 'Total'}: $totalVal\n'
-                              '${widget.isArabic ? 'سائقين' : 'Drivers'}: $driversVal\n'
-                              '${widget.isArabic ? 'ركاب' : 'Passengers'}: $passengersVal',
-                              TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            );
-                          }
-                          return null;
-                        }).toList();
-                      },
-                    ),
-                    touchCallback: (event, response) {
-                      setState(() {
-                        if (event.isInterestedForInteractions &&
-                            response?.lineBarSpots != null &&
-                            response!.lineBarSpots!.isNotEmpty) {
-                          _touchedIndex =
-                              response.lineBarSpots!.first.x.toInt();
-                        } else {
-                          _touchedIndex = null;
+                          return LineTooltipItem(
+                            '${ChartTooltipHelper.formatDate(date)}\n'
+                            '${widget.isArabic ? 'الإجمالي' : 'Total'}: $totalVal\n'
+                            '${widget.isArabic ? 'سائقين' : 'Drivers'}: $driversVal\n'
+                            '${widget.isArabic ? 'ركاب' : 'Passengers'}: $passengersVal',
+                            TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
                         }
-                      });
+                        return null;
+                      }).toList();
                     },
                   ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: _getMaxUsers(chartData) / 5,
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: AppTheme.getCardBorder(0.15),
-                        strokeWidth: 1,
-                        dashArray: [5, 5],
-                      );
-                    },
+                  touchCallback: (event, response) {
+                    setState(() {
+                      if (event.isInterestedForInteractions &&
+                          response?.lineBarSpots != null &&
+                          response!.lineBarSpots!.isNotEmpty) {
+                        _touchedIndex = response.lineBarSpots!.first.x.toInt();
+                      } else {
+                        _touchedIndex = null;
+                      }
+                    });
+                  },
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: _getInterval(_getMaxUsers(chartData)),
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: AppTheme.getCardBorder(0.15),
+                      strokeWidth: 1,
+                      dashArray: [5, 5],
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
                   ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: isSmall ? 22 : 26,
-                        interval: chartData.length > 10
-                            ? (chartData.length / (isSmall ? 4 : 6))
-                                .ceilToDouble()
-                            : 1,
-                        getTitlesWidget: (value, meta) {
-                          final idx = value.toInt();
-                          if (idx >= 0 && idx < chartData.length) {
-                            final date = chartData[idx]['date'] as String;
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                date.length > 10
-                                    ? date.substring(5, 10)
-                                    : date.substring(5),
-                                style: TextStyle(
-                                  color: _touchedIndex == idx
-                                      ? Colors.blue
-                                      : AppTheme.textSecondary,
-                                  fontSize: isSmall ? 9 : 10,
-                                  fontWeight: _touchedIndex == idx
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: isSmall ? 35 : 40,
-                        interval: _getMaxUsers(chartData) / 4,
-                        getTitlesWidget: (value, meta) {
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isSmall ? 22 : 26,
+                      interval: chartData.length > 10
+                          ? (chartData.length / (isSmall ? 4 : 6)).ceilToDouble()
+                          : 1,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx >= 0 && idx < chartData.length) {
+                          final date = chartData[idx]['date'] as String;
                           return Padding(
-                            padding: const EdgeInsets.only(right: 4),
+                            padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              value.toInt().toString(),
+                              date.length >= 10 ? date.substring(5, 10) : date,
                               style: TextStyle(
-                                color: AppTheme.textSecondary,
+                                color: _touchedIndex == idx
+                                    ? Colors.blue
+                                    : AppTheme.textSecondary,
                                 fontSize: isSmall ? 9 : 10,
+                                fontWeight: _touchedIndex == idx
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
                           );
-                        },
-                      ),
+                        }
+                        return const Text('');
+                      },
                     ),
                   ),
-                  borderData: FlBorderData(show: false),
-                  minX: 0,
-                  maxX: (chartData.length - 1).toDouble(),
-                  minY: 0,
-                  maxY: _getMaxUsers(chartData) * 1.15,
-                  lineBarsData: _buildLineBarsData(chartData, isSmall),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isSmall ? 40 : 50,
+                      interval: _getInterval(_getMaxUsers(chartData)),
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return const Text('');
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Text(
+                            value.toInt().toString(),
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: isSmall ? 9 : 10,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ),
+                borderData: FlBorderData(show: false),
+                minX: 0,
+                maxX: (chartData.length - 1).toDouble(),
+                minY: 0,
+                maxY: _getMaxY(_getMaxUsers(chartData)),
+                lineBarsData: _buildLineBarsData(chartData, isSmall),
               ),
             ),
+          ),
 
-            // Insights
-            if (widget.showInsights) ...[
-              SizedBox(height: isSmall ? 12 : 16),
-              ChartDescription(
-                isCompact: isSmall,
-                summary: _generateSummary(growthRate.toDouble(), total),
-                insights: [
-                  ChartInsight(
-                    label: widget.isArabic ? 'معدل النمو' : 'Growth Rate',
-                    value:
-                        '${growthRate >= 0 ? '+' : ''}${growthRate.toStringAsFixed(1)}%',
-                    color: growthRate >= 0 ? Colors.green : Colors.red,
-                    icon: growthRate >= 0
-                        ? Icons.trending_up
-                        : Icons.trending_down,
-                  ),
-                  ChartInsight(
-                    label: widget.isArabic ? 'نشط' : 'Active',
-                    value:
-                        '$active (${total > 0 ? (active / total * 100).toStringAsFixed(1) : 0}%)',
-                    color: Colors.green,
-                    icon: Icons.person,
-                  ),
-                ],
-              ),
-            ],
+          // Insights
+          if (widget.showInsights) ...[
+            SizedBox(height: isSmall ? 12 : 16),
+            ChartDescription(
+              isCompact: isSmall,
+              summary: _generateSummary(growthRate.toDouble(), total),
+              insights: [
+                ChartInsight(
+                  label: widget.isArabic ? 'معدل النمو' : 'Growth Rate',
+                  value:
+                      '${growthRate >= 0 ? '+' : ''}${growthRate.toStringAsFixed(1)}%',
+                  color: growthRate >= 0 ? Colors.green : Colors.red,
+                  icon: growthRate >= 0
+                      ? Icons.trending_up
+                      : Icons.trending_down,
+                ),
+                ChartInsight(
+                  label: widget.isArabic ? 'نشط' : 'Active',
+                  value:
+                      '$active (${total > 0 ? (active / total * 100).toStringAsFixed(1) : 0}%)',
+                  color: Colors.green,
+                  icon: Icons.person,
+                ),
+              ],
+            ),
           ],
-        );
-      },
-    );
+        ],
+      );
+    });
   }
 
   Widget _buildSummaryStats({
@@ -303,7 +298,7 @@ class _UserGrowthChartState extends State<UserGrowthChart> {
       runSpacing: 12,
       children: [
         SizedBox(
-          width: isSmall ? double.infinity : 130,
+          width: isSmall ? double.infinity : 150,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'إجمالي المستخدمين' : 'Total Users',
             value: total.toString(),
@@ -313,7 +308,7 @@ class _UserGrowthChartState extends State<UserGrowthChart> {
           ),
         ),
         SizedBox(
-          width: isSmall ? double.infinity : 130,
+          width: isSmall ? double.infinity : 150,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'السائقين' : 'Drivers',
             value: (byRole['drivers'] ?? 0).toString(),
@@ -323,7 +318,7 @@ class _UserGrowthChartState extends State<UserGrowthChart> {
           ),
         ),
         SizedBox(
-          width: isSmall ? double.infinity : 130,
+          width: isSmall ? double.infinity : 150,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'الركاب' : 'Passengers',
             value: (byRole['passengers'] ?? 0).toString(),
@@ -439,13 +434,27 @@ class _UserGrowthChartState extends State<UserGrowthChart> {
   }
 
   double _getMaxUsers(List<dynamic> data) {
-    if (data.isEmpty) return 100;
+    if (data.isEmpty) return 0;
     double max = 0;
     for (final item in data) {
       final total = (item['total'] as num?)?.toDouble() ?? 0;
       if (total > max) max = total;
     }
-    return max > 0 ? max : 100;
+    return max;
+  }
+
+  double _getInterval(double max) {
+    if (max <= 0) return 10;
+    if (max < 20) return 5;
+    if (max < 100) return 25;
+    if (max < 500) return 100;
+    if (max < 1000) return 250;
+    return (max / 4).ceilToDouble();
+  }
+
+  double _getMaxY(double max) {
+    if (max <= 0) return 20;
+    return (max * 1.2).ceilToDouble();
   }
 }
 
@@ -517,126 +526,124 @@ class _UserByRoleChartState extends State<UserByRoleChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
-        final gaugeSize = isSmall ? 180.0 : 220.0;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
+      final gaugeSize = isSmall ? 180.0 : 220.0;
 
-        return Column(
-          children: [
-            // Legend
-            CompactLegend(
-              items: roleData
-                  .map((item) => LegendItem(
-                        label: item['label'] as String,
-                        color: item['color'] as Color,
-                        value: total > 0
-                            ? '${((item['value'] as num) / total * 100).toStringAsFixed(1)}%'
-                            : '0%',
-                      ))
-                  .toList(),
-            ),
-            SizedBox(height: isSmall ? 12 : 16),
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Legend
+          CompactLegend(
+            items: roleData
+                .map((item) => LegendItem(
+                      label: item['label'] as String,
+                      color: item['color'] as Color,
+                      value: total > 0
+                          ? '${((item['value'] as num) / total * 100).toStringAsFixed(1)}%'
+                          : '0%',
+                    ))
+                .toList(),
+          ),
+          SizedBox(height: isSmall ? 12 : 16),
 
-            // Donut chart
-            SizedBox(
-              height: gaugeSize,
-              width: gaugeSize,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  PieChart(
-                    PieChartData(
-                      pieTouchData: PieTouchData(
-                        enabled: true,
-                        touchCallback: (event, response) {
-                          setState(() {
-                            if (event.isInterestedForInteractions &&
-                                response?.touchedSection != null) {
-                              _touchedIndex =
-                                  response!.touchedSection!.touchedSectionIndex;
-                            } else {
-                              _touchedIndex = null;
-                            }
-                          });
-                        },
-                      ),
-                      sectionsSpace: 3,
-                      centerSpaceRadius: isSmall ? 45 : 60,
-                      sections: roleData.asMap().entries.map((entry) {
-                        final isHighlighted = entry.key == _touchedIndex;
-                        final color = entry.value['color'] as Color;
-                        final value = entry.value['value'] as num;
-                        final percentage =
-                            total > 0 ? (value / total * 100) : 0;
-
-                        return PieChartSectionData(
-                          value: value.toDouble(),
-                          color: color,
-                          title: isHighlighted
-                              ? '${percentage.toStringAsFixed(1)}%'
-                              : '',
-                          radius: isHighlighted
-                              ? (isSmall ? 50 : 65)
-                              : (isSmall ? 40 : 55),
-                          titleStyle: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        total.toString(),
-                        style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: isSmall ? 24 : 32,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        widget.isArabic ? 'مستخدم' : 'Users',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: isSmall ? 11 : 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: isSmall ? 12 : 16),
-
-            // Activity status
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+          // Donut chart
+          SizedBox(
+            height: gaugeSize,
+            width: gaugeSize,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                _buildActivityBadge(
-                  label: widget.isArabic ? 'نشط' : 'Active',
-                  value: active,
-                  color: Colors.green,
-                  isSmall: isSmall,
+                PieChart(
+                  PieChartData(
+                    pieTouchData: PieTouchData(
+                      enabled: true,
+                      touchCallback: (event, response) {
+                        setState(() {
+                          if (event.isInterestedForInteractions &&
+                              response?.touchedSection != null) {
+                            _touchedIndex =
+                                response!.touchedSection!.touchedSectionIndex;
+                          } else {
+                            _touchedIndex = null;
+                          }
+                        });
+                      },
+                    ),
+                    sectionsSpace: 3,
+                    centerSpaceRadius: isSmall ? 45 : 60,
+                    sections: roleData.asMap().entries.map((entry) {
+                      final isHighlighted = entry.key == _touchedIndex;
+                      final color = entry.value['color'] as Color;
+                      final value = entry.value['value'] as num;
+                      final percentage = total > 0 ? (value / total * 100) : 0;
+
+                      return PieChartSectionData(
+                        value: value.toDouble(),
+                        color: color,
+                        title: isHighlighted
+                            ? '${percentage.toStringAsFixed(1)}%'
+                            : '',
+                        radius: isHighlighted
+                            ? (isSmall ? 50 : 65)
+                            : (isSmall ? 40 : 55),
+                        titleStyle: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
-                const SizedBox(width: 16),
-                _buildActivityBadge(
-                  label: widget.isArabic ? 'غير نشط' : 'Inactive',
-                  value: inactive,
-                  color: Colors.grey,
-                  isSmall: isSmall,
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      total.toString(),
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: isSmall ? 24 : 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      widget.isArabic ? 'مستخدم' : 'Users',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: isSmall ? 11 : 13,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        );
-      },
-    );
+          ),
+
+          SizedBox(height: isSmall ? 12 : 16),
+
+          // Activity status
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildActivityBadge(
+                label: widget.isArabic ? 'نشط' : 'Active',
+                value: active,
+                color: Colors.green,
+                isSmall: isSmall,
+              ),
+              const SizedBox(width: 16),
+              _buildActivityBadge(
+                label: widget.isArabic ? 'غير نشط' : 'Inactive',
+                value: inactive,
+                color: Colors.grey,
+                isSmall: isSmall,
+              ),
+            ],
+          ),
+        ],
+      );
+    });
   }
 
   Widget _buildActivityBadge({

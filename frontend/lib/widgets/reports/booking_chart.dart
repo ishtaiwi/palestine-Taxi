@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:responsive_sizer/responsive_sizer.dart';
 import '../../theme/app_theme.dart';
 import 'shared/shared.dart';
 
@@ -68,232 +67,227 @@ class _BookingTimeSeriesChartState extends State<BookingTimeSeriesChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Summary stats
-            _buildSummaryStats(
-              totalBookings: totalBookings,
-              confirmationRate: confirmationRate,
-              byStatus: byStatus,
-              percentageChange: percentageChange,
-              isSmall: isSmall,
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Summary stats
+          _buildSummaryStats(
+            totalBookings: totalBookings,
+            confirmationRate: confirmationRate,
+            byStatus: byStatus,
+            percentageChange: percentageChange,
+            isSmall: isSmall,
+          ),
+          SizedBox(height: isSmall ? 12 : 16),
+
+          // Interactive legend
+          if (widget.showLegend) ...[
+            ChartLegend(
+              items: [
+                LegendItem(
+                  label: widget.isArabic ? 'الإجمالي' : 'Total',
+                  color: _seriesColors['total']!,
+                  shape: LegendShape.line,
+                  isVisible: _seriesVisibility['total']!,
+                ),
+                LegendItem(
+                  label: widget.isArabic ? 'مؤكد' : 'Confirmed',
+                  color: _seriesColors['confirmed']!,
+                  shape: LegendShape.line,
+                  isVisible: _seriesVisibility['confirmed']!,
+                ),
+                LegendItem(
+                  label: widget.isArabic ? 'ملغي' : 'Cancelled',
+                  color: _seriesColors['cancelled']!,
+                  shape: LegendShape.line,
+                  isVisible: _seriesVisibility['cancelled']!,
+                ),
+              ],
+              onToggle: (index, isVisible) {
+                setState(() {
+                  final keys = ['total', 'confirmed', 'cancelled'];
+                  if (index < keys.length) {
+                    _seriesVisibility[keys[index]] = isVisible;
+                  }
+                });
+              },
             ),
             SizedBox(height: isSmall ? 12 : 16),
+          ],
 
-            // Interactive legend
-            if (widget.showLegend) ...[
-              ChartLegend(
-                items: [
-                  LegendItem(
-                    label: widget.isArabic ? 'الإجمالي' : 'Total',
-                    color: _seriesColors['total']!,
-                    shape: LegendShape.line,
-                    isVisible: _seriesVisibility['total']!,
-                  ),
-                  LegendItem(
-                    label: widget.isArabic ? 'مؤكد' : 'Confirmed',
-                    color: _seriesColors['confirmed']!,
-                    shape: LegendShape.line,
-                    isVisible: _seriesVisibility['confirmed']!,
-                  ),
-                  LegendItem(
-                    label: widget.isArabic ? 'ملغي' : 'Cancelled',
-                    color: _seriesColors['cancelled']!,
-                    shape: LegendShape.line,
-                    isVisible: _seriesVisibility['cancelled']!,
-                  ),
-                ],
-                onToggle: (index, isVisible) {
-                  setState(() {
-                    final keys = ['total', 'confirmed', 'cancelled'];
-                    if (index < keys.length) {
-                      _seriesVisibility[keys[index]] = isVisible;
-                    }
-                  });
-                },
-              ),
-              SizedBox(height: isSmall ? 12 : 16),
-            ],
+          // Chart
+          ResponsiveChartContainer(
+            preferredSize: isSmall ? ChartSize.medium : ChartSize.large,
+            chart: LineChart(
+              LineChartData(
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    tooltipRoundedRadius: 12,
+                    tooltipPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    getTooltipColor: (touchedSpot) => AppTheme.isDarkMode
+                        ? const Color(0xFF1A1F35)
+                        : Colors.white,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        final idx = spot.x.toInt();
+                        if (idx >= 0 && idx < chartData.length) {
+                          final dataPoint = chartData[idx];
+                          final date = dataPoint['date'] as String? ?? '';
+                          final total = dataPoint['total'] ?? 0;
+                          final confirmed = dataPoint['confirmed'] ?? 0;
+                          final cancelled = dataPoint['cancelled'] ?? 0;
+                          final pending = dataPoint['pending'] ?? 0;
+                          final rate =
+                              total > 0 ? (confirmed / total * 100) : 0;
 
-            // Chart
-            ResponsiveChartContainer(
-              preferredSize: isSmall ? ChartSize.medium : ChartSize.large,
-              chart: LineChart(
-                LineChartData(
-                  lineTouchData: LineTouchData(
-                    enabled: true,
-                    touchTooltipData: LineTouchTooltipData(
-                      fitInsideHorizontally: true,
-                      fitInsideVertically: true,
-                      tooltipRoundedRadius: 12,
-                      tooltipPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      getTooltipColor: (touchedSpot) => AppTheme.isDarkMode
-                          ? const Color(0xFF1A1F35)
-                          : Colors.white,
-                      getTooltipItems: (touchedSpots) {
-                        return touchedSpots.map((spot) {
-                          final idx = spot.x.toInt();
-                          if (idx >= 0 && idx < chartData.length) {
-                            final dataPoint = chartData[idx];
-                            final date = dataPoint['date'] as String? ?? '';
-                            final total = dataPoint['total'] ?? 0;
-                            final confirmed = dataPoint['confirmed'] ?? 0;
-                            final cancelled = dataPoint['cancelled'] ?? 0;
-                            final pending = dataPoint['pending'] ?? 0;
-                            final rate =
-                                total > 0 ? (confirmed / total * 100) : 0;
-
-                            return LineTooltipItem(
-                              '${ChartTooltipHelper.formatDate(date)}\n'
-                              '${widget.isArabic ? 'الإجمالي' : 'Total'}: $total\n'
-                              '${widget.isArabic ? 'مؤكد' : 'Confirmed'}: $confirmed\n'
-                              '${widget.isArabic ? 'ملغي' : 'Cancelled'}: $cancelled\n'
-                              '${widget.isArabic ? 'قيد الانتظار' : 'Pending'}: $pending\n'
-                              '${widget.isArabic ? 'معدل التأكيد' : 'Confirm Rate'}: ${rate.toStringAsFixed(1)}%',
-                              TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            );
-                          }
-                          return null;
-                        }).toList();
-                      },
-                    ),
-                    touchCallback: (event, response) {
-                      setState(() {
-                        if (event.isInterestedForInteractions &&
-                            response?.lineBarSpots != null &&
-                            response!.lineBarSpots!.isNotEmpty) {
-                          _touchedIndex =
-                              response.lineBarSpots!.first.x.toInt();
-                        } else {
-                          _touchedIndex = null;
+                          return LineTooltipItem(
+                            '${ChartTooltipHelper.formatDate(date)}\n'
+                            '${widget.isArabic ? 'الإجمالي' : 'Total'}: $total\n'
+                            '${widget.isArabic ? 'مؤكد' : 'Confirmed'}: $confirmed\n'
+                            '${widget.isArabic ? 'ملغي' : 'Cancelled'}: $cancelled\n'
+                            '${widget.isArabic ? 'قيد الانتظار' : 'Pending'}: $pending\n'
+                            '${widget.isArabic ? 'معدل التأكيد' : 'Confirm Rate'}: ${rate.toStringAsFixed(1)}%',
+                            TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
                         }
-                      });
+                        return null;
+                      }).toList();
                     },
                   ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: _getMaxBookings(chartData) / 5,
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: AppTheme.getCardBorder(0.15),
-                        strokeWidth: 1,
-                        dashArray: [5, 5],
-                      );
-                    },
+                  touchCallback: (event, response) {
+                    setState(() {
+                      if (event.isInterestedForInteractions &&
+                          response?.lineBarSpots != null &&
+                          response!.lineBarSpots!.isNotEmpty) {
+                        _touchedIndex = response.lineBarSpots!.first.x.toInt();
+                      } else {
+                        _touchedIndex = null;
+                      }
+                    });
+                  },
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: _getInterval(_getMaxBookings(chartData)),
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: AppTheme.getCardBorder(0.15),
+                      strokeWidth: 1,
+                      dashArray: [5, 5],
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
                   ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: isSmall ? 22 : 26,
-                        interval: chartData.length > 10
-                            ? (chartData.length / (isSmall ? 4 : 6))
-                                .ceilToDouble()
-                            : 1,
-                        getTitlesWidget: (value, meta) {
-                          final idx = value.toInt();
-                          if (idx >= 0 && idx < chartData.length) {
-                            final date = chartData[idx]['date'] as String;
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                date.length > 10
-                                    ? date.substring(5, 10)
-                                    : date.substring(5),
-                                style: TextStyle(
-                                  color: _touchedIndex == idx
-                                      ? Colors.blue
-                                      : AppTheme.textSecondary,
-                                  fontSize: isSmall ? 9 : 10,
-                                  fontWeight: _touchedIndex == idx
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: isSmall ? 35 : 40,
-                        interval: _getMaxBookings(chartData) / 4,
-                        getTitlesWidget: (value, meta) {
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isSmall ? 22 : 26,
+                      interval: chartData.length > 10
+                          ? (chartData.length / (isSmall ? 4 : 6)).ceilToDouble()
+                          : 1,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx >= 0 && idx < chartData.length) {
+                          final date = chartData[idx]['date'] as String;
                           return Padding(
-                            padding: const EdgeInsets.only(right: 4),
+                            padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              value.toInt().toString(),
+                              date.length >= 10 ? date.substring(5, 10) : date,
                               style: TextStyle(
-                                color: AppTheme.textSecondary,
+                                color: _touchedIndex == idx
+                                    ? Colors.blue
+                                    : AppTheme.textSecondary,
                                 fontSize: isSmall ? 9 : 10,
+                                fontWeight: _touchedIndex == idx
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
                           );
-                        },
-                      ),
+                        }
+                        return const Text('');
+                      },
                     ),
                   ),
-                  borderData: FlBorderData(show: false),
-                  minX: 0,
-                  maxX: (chartData.length - 1).toDouble(),
-                  minY: 0,
-                  maxY: _getMaxBookings(chartData) * 1.15,
-                  lineBarsData: _buildLineBarsData(chartData, isSmall),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isSmall ? 40 : 50,
+                      interval: _getInterval(_getMaxBookings(chartData)),
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return const Text('');
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Text(
+                            value.toInt().toString(),
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: isSmall ? 9 : 10,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ),
+                borderData: FlBorderData(show: false),
+                minX: 0,
+                maxX: (chartData.length - 1).toDouble(),
+                minY: 0,
+                maxY: _getMaxY(_getMaxBookings(chartData)),
+                lineBarsData: _buildLineBarsData(chartData, isSmall),
               ),
             ),
+          ),
 
-            // Insights
-            if (widget.showInsights) ...[
-              SizedBox(height: isSmall ? 12 : 16),
-              ChartDescription(
-                isCompact: isSmall,
-                summary: _generateSummary(confirmationRate.toDouble()),
-                insights: [
+          // Insights
+          if (widget.showInsights) ...[
+            SizedBox(height: isSmall ? 12 : 16),
+            ChartDescription(
+              isCompact: isSmall,
+              summary: _generateSummary(confirmationRate.toDouble()),
+              insights: [
+                ChartInsight(
+                  label: widget.isArabic ? 'معدل التأكيد' : 'Confirmation Rate',
+                  value: '${confirmationRate.toStringAsFixed(1)}%',
+                  color: confirmationRate >= 80
+                      ? Colors.green
+                      : (confirmationRate >= 60 ? Colors.orange : Colors.red),
+                  icon: Icons.verified,
+                ),
+                if (peakHours.isNotEmpty)
                   ChartInsight(
-                    label:
-                        widget.isArabic ? 'معدل التأكيد' : 'Confirmation Rate',
-                    value: '${confirmationRate.toStringAsFixed(1)}%',
-                    color: confirmationRate >= 80
-                        ? Colors.green
-                        : (confirmationRate >= 60 ? Colors.orange : Colors.red),
-                    icon: Icons.verified,
+                    label: widget.isArabic ? 'أوقات الذروة' : 'Peak Hours',
+                    value: _formatPeakHours(peakHours),
+                    color: Colors.purple,
+                    icon: Icons.schedule,
                   ),
-                  if (peakHours.isNotEmpty)
-                    ChartInsight(
-                      label: widget.isArabic ? 'أوقات الذروة' : 'Peak Hours',
-                      value: _formatPeakHours(peakHours),
-                      color: Colors.purple,
-                      icon: Icons.schedule,
-                    ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ],
-        );
-      },
-    );
+        ],
+      );
+    });
   }
 
   Widget _buildSummaryStats({
@@ -308,7 +302,7 @@ class _BookingTimeSeriesChartState extends State<BookingTimeSeriesChart> {
       runSpacing: 12,
       children: [
         SizedBox(
-          width: isSmall ? double.infinity : Adaptive.w(15),
+          width: isSmall ? double.infinity : 160,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'إجمالي الحجوزات' : 'Total Bookings',
             value: totalBookings.toString(),
@@ -318,7 +312,7 @@ class _BookingTimeSeriesChartState extends State<BookingTimeSeriesChart> {
           ),
         ),
         SizedBox(
-          width: isSmall ? double.infinity : Adaptive.w(15),
+          width: isSmall ? double.infinity : 160,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'مؤكد' : 'Confirmed',
             value: (byStatus['confirmed'] ?? 0).toString(),
@@ -328,7 +322,7 @@ class _BookingTimeSeriesChartState extends State<BookingTimeSeriesChart> {
           ),
         ),
         SizedBox(
-          width: isSmall ? double.infinity : Adaptive.w(15),
+          width: isSmall ? double.infinity : 160,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'معدل التأكيد' : 'Rate',
             value: '${confirmationRate.toStringAsFixed(1)}%',
@@ -451,13 +445,27 @@ class _BookingTimeSeriesChartState extends State<BookingTimeSeriesChart> {
   }
 
   double _getMaxBookings(List<dynamic> data) {
-    if (data.isEmpty) return 100;
+    if (data.isEmpty) return 0;
     double max = 0;
     for (final item in data) {
       final total = (item['total'] as num?)?.toDouble() ?? 0;
       if (total > max) max = total;
     }
-    return max > 0 ? max : 100;
+    return max;
+  }
+
+  double _getInterval(double max) {
+    if (max <= 0) return 5;
+    if (max < 10) return 2;
+    if (max < 50) return 10;
+    if (max < 100) return 20;
+    if (max < 500) return 100;
+    return (max / 4).ceilToDouble();
+  }
+
+  double _getMaxY(double max) {
+    if (max <= 0) return 10;
+    return (max * 1.2).ceilToDouble();
   }
 }
 
@@ -523,35 +531,34 @@ class _BookingByStatusChartState extends State<BookingByStatusChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
 
-        return Column(
-          children: [
-            // Legend
-            CompactLegend(
-              items: statusData
-                  .map((item) => LegendItem(
-                        label: item['label'] as String,
-                        color: item['color'] as Color,
-                        value: totalBookings > 0
-                            ? '${((item['value'] as num) / totalBookings * 100).toStringAsFixed(1)}%'
-                            : '0%',
-                      ))
-                  .toList(),
-            ),
-            SizedBox(height: isSmall ? 12 : 16),
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Legend
+          CompactLegend(
+            items: statusData
+                .map((item) => LegendItem(
+                      label: item['label'] as String,
+                      color: item['color'] as Color,
+                      value: totalBookings > 0
+                          ? '${((item['value'] as num) / totalBookings * 100).toStringAsFixed(1)}%'
+                          : '0%',
+                    ))
+                .toList(),
+          ),
+          SizedBox(height: isSmall ? 12 : 16),
 
-            // Chart
-            if (widget.showAsDonut)
-              _buildDonutChart(statusData, totalBookings, isSmall)
-            else
-              _buildBarChart(statusData, isSmall),
-          ],
-        );
-      },
-    );
+          // Chart
+          if (widget.showAsDonut)
+            _buildDonutChart(statusData, totalBookings, isSmall)
+          else
+            _buildBarChart(statusData, isSmall),
+        ],
+      );
+    });
   }
 
   String _getStatusLabel(String status) {
@@ -647,7 +654,7 @@ class _BookingByStatusChartState extends State<BookingByStatusChart> {
       chart: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
-          maxY: maxValue * 1.2,
+          maxY: _getMaxY(maxValue),
           barTouchData: BarTouchData(
             enabled: true,
             touchTooltipData: BarTouchTooltipData(
@@ -711,8 +718,10 @@ class _BookingByStatusChartState extends State<BookingByStatusChart> {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: isSmall ? 35 : 40,
+                reservedSize: isSmall ? 40 : 50,
+                interval: _getInterval(maxValue),
                 getTitlesWidget: (value, meta) {
+                  if (value == 0) return const Text('');
                   return Padding(
                     padding: const EdgeInsets.only(right: 4),
                     child: Text(
@@ -736,6 +745,7 @@ class _BookingByStatusChartState extends State<BookingByStatusChart> {
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
+            horizontalInterval: _getInterval(maxValue),
             getDrawingHorizontalLine: (value) {
               return FlLine(
                 color: AppTheme.getCardBorder(0.15),
@@ -759,7 +769,7 @@ class _BookingByStatusChartState extends State<BookingByStatusChart> {
                       const BorderRadius.vertical(top: Radius.circular(6)),
                   backDrawRodData: BackgroundBarChartRodData(
                     show: true,
-                    toY: maxValue * 1.2,
+                    toY: _getMaxY(maxValue),
                     color: AppTheme.getCardBorder(0.05),
                   ),
                 ),
@@ -769,6 +779,20 @@ class _BookingByStatusChartState extends State<BookingByStatusChart> {
         ),
       ),
     );
+  }
+
+  double _getInterval(double max) {
+    if (max <= 0) return 5;
+    if (max < 10) return 2;
+    if (max < 50) return 10;
+    if (max < 100) return 20;
+    if (max < 500) return 100;
+    return (max / 4).ceilToDouble();
+  }
+
+  double _getMaxY(double max) {
+    if (max <= 0) return 10;
+    return (max * 1.2).ceilToDouble();
   }
 }
 

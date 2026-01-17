@@ -13,7 +13,6 @@ import '../../widgets/reports/trip_chart.dart';
 import '../../widgets/reports/user_chart.dart';
 import '../../widgets/reports/vehicle_chart.dart';
 import '../../widgets/reports/line_chart.dart';
-import 'package:responsive_sizer/responsive_sizer.dart';
 
 class AdminReportsPage extends StatefulWidget {
   const AdminReportsPage({super.key});
@@ -812,15 +811,10 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _revenueError,
             onRetry: _loadRevenueData,
             child: _revenueData != null
-                ? SizedBox(
-                    //////////////////////////////////////////////////////////
-                    height: Adaptive.h(70),
-                    ///////////////////////////////////////////////////////////
-                    child: RevenueChart(
-                        data: _revenueData!,
-                        isArabic: _isArabic,
-                        showComparison: _comparePrevious),
-                  )
+                ? RevenueChart(
+                    data: _revenueData!,
+                    isArabic: _isArabic,
+                    showComparison: _comparePrevious)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -835,11 +829,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _revenueError,
             onRetry: _loadRevenueData,
             child: _revenueData != null
-                ? SizedBox(
-                    height: Adaptive.h(70),
-                    child: RevenueByLineChart(
-                        data: _revenueData!, isArabic: _isArabic),
-                  )
+                ? RevenueByLineChart(data: _revenueData!, isArabic: _isArabic)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -861,11 +851,8 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _bookingError,
             onRetry: _loadBookingData,
             child: _bookingData != null
-                ? SizedBox(
-                    height: 280,
-                    child: BookingTimeSeriesChart(
-                        data: _bookingData!, isArabic: _isArabic),
-                  )
+                ? BookingTimeSeriesChart(
+                    data: _bookingData!, isArabic: _isArabic)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -880,11 +867,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _bookingError,
             onRetry: _loadBookingData,
             child: _bookingData != null
-                ? SizedBox(
-                    height: 280,
-                    child: BookingByStatusChart(
-                        data: _bookingData!, isArabic: _isArabic),
-                  )
+                ? BookingByStatusChart(data: _bookingData!, isArabic: _isArabic)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -906,11 +889,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _tripError,
             onRetry: _loadTripData,
             child: _tripData != null
-                ? SizedBox(
-                    height: 280,
-                    child: TripTimeSeriesChart(
-                        data: _tripData!, isArabic: _isArabic),
-                  )
+                ? TripTimeSeriesChart(data: _tripData!, isArabic: _isArabic)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -924,13 +903,8 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _tripError,
             onRetry: _loadTripData,
             child: _tripData != null
-                ? SizedBox(
-                    height: 280,
-                    child: TripStatusChart(
-                        data: _tripData!,
-                        isArabic: _isArabic,
-                        showAsDonut: true),
-                  )
+                ? TripStatusChart(
+                    data: _tripData!, isArabic: _isArabic, showAsDonut: true)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -944,13 +918,10 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _tripError,
             onRetry: _loadTripData,
             child: _tripData != null
-                ? SizedBox(
-                    height: 280,
-                    child: UtilizationGaugeChart(
-                        data: _tripData!,
-                        isArabic: _isArabic,
-                        showTrend: _comparePrevious),
-                  )
+                ? UtilizationGaugeChart(
+                    data: _tripData!,
+                    isArabic: _isArabic,
+                    showTrend: _comparePrevious)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -972,11 +943,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _userError,
             onRetry: _loadUserData,
             child: _userData != null
-                ? SizedBox(
-                    height: Adaptive.h(70),
-                    child:
-                        UserGrowthChart(data: _userData!, isArabic: _isArabic),
-                  )
+                ? UserGrowthChart(data: _userData!, isArabic: _isArabic)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -991,11 +958,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _userError,
             onRetry: _loadUserData,
             child: _userData != null
-                ? SizedBox(
-                    height: Adaptive.h(70),
-                    child:
-                        UserByRoleChart(data: _userData!, isArabic: _isArabic),
-                  )
+                ? UserByRoleChart(data: _userData!, isArabic: _isArabic)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -1017,11 +980,8 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _vehicleError,
             onRetry: _loadVehicleData,
             child: _vehicleData != null
-                ? SizedBox(
-                    height: 280,
-                    child: VehicleUtilizationChart(
-                        data: _vehicleData!, isArabic: _isArabic),
-                  )
+                ? VehicleUtilizationChart(
+                    data: _vehicleData!, isArabic: _isArabic)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -1036,11 +996,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _vehicleError,
             onRetry: _loadVehicleData,
             child: _vehicleData != null
-                ? SizedBox(
-                    height: 280,
-                    child: VehicleStatusChart(
-                        data: _vehicleData!, isArabic: _isArabic),
-                  )
+                ? VehicleStatusChart(data: _vehicleData!, isArabic: _isArabic)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -1061,13 +1017,10 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _lineError,
             onRetry: _loadLineData,
             child: _lineData != null
-                ? SizedBox(
-                    height: Adaptive.h(70),
-                    child: LinePerformanceChart(
-                        data: _lineData!,
-                        metric: 'revenue',
-                        isArabic: _isArabic),
-                  )
+                ? LinePerformanceChart(
+                    data: _lineData!,
+                    metric: 'revenue',
+                    isArabic: _isArabic)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -1081,13 +1034,10 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _lineError,
             onRetry: _loadLineData,
             child: _lineData != null
-                ? SizedBox(
-                    height: 280,
-                    child: LinePerformanceChart(
-                        data: _lineData!,
-                        metric: 'bookings',
-                        isArabic: _isArabic),
-                  )
+                ? LinePerformanceChart(
+                    data: _lineData!,
+                    metric: 'bookings',
+                    isArabic: _isArabic)
                 : const SizedBox.shrink(),
           ),
         ),
@@ -1101,11 +1051,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
             errorMessage: _lineError,
             onRetry: _loadLineData,
             child: _lineData != null
-                ? SizedBox(
-                    height: 280,
-                    child:
-                        LineRankingTable(data: _lineData!, isArabic: _isArabic),
-                  )
+                ? LineRankingTable(data: _lineData!, isArabic: _isArabic)
                 : const SizedBox.shrink(),
           ),
         ),

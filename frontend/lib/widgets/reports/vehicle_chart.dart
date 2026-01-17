@@ -59,216 +59,214 @@ class _VehicleUtilizationChartState extends State<VehicleUtilizationChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Fleet summary stats
-            if (fleetStats != null) ...[
-              _buildFleetStats(fleetStats, percentageChange, isSmall),
-              SizedBox(height: isSmall ? 12 : 16),
-            ],
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Fleet summary stats
+          if (fleetStats != null) ...[
+            _buildFleetStats(fleetStats, percentageChange, isSmall),
+            SizedBox(height: isSmall ? 12 : 16),
+          ],
 
-            // Chart
-            ResponsiveChartContainer(
-              preferredSize: ChartSize.large,
-              chart: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: _getMaxTrips(displayVehicles) * 1.2,
-                  barTouchData: BarTouchData(
-                    enabled: true,
-                    touchTooltipData: BarTouchTooltipData(
-                      fitInsideHorizontally: true,
-                      fitInsideVertically: true,
-                      tooltipRoundedRadius: 12,
-                      tooltipPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      getTooltipColor: (group) => AppTheme.isDarkMode
-                          ? const Color(0xFF1A1F35)
-                          : Colors.white,
-                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        final vehicle = displayVehicles[group.x];
-                        final plateno = vehicle['plateno'] ?? '';
-                        final tripCount = vehicle['tripCount'] ?? 0;
-                        final totalBookings = vehicle['totalBookings'] ?? 0;
-                        final utilization =
-                            ((vehicle['utilization'] as num?)?.toDouble() ??
-                                    0) *
-                                100;
+          // Chart
+          ResponsiveChartContainer(
+            preferredSize: ChartSize.large,
+            chart: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: _getMaxY(_getMaxTripsValue(displayVehicles)),
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    tooltipRoundedRadius: 12,
+                    tooltipPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    getTooltipColor: (group) => AppTheme.isDarkMode
+                        ? const Color(0xFF1A1F35)
+                        : Colors.white,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final vehicle = displayVehicles[group.x];
+                      final plateno = vehicle['plateno'] ?? '';
+                      final tripCount = vehicle['tripCount'] ?? 0;
+                      final totalBookings = vehicle['totalBookings'] ?? 0;
+                      final utilization =
+                          ((vehicle['utilization'] as num?)?.toDouble() ?? 0) *
+                              100;
 
-                        return BarTooltipItem(
-                          '$plateno\n'
-                          '${widget.isArabic ? 'الرحلات' : 'Trips'}: $tripCount\n'
-                          '${widget.isArabic ? 'الحجوزات' : 'Bookings'}: $totalBookings\n'
-                          '${widget.isArabic ? 'الاستخدام' : 'Utilization'}: ${utilization.toStringAsFixed(1)}%',
-                          TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                      return BarTooltipItem(
+                        '$plateno\n'
+                        '${widget.isArabic ? 'الرحلات' : 'Trips'}: $tripCount\n'
+                        '${widget.isArabic ? 'الحجوزات' : 'Bookings'}: $totalBookings\n'
+                        '${widget.isArabic ? 'الاستخدام' : 'Utilization'}: ${utilization.toStringAsFixed(1)}%',
+                        TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      );
+                    },
+                  ),
+                  touchCallback: (event, response) {
+                    setState(() {
+                      if (event.isInterestedForInteractions &&
+                          response?.spot != null) {
+                        _touchedIndex = response!.spot!.touchedBarGroupIndex;
+                      } else {
+                        _touchedIndex = null;
+                      }
+                    });
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        if (value.toInt() >= 0 &&
+                            value.toInt() < displayVehicles.length) {
+                          final plateno = displayVehicles[value.toInt()]
+                                  ['plateno'] as String? ??
+                              '';
+                          final isHighlighted = _touchedIndex == value.toInt();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: RotatedBox(
+                              quarterTurns: isSmall ? 1 : 0,
+                              child: Text(
+                                plateno.length > 8
+                                    ? '${plateno.substring(0, 8)}...'
+                                    : plateno,
+                                style: TextStyle(
+                                  color: isHighlighted
+                                      ? Colors.blue
+                                      : AppTheme.textSecondary,
+                                  fontSize: isSmall ? 9 : 10,
+                                  fontWeight: isHighlighted
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                      reservedSize: isSmall ? 50 : 40,
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isSmall ? 40 : 50,
+                      interval: _getInterval(_getMaxTripsValue(displayVehicles)),
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return const Text('');
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Text(
+                            value.toInt().toString(),
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: isSmall ? 9 : 10,
+                            ),
                           ),
                         );
                       },
                     ),
-                    touchCallback: (event, response) {
-                      setState(() {
-                        if (event.isInterestedForInteractions &&
-                            response?.spot != null) {
-                          _touchedIndex = response!.spot!.touchedBarGroupIndex;
-                        } else {
-                          _touchedIndex = null;
-                        }
-                      });
-                    },
                   ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        getTitlesWidget: (value, meta) {
-                          if (value.toInt() >= 0 &&
-                              value.toInt() < displayVehicles.length) {
-                            final plateno = displayVehicles[value.toInt()]
-                                    ['plateno'] as String? ??
-                                '';
-                            final isHighlighted =
-                                _touchedIndex == value.toInt();
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: RotatedBox(
-                                quarterTurns: isSmall ? 1 : 0,
-                                child: Text(
-                                  plateno.length > 8
-                                      ? '${plateno.substring(0, 8)}...'
-                                      : plateno,
-                                  style: TextStyle(
-                                    color: isHighlighted
-                                        ? Colors.blue
-                                        : AppTheme.textSecondary,
-                                    fontSize: isSmall ? 9 : 10,
-                                    fontWeight: isHighlighted
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                        reservedSize: isSmall ? 50 : 40,
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: isSmall ? 35 : 40,
-                        getTitlesWidget: (value, meta) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: Text(
-                              value.toInt().toString(),
-                              style: TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: isSmall ? 9 : 10,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
                   ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: AppTheme.getCardBorder(0.15),
-                        strokeWidth: 1,
-                        dashArray: [5, 5],
-                      );
-                    },
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
                   ),
-                  borderData: FlBorderData(show: false),
-                  barGroups: displayVehicles.asMap().entries.map((entry) {
-                    final tripCount =
-                        (entry.value['tripCount'] as num?)?.toInt() ?? 0;
-                    final utilization =
-                        ((entry.value['utilization'] as num?)?.toDouble() ?? 0);
-                    final isHighlighted = _touchedIndex == entry.key;
-
-                    // Color based on utilization
-                    Color barColor;
-                    if (utilization >= 0.8) {
-                      barColor = Colors.green;
-                    } else if (utilization >= 0.5) {
-                      barColor = Colors.blue;
-                    } else {
-                      barColor = Colors.orange;
-                    }
-
-                    return BarChartGroupData(
-                      x: entry.key,
-                      barRods: [
-                        BarChartRodData(
-                          toY: tripCount.toDouble(),
-                          color: isHighlighted
-                              ? barColor
-                              : barColor.withOpacity(0.8),
-                          width: isHighlighted ? 24 : 20,
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(6)),
-                          backDrawRodData: BackgroundBarChartRodData(
-                            show: true,
-                            toY: _getMaxTrips(displayVehicles) * 1.2,
-                            color: AppTheme.getCardBorder(0.05),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
                 ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval:
+                      _getInterval(_getMaxTripsValue(displayVehicles)),
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: AppTheme.getCardBorder(0.15),
+                      strokeWidth: 1,
+                      dashArray: [5, 5],
+                    );
+                  },
+                ),
+                borderData: FlBorderData(show: false),
+                barGroups: displayVehicles.asMap().entries.map((entry) {
+                  final tripCount =
+                      (entry.value['tripCount'] as num?)?.toInt() ?? 0;
+                  final utilization =
+                      ((entry.value['utilization'] as num?)?.toDouble() ?? 0);
+                  final isHighlighted = _touchedIndex == entry.key;
+
+                  // Color based on utilization
+                  Color barColor;
+                  if (utilization >= 0.8) {
+                    barColor = Colors.green;
+                  } else if (utilization >= 0.5) {
+                    barColor = Colors.blue;
+                  } else {
+                    barColor = Colors.orange;
+                  }
+
+                  return BarChartGroupData(
+                    x: entry.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: tripCount.toDouble(),
+                        color: isHighlighted ? barColor : barColor.withOpacity(0.8),
+                        width: isHighlighted ? 24 : 20,
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(6)),
+                        backDrawRodData: BackgroundBarChartRodData(
+                          show: true,
+                          toY: _getMaxY(_getMaxTripsValue(displayVehicles)),
+                          color: AppTheme.getCardBorder(0.05),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
               ),
             ),
+          ),
 
-            // Insights
-            if (widget.showInsights && fleetStats != null) ...[
-              SizedBox(height: isSmall ? 12 : 16),
-              ChartDescription(
-                isCompact: isSmall,
-                insights: [
-                  ChartInsight(
-                    label:
-                        widget.isArabic ? 'متوسط الاستخدام' : 'Avg Utilization',
-                    value:
-                        '${((fleetStats['averageUtilization'] as num?)?.toDouble() ?? 0 * 100).toStringAsFixed(1)}%',
-                    color: Colors.blue,
-                    icon: Icons.speed,
-                  ),
-                  ChartInsight(
-                    label: widget.isArabic ? 'مركبات نشطة' : 'Active Vehicles',
-                    value:
-                        '${fleetStats['activeVehicles'] ?? 0}/${fleetStats['totalVehicles'] ?? 0}',
-                    color: Colors.green,
-                    icon: Icons.directions_car,
-                  ),
-                ],
-              ),
-            ],
+          // Insights
+          if (widget.showInsights && fleetStats != null) ...[
+            SizedBox(height: isSmall ? 12 : 16),
+            ChartDescription(
+              isCompact: isSmall,
+              insights: [
+                ChartInsight(
+                  label: widget.isArabic ? 'متوسط الاستخدام' : 'Avg Utilization',
+                  value:
+                      '${((fleetStats['averageUtilization'] as num?)?.toDouble() ?? 0 * 100).toStringAsFixed(1)}%',
+                  color: Colors.blue,
+                  icon: Icons.speed,
+                ),
+                ChartInsight(
+                  label: widget.isArabic ? 'مركبات نشطة' : 'Active Vehicles',
+                  value:
+                      '${fleetStats['activeVehicles'] ?? 0}/${fleetStats['totalVehicles'] ?? 0}',
+                  color: Colors.green,
+                  icon: Icons.directions_car,
+                ),
+              ],
+            ),
           ],
-        );
-      },
-    );
+        ],
+      );
+    });
   }
 
   Widget _buildFleetStats(
@@ -281,7 +279,7 @@ class _VehicleUtilizationChartState extends State<VehicleUtilizationChart> {
       runSpacing: 12,
       children: [
         SizedBox(
-          width: isSmall ? double.infinity : 130,
+          width: isSmall ? double.infinity : 140,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'إجمالي المركبات' : 'Total Vehicles',
             value: (fleetStats['totalVehicles'] ?? 0).toString(),
@@ -290,7 +288,7 @@ class _VehicleUtilizationChartState extends State<VehicleUtilizationChart> {
           ),
         ),
         SizedBox(
-          width: isSmall ? double.infinity : 130,
+          width: isSmall ? double.infinity : 140,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'نشطة' : 'Active',
             value: (fleetStats['activeVehicles'] ?? 0).toString(),
@@ -300,7 +298,7 @@ class _VehicleUtilizationChartState extends State<VehicleUtilizationChart> {
           ),
         ),
         SizedBox(
-          width: isSmall ? double.infinity : 130,
+          width: isSmall ? double.infinity : 140,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'خاملة' : 'Idle',
             value: (fleetStats['idleVehicles'] ?? 0).toString(),
@@ -312,14 +310,27 @@ class _VehicleUtilizationChartState extends State<VehicleUtilizationChart> {
     );
   }
 
-  double _getMaxTrips(List<dynamic> vehicles) {
-    if (vehicles.isEmpty) return 100;
+  double _getMaxTripsValue(List<dynamic> vehicles) {
+    if (vehicles.isEmpty) return 0;
     double max = 0;
     for (final vehicle in vehicles) {
       final trips = (vehicle['tripCount'] as num?)?.toDouble() ?? 0;
       if (trips > max) max = trips;
     }
-    return max > 0 ? max : 100;
+    return max;
+  }
+
+  double _getInterval(double max) {
+    if (max <= 0) return 5;
+    if (max < 10) return 2;
+    if (max < 50) return 10;
+    if (max < 100) return 20;
+    return (max / 4).ceilToDouble();
+  }
+
+  double _getMaxY(double max) {
+    if (max <= 0) return 10;
+    return (max * 1.2).ceilToDouble();
   }
 }
 
@@ -384,104 +395,102 @@ class _VehicleStatusChartState extends State<VehicleStatusChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
-        final gaugeSize = isSmall ? 180.0 : 220.0;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
+      final gaugeSize = isSmall ? 180.0 : 220.0;
 
-        return Column(
-          children: [
-            // Legend
-            CompactLegend(
-              items: statusData
-                  .map((item) => LegendItem(
-                        label: item['label'] as String,
-                        color: item['color'] as Color,
-                        value: total > 0
-                            ? '${((item['value'] as num) / total * 100).toStringAsFixed(1)}%'
-                            : '0%',
-                      ))
-                  .toList(),
-            ),
-            SizedBox(height: isSmall ? 12 : 16),
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Legend
+          CompactLegend(
+            items: statusData
+                .map((item) => LegendItem(
+                      label: item['label'] as String,
+                      color: item['color'] as Color,
+                      value: total > 0
+                          ? '${((item['value'] as num) / total * 100).toStringAsFixed(1)}%'
+                          : '0%',
+                    ))
+                .toList(),
+          ),
+          SizedBox(height: isSmall ? 12 : 16),
 
-            // Donut chart
-            SizedBox(
-              height: gaugeSize,
-              width: gaugeSize,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  PieChart(
-                    PieChartData(
-                      pieTouchData: PieTouchData(
-                        enabled: true,
-                        touchCallback: (event, response) {
-                          setState(() {
-                            if (event.isInterestedForInteractions &&
-                                response?.touchedSection != null) {
-                              _touchedIndex =
-                                  response!.touchedSection!.touchedSectionIndex;
-                            } else {
-                              _touchedIndex = null;
-                            }
-                          });
-                        },
-                      ),
-                      sectionsSpace: 3,
-                      centerSpaceRadius: isSmall ? 45 : 60,
-                      sections: statusData.asMap().entries.map((entry) {
-                        final isHighlighted = entry.key == _touchedIndex;
-                        final color = entry.value['color'] as Color;
-                        final value = entry.value['value'] as num;
-                        final percentage =
-                            total > 0 ? (value / total * 100) : 0;
-
-                        return PieChartSectionData(
-                          value: value.toDouble(),
-                          color: color,
-                          title: isHighlighted
-                              ? '${percentage.toStringAsFixed(1)}%'
-                              : '',
-                          radius: isHighlighted
-                              ? (isSmall ? 50 : 65)
-                              : (isSmall ? 40 : 55),
-                          titleStyle: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        );
-                      }).toList(),
+          // Donut chart
+          SizedBox(
+            height: gaugeSize,
+            width: gaugeSize,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                PieChart(
+                  PieChartData(
+                    pieTouchData: PieTouchData(
+                      enabled: true,
+                      touchCallback: (event, response) {
+                        setState(() {
+                          if (event.isInterestedForInteractions &&
+                              response?.touchedSection != null) {
+                            _touchedIndex =
+                                response!.touchedSection!.touchedSectionIndex;
+                          } else {
+                            _touchedIndex = null;
+                          }
+                        });
+                      },
                     ),
-                  ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        total.toString(),
-                        style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: isSmall ? 24 : 32,
+                    sectionsSpace: 3,
+                    centerSpaceRadius: isSmall ? 45 : 60,
+                    sections: statusData.asMap().entries.map((entry) {
+                      final isHighlighted = entry.key == _touchedIndex;
+                      final color = entry.value['color'] as Color;
+                      final value = entry.value['value'] as num;
+                      final percentage = total > 0 ? (value / total * 100) : 0;
+
+                      return PieChartSectionData(
+                        value: value.toDouble(),
+                        color: color,
+                        title: isHighlighted
+                            ? '${percentage.toStringAsFixed(1)}%'
+                            : '',
+                        radius: isHighlighted
+                            ? (isSmall ? 50 : 65)
+                            : (isSmall ? 40 : 55),
+                        titleStyle: const TextStyle(
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
-                      ),
-                      Text(
-                        widget.isArabic ? 'مركبات' : 'Vehicles',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: isSmall ? 11 : 13,
-                        ),
-                      ),
-                    ],
+                      );
+                    }).toList(),
                   ),
-                ],
-              ),
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      total.toString(),
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: isSmall ? 24 : 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      widget.isArabic ? 'مركبات' : 'Vehicles',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: isSmall ? 11 : 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        );
-      },
-    );
+          ),
+        ],
+      );
+    });
   }
 
   String _getStatusLabel(String status) {
@@ -528,176 +537,203 @@ class _ActiveVehiclesTimeChartState extends State<ActiveVehiclesTimeChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
 
-        return ResponsiveChartContainer(
-          preferredSize: isSmall ? ChartSize.medium : ChartSize.large,
-          chart: LineChart(
-            LineChartData(
-              lineTouchData: LineTouchData(
-                enabled: true,
-                touchTooltipData: LineTouchTooltipData(
-                  fitInsideHorizontally: true,
-                  fitInsideVertically: true,
-                  tooltipRoundedRadius: 12,
-                  getTooltipColor: (touchedSpot) => AppTheme.isDarkMode
-                      ? const Color(0xFF1A1F35)
-                      : Colors.white,
-                  getTooltipItems: (touchedSpots) {
-                    return touchedSpots.map((spot) {
-                      final idx = spot.x.toInt();
-                      if (idx >= 0 && idx < activeVehiclesOverTime.length) {
-                        final dataPoint = activeVehiclesOverTime[idx];
-                        final date = dataPoint['date'] as String? ?? '';
-                        final activeCount = dataPoint['activeVehicles'] ?? 0;
-                        final tripCount = dataPoint['tripCount'] ?? 0;
+      return ResponsiveChartContainer(
+        preferredSize: isSmall ? ChartSize.medium : ChartSize.large,
+        chart: LineChart(
+          LineChartData(
+            lineTouchData: LineTouchData(
+              enabled: true,
+              touchTooltipData: LineTouchTooltipData(
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
+                tooltipRoundedRadius: 12,
+                getTooltipColor: (touchedSpot) => AppTheme.isDarkMode
+                    ? const Color(0xFF1A1F35)
+                    : Colors.white,
+                getTooltipItems: (touchedSpots) {
+                  return touchedSpots.map((spot) {
+                    final idx = spot.x.toInt();
+                    if (idx >= 0 && idx < activeVehiclesOverTime.length) {
+                      final dataPoint = activeVehiclesOverTime[idx];
+                      final date = dataPoint['date'] as String? ?? '';
+                      final activeCount = dataPoint['activeVehicles'] ?? 0;
+                      final tripCount = dataPoint['tripCount'] ?? 0;
 
-                        return LineTooltipItem(
-                          '${ChartTooltipHelper.formatDate(date)}\n'
-                          '${widget.isArabic ? 'مركبات نشطة' : 'Active'}: $activeCount\n'
-                          '${widget.isArabic ? 'رحلات' : 'Trips'}: $tripCount',
-                          TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        );
-                      }
-                      return null;
-                    }).toList();
-                  },
-                ),
-                touchCallback: (event, response) {
-                  setState(() {
-                    if (event.isInterestedForInteractions &&
-                        response?.lineBarSpots != null &&
-                        response!.lineBarSpots!.isNotEmpty) {
-                      _touchedIndex = response.lineBarSpots!.first.x.toInt();
-                    } else {
-                      _touchedIndex = null;
+                      return LineTooltipItem(
+                        '${ChartTooltipHelper.formatDate(date)}\n'
+                        '${widget.isArabic ? 'مركبات نشطة' : 'Active'}: $activeCount\n'
+                        '${widget.isArabic ? 'رحلات' : 'Trips'}: $tripCount',
+                        TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      );
                     }
-                  });
+                    return null;
+                  }).toList();
                 },
               ),
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                getDrawingHorizontalLine: (value) {
-                  return FlLine(
-                    color: AppTheme.getCardBorder(0.15),
-                    strokeWidth: 1,
-                    dashArray: [5, 5],
-                  );
-                },
+              touchCallback: (event, response) {
+                setState(() {
+                  if (event.isInterestedForInteractions &&
+                      response?.lineBarSpots != null &&
+                      response!.lineBarSpots!.isNotEmpty) {
+                    _touchedIndex = response.lineBarSpots!.first.x.toInt();
+                  } else {
+                    _touchedIndex = null;
+                  }
+                });
+              },
+            ),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval:
+                  _getInterval(_getMaxActiveVehicles(activeVehiclesOverTime)),
+              getDrawingHorizontalLine: (value) {
+                return FlLine(
+                  color: AppTheme.getCardBorder(0.15),
+                  strokeWidth: 1,
+                  dashArray: [5, 5],
+                );
+              },
+            ),
+            titlesData: FlTitlesData(
+              show: true,
+              rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
               ),
-              titlesData: FlTitlesData(
-                show: true,
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: isSmall ? 22 : 26,
-                    interval: activeVehiclesOverTime.length > 10
-                        ? (activeVehiclesOverTime.length / (isSmall ? 4 : 6))
-                            .ceilToDouble()
-                        : 1,
-                    getTitlesWidget: (value, meta) {
-                      final idx = value.toInt();
-                      if (idx >= 0 && idx < activeVehiclesOverTime.length) {
-                        final date =
-                            activeVehiclesOverTime[idx]['date'] as String? ??
-                                '';
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            date.length >= 10 ? date.substring(5, 10) : date,
-                            style: TextStyle(
-                              color: _touchedIndex == idx
-                                  ? Colors.teal
-                                  : AppTheme.textSecondary,
-                              fontSize: isSmall ? 9 : 10,
-                              fontWeight: _touchedIndex == idx
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        );
-                      }
-                      return const Text('');
-                    },
-                  ),
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: isSmall ? 35 : 40,
-                    getTitlesWidget: (value, meta) {
+              topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: isSmall ? 22 : 26,
+                  interval: activeVehiclesOverTime.length > 10
+                      ? (activeVehiclesOverTime.length / (isSmall ? 4 : 6))
+                          .ceilToDouble()
+                      : 1,
+                  getTitlesWidget: (value, meta) {
+                    final idx = value.toInt();
+                    if (idx >= 0 && idx < activeVehiclesOverTime.length) {
+                      final date =
+                          activeVehiclesOverTime[idx]['date'] as String? ?? '';
                       return Padding(
-                        padding: const EdgeInsets.only(right: 4),
+                        padding: const EdgeInsets.only(top: 4),
                         child: Text(
-                          value.toInt().toString(),
+                          date.length >= 10 ? date.substring(5, 10) : date,
                           style: TextStyle(
-                            color: AppTheme.textSecondary,
+                            color: _touchedIndex == idx
+                                ? Colors.teal
+                                : AppTheme.textSecondary,
                             fontSize: isSmall ? 9 : 10,
+                            fontWeight: _touchedIndex == idx
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                         ),
                       );
-                    },
+                    }
+                    return const Text('');
+                  },
+                ),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: isSmall ? 40 : 50,
+                  interval:
+                      _getInterval(_getMaxActiveVehicles(activeVehiclesOverTime)),
+                  getTitlesWidget: (value, meta) {
+                    if (value == 0) return const Text('');
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: Text(
+                        value.toInt().toString(),
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: isSmall ? 9 : 10,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            borderData: FlBorderData(show: false),
+            minY: 0,
+            maxY: _getMaxY(_getMaxActiveVehicles(activeVehiclesOverTime)),
+            lineBarsData: [
+              LineChartBarData(
+                spots: activeVehiclesOverTime.asMap().entries.map((entry) {
+                  return FlSpot(
+                    entry.key.toDouble(),
+                    (entry.value['activeVehicles'] as num?)?.toDouble() ?? 0,
+                  );
+                }).toList(),
+                isCurved: true,
+                curveSmoothness: 0.25,
+                color: Colors.teal,
+                barWidth: isSmall ? 2.5 : 3,
+                isStrokeCapRound: true,
+                dotData: FlDotData(
+                  show: true,
+                  getDotPainter: (spot, percent, barData, index) {
+                    final isHighlighted = index == _touchedIndex;
+                    return FlDotCirclePainter(
+                      radius: isHighlighted
+                          ? 5
+                          : (activeVehiclesOverTime.length < 15 ? 2.5 : 0),
+                      color: Colors.teal,
+                      strokeWidth: isHighlighted ? 2 : 1.5,
+                      strokeColor: Colors.white,
+                    );
+                  },
+                ),
+                belowBarData: BarAreaData(
+                  show: true,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.teal.withOpacity(0.2),
+                      Colors.teal.withOpacity(0.02),
+                    ],
                   ),
                 ),
               ),
-              borderData: FlBorderData(show: false),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: activeVehiclesOverTime.asMap().entries.map((entry) {
-                    return FlSpot(
-                      entry.key.toDouble(),
-                      (entry.value['activeVehicles'] as num?)?.toDouble() ?? 0,
-                    );
-                  }).toList(),
-                  isCurved: true,
-                  curveSmoothness: 0.25,
-                  color: Colors.teal,
-                  barWidth: isSmall ? 2.5 : 3,
-                  isStrokeCapRound: true,
-                  dotData: FlDotData(
-                    show: true,
-                    getDotPainter: (spot, percent, barData, index) {
-                      final isHighlighted = index == _touchedIndex;
-                      return FlDotCirclePainter(
-                        radius: isHighlighted
-                            ? 5
-                            : (activeVehiclesOverTime.length < 15 ? 2.5 : 0),
-                        color: Colors.teal,
-                        strokeWidth: isHighlighted ? 2 : 1.5,
-                        strokeColor: Colors.white,
-                      );
-                    },
-                  ),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.teal.withOpacity(0.2),
-                        Colors.teal.withOpacity(0.02),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            ],
           ),
-        );
-      },
-    );
+        ),
+      );
+    });
+  }
+
+  double _getMaxActiveVehicles(List<dynamic> data) {
+    if (data.isEmpty) return 0;
+    double max = 0;
+    for (final item in data) {
+      final active = (item['activeVehicles'] as num?)?.toDouble() ?? 0;
+      if (active > max) max = active;
+    }
+    return max;
+  }
+
+  double _getInterval(double max) {
+    if (max <= 0) return 5;
+    if (max < 10) return 2;
+    if (max < 50) return 10;
+    if (max < 100) return 20;
+    return (max / 4).ceilToDouble();
+  }
+
+  double _getMaxY(double max) {
+    if (max <= 0) return 10;
+    return (max * 1.2).ceilToDouble();
   }
 }

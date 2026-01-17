@@ -8,6 +8,8 @@ class TripTimeSeriesChart extends StatefulWidget {
   final bool isArabic;
   final bool showLegend;
   final bool showInsights;
+  final bool showSummary;
+  final ChartSize preferredSize;
 
   const TripTimeSeriesChart({
     super.key,
@@ -15,6 +17,8 @@ class TripTimeSeriesChart extends StatefulWidget {
     this.isArabic = false,
     this.showLegend = true,
     this.showInsights = true,
+    this.showSummary = true,
+    this.preferredSize = ChartSize.large,
   });
 
   @override
@@ -67,14 +71,15 @@ class _TripTimeSeriesChartState extends State<TripTimeSeriesChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Summary stats
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Summary stats
+          if (widget.showSummary) ...[
             _buildSummaryStats(
               totalTrips: totalTrips,
               completed: completed,
@@ -84,207 +89,206 @@ class _TripTimeSeriesChartState extends State<TripTimeSeriesChart> {
               isSmall: isSmall,
             ),
             SizedBox(height: isSmall ? 12 : 16),
+          ],
 
-            // Interactive legend
-            if (widget.showLegend) ...[
-              ChartLegend(
-                items: [
-                  LegendItem(
-                    label: widget.isArabic ? 'مكتمل' : 'Completed',
-                    color: _seriesColors['completed']!,
-                    value: completed.toString(),
-                    shape: LegendShape.line,
-                    isVisible: _seriesVisibility['completed']!,
-                  ),
-                  LegendItem(
-                    label: widget.isArabic ? 'ملغي' : 'Cancelled',
-                    color: _seriesColors['cancelled']!,
-                    value: cancelled.toString(),
-                    shape: LegendShape.line,
-                    isVisible: _seriesVisibility['cancelled']!,
-                  ),
-                ],
-                showValues: true,
-                onToggle: (index, isVisible) {
-                  setState(() {
-                    final key = index == 0 ? 'completed' : 'cancelled';
-                    _seriesVisibility[key] = isVisible;
-                  });
-                },
-              ),
-              SizedBox(height: isSmall ? 12 : 16),
-            ],
+          // Interactive legend
+          if (widget.showLegend) ...[
+            ChartLegend(
+              items: [
+                LegendItem(
+                  label: widget.isArabic ? 'مكتمل' : 'Completed',
+                  color: _seriesColors['completed']!,
+                  value: completed.toString(),
+                  shape: LegendShape.line,
+                  isVisible: _seriesVisibility['completed']!,
+                ),
+                LegendItem(
+                  label: widget.isArabic ? 'ملغي' : 'Cancelled',
+                  color: _seriesColors['cancelled']!,
+                  value: cancelled.toString(),
+                  shape: LegendShape.line,
+                  isVisible: _seriesVisibility['cancelled']!,
+                ),
+              ],
+              showValues: true,
+              onToggle: (index, isVisible) {
+                setState(() {
+                  final key = index == 0 ? 'completed' : 'cancelled';
+                  _seriesVisibility[key] = isVisible;
+                });
+              },
+            ),
+            SizedBox(height: isSmall ? 12 : 16),
+          ],
 
-            // Chart
-            ResponsiveChartContainer(
-              preferredSize: isSmall ? ChartSize.medium : ChartSize.large,
-              chart: LineChart(
-                LineChartData(
-                  lineTouchData: LineTouchData(
-                    enabled: true,
-                    touchTooltipData: LineTouchTooltipData(
-                      fitInsideHorizontally: true,
-                      fitInsideVertically: true,
-                      tooltipRoundedRadius: 12,
-                      tooltipPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      getTooltipColor: (touchedSpot) => AppTheme.isDarkMode
-                          ? const Color(0xFF1A1F35)
-                          : Colors.white,
-                      getTooltipItems: (touchedSpots) {
-                        return touchedSpots.map((spot) {
-                          final idx = spot.x.toInt();
-                          if (idx >= 0 && idx < overTime.length) {
-                            final dataPoint = overTime[idx];
-                            final date = dataPoint['date'] as String? ?? '';
-                            final completedVal = dataPoint['completed'] ?? 0;
-                            final cancelledVal = dataPoint['cancelled'] ?? 0;
-                            final total =
-                                (completedVal as num) + (cancelledVal as num);
-                            final rate =
-                                total > 0 ? (completedVal / total * 100) : 0;
+          // Chart
+          ResponsiveChartContainer(
+            preferredSize: isSmall ? ChartSize.medium : widget.preferredSize,
+            chart: LineChart(
+              LineChartData(
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    tooltipRoundedRadius: 12,
+                    tooltipPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    getTooltipColor: (touchedSpot) => AppTheme.isDarkMode
+                        ? const Color(0xFF1A1F35)
+                        : Colors.white,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        final idx = spot.x.toInt();
+                        if (idx >= 0 && idx < overTime.length) {
+                          final dataPoint = overTime[idx];
+                          final date = dataPoint['date'] as String? ?? '';
+                          final completedVal = dataPoint['completed'] ?? 0;
+                          final cancelledVal = dataPoint['cancelled'] ?? 0;
+                          final total =
+                              (completedVal as num) + (cancelledVal as num);
+                          final rate =
+                              total > 0 ? (completedVal / total * 100) : 0;
 
-                            return LineTooltipItem(
-                              '${ChartTooltipHelper.formatDate(date)}\n'
-                              'Completed: $completedVal\n'
-                              'Cancelled: $cancelledVal\n'
-                              'Rate: ${rate.toStringAsFixed(1)}%',
-                              TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            );
-                          }
-                          return null;
-                        }).toList();
-                      },
-                    ),
-                    touchCallback: (event, response) {
-                      setState(() {
-                        if (event.isInterestedForInteractions &&
-                            response?.lineBarSpots != null &&
-                            response!.lineBarSpots!.isNotEmpty) {
-                          _touchedIndex =
-                              response.lineBarSpots!.first.x.toInt();
-                        } else {
-                          _touchedIndex = null;
+                          return LineTooltipItem(
+                            '${ChartTooltipHelper.formatDate(date)}\n'
+                            'Completed: $completedVal\n'
+                            'Cancelled: $cancelledVal\n'
+                            'Rate: ${rate.toStringAsFixed(1)}%',
+                            TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
                         }
-                      });
+                        return null;
+                      }).toList();
                     },
                   ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: _getMaxTrips(overTime) / 5,
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: AppTheme.getCardBorder(0.15),
-                        strokeWidth: 1,
-                        dashArray: [5, 5],
-                      );
-                    },
+                  touchCallback: (event, response) {
+                    setState(() {
+                      if (event.isInterestedForInteractions &&
+                          response?.lineBarSpots != null &&
+                          response!.lineBarSpots!.isNotEmpty) {
+                        _touchedIndex = response.lineBarSpots!.first.x.toInt();
+                      } else {
+                        _touchedIndex = null;
+                      }
+                    });
+                  },
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: _getInterval(_getMaxTrips(overTime)),
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: AppTheme.getCardBorder(0.15),
+                      strokeWidth: 1,
+                      dashArray: [5, 5],
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
                   ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: isSmall ? 22 : 26,
-                        interval: overTime.length > 10
-                            ? (overTime.length / (isSmall ? 4 : 6))
-                                .ceilToDouble()
-                            : 1,
-                        getTitlesWidget: (value, meta) {
-                          final idx = value.toInt();
-                          if (idx >= 0 && idx < overTime.length) {
-                            final date = overTime[idx]['date'] as String;
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                date.substring(5, 10),
-                                style: TextStyle(
-                                  color: _touchedIndex == idx
-                                      ? Colors.green
-                                      : AppTheme.textSecondary,
-                                  fontSize: isSmall ? 9 : 10,
-                                  fontWeight: _touchedIndex == idx
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: isSmall ? 35 : 40,
-                        interval: _getMaxTrips(overTime) / 4,
-                        getTitlesWidget: (value, meta) {
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isSmall ? 22 : 26,
+                      interval: overTime.length > 10
+                          ? (overTime.length / (isSmall ? 4 : 6)).ceilToDouble()
+                          : 1,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx >= 0 && idx < overTime.length) {
+                          final date = overTime[idx]['date'] as String;
                           return Padding(
-                            padding: const EdgeInsets.only(right: 4),
+                            padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              value.toInt().toString(),
+                              date.length >= 10 ? date.substring(5, 10) : date,
                               style: TextStyle(
-                                color: AppTheme.textSecondary,
+                                color: _touchedIndex == idx
+                                    ? Colors.green
+                                    : AppTheme.textSecondary,
                                 fontSize: isSmall ? 9 : 10,
+                                fontWeight: _touchedIndex == idx
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
                           );
-                        },
-                      ),
+                        }
+                        return const Text('');
+                      },
                     ),
                   ),
-                  borderData: FlBorderData(show: false),
-                  minX: 0,
-                  maxX: (overTime.length - 1).toDouble(),
-                  minY: 0,
-                  maxY: _getMaxTrips(overTime) * 1.15,
-                  lineBarsData: _buildLineBarsData(overTime, isSmall),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: isSmall ? 35 : 45,
+                      interval: _getInterval(_getMaxTrips(overTime)),
+                      getTitlesWidget: (value, meta) {
+                        if (value == 0) return const Text('');
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Text(
+                            value.toInt().toString(),
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: isSmall ? 9 : 10,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ),
+                borderData: FlBorderData(show: false),
+                minX: 0,
+                maxX: (overTime.length - 1).toDouble(),
+                minY: 0,
+                maxY: _getMaxY(_getMaxTrips(overTime)),
+                lineBarsData: _buildLineBarsData(overTime, isSmall),
               ),
             ),
+          ),
 
-            // Insights
-            if (widget.showInsights) ...[
-              SizedBox(height: isSmall ? 12 : 16),
-              ChartDescription(
-                isCompact: isSmall,
-                summary: _generateSummary(overTime, completionRate.toDouble()),
-                insights: [
-                  ChartInsight(
-                    label: widget.isArabic ? 'معدل الإتمام' : 'Completion Rate',
-                    value: '${completionRate.toStringAsFixed(1)}%',
-                    color: completionRate >= 80
-                        ? Colors.green
-                        : (completionRate >= 60 ? Colors.orange : Colors.red),
-                    icon: Icons.check_circle,
-                  ),
-                  ChartInsight(
-                    label: widget.isArabic ? 'متوسط يومي' : 'Daily Average',
-                    value: overTime.isNotEmpty
-                        ? (completed / overTime.length).toStringAsFixed(1)
-                        : '0',
-                    color: Colors.blue,
-                    icon: Icons.analytics,
-                  ),
-                ],
-              ),
-            ],
+          // Insights
+          if (widget.showInsights) ...[
+            SizedBox(height: isSmall ? 12 : 16),
+            ChartDescription(
+              isCompact: isSmall,
+              summary: _generateSummary(overTime, completionRate.toDouble()),
+              insights: [
+                ChartInsight(
+                  label: widget.isArabic ? 'معدل الإتمام' : 'Completion Rate',
+                  value: '${completionRate.toStringAsFixed(1)}%',
+                  color: completionRate >= 80
+                      ? Colors.green
+                      : (completionRate >= 60 ? Colors.orange : Colors.red),
+                  icon: Icons.check_circle,
+                ),
+                ChartInsight(
+                  label: widget.isArabic ? 'متوسط يومي' : 'Daily Average',
+                  value: overTime.isNotEmpty
+                      ? (completed / overTime.length).toStringAsFixed(1)
+                      : '0',
+                  color: Colors.blue,
+                  icon: Icons.analytics,
+                ),
+              ],
+            ),
           ],
-        );
-      },
-    );
+        ],
+      );
+    });
   }
 
   Widget _buildSummaryStats({
@@ -300,7 +304,7 @@ class _TripTimeSeriesChartState extends State<TripTimeSeriesChart> {
       runSpacing: 12,
       children: [
         SizedBox(
-          width: isSmall ? double.infinity : 140,
+          width: isSmall ? double.infinity : 150,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'إجمالي الرحلات' : 'Total Trips',
             value: totalTrips.toString(),
@@ -310,7 +314,7 @@ class _TripTimeSeriesChartState extends State<TripTimeSeriesChart> {
           ),
         ),
         SizedBox(
-          width: isSmall ? double.infinity : 140,
+          width: isSmall ? double.infinity : 150,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'مكتملة' : 'Completed',
             value: completed.toString(),
@@ -320,7 +324,7 @@ class _TripTimeSeriesChartState extends State<TripTimeSeriesChart> {
           ),
         ),
         SizedBox(
-          width: isSmall ? double.infinity : 140,
+          width: isSmall ? double.infinity : 150,
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'معدل الإتمام' : 'Rate',
             value: '${completionRate.toStringAsFixed(1)}%',
@@ -429,7 +433,7 @@ class _TripTimeSeriesChartState extends State<TripTimeSeriesChart> {
   }
 
   double _getMaxTrips(List<dynamic> data) {
-    if (data.isEmpty) return 100;
+    if (data.isEmpty) return 0;
     double max = 0;
     for (final item in data) {
       final completed = (item['completed'] as num?)?.toDouble() ?? 0;
@@ -437,7 +441,21 @@ class _TripTimeSeriesChartState extends State<TripTimeSeriesChart> {
       final total = completed + cancelled;
       if (total > max) max = total;
     }
-    return max > 0 ? max : 100;
+    return max;
+  }
+
+  double _getInterval(double max) {
+    if (max <= 0) return 5;
+    if (max < 10) return 2;
+    if (max < 50) return 10;
+    if (max < 100) return 20;
+    if (max < 500) return 100;
+    return (max / 4).ceilToDouble();
+  }
+
+  double _getMaxY(double max) {
+    if (max <= 0) return 10;
+    return (max * 1.2).ceilToDouble();
   }
 }
 
@@ -517,35 +535,34 @@ class _TripStatusChartState extends State<TripStatusChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isSmall = constraints.maxWidth < 400;
+    return LayoutBuilder(builder: (context, constraints) {
+      final isSmall = constraints.maxWidth < 400;
 
-        return Column(
-          children: [
-            // Legend
-            CompactLegend(
-              items: statusData
-                  .map((item) => LegendItem(
-                        label: item['label'] as String,
-                        color: item['color'] as Color,
-                        value: totalTrips > 0
-                            ? '${((item['value'] as num) / totalTrips * 100).toStringAsFixed(1)}%'
-                            : '0%',
-                      ))
-                  .toList(),
-            ),
-            SizedBox(height: isSmall ? 12 : 16),
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Legend
+          CompactLegend(
+            items: statusData
+                .map((item) => LegendItem(
+                      label: item['label'] as String,
+                      color: item['color'] as Color,
+                      value: totalTrips > 0
+                          ? '${((item['value'] as num) / totalTrips * 100).toStringAsFixed(1)}%'
+                          : '0%',
+                    ))
+                .toList(),
+          ),
+          SizedBox(height: isSmall ? 12 : 16),
 
-            // Chart
-            if (widget.showAsDonut)
-              _buildDonutChart(statusData, totalTrips, isSmall)
-            else
-              _buildBarChart(statusData, totalTrips, isSmall),
-          ],
-        );
-      },
-    );
+          // Chart
+          if (widget.showAsDonut)
+            _buildDonutChart(statusData, totalTrips, isSmall)
+          else
+            _buildBarChart(statusData, totalTrips, isSmall),
+        ],
+      );
+    });
   }
 
   Widget _buildDonutChart(
@@ -633,7 +650,7 @@ class _TripStatusChartState extends State<TripStatusChart> {
       chart: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
-          maxY: maxValue * 1.2,
+          maxY: _getMaxY(maxValue),
           barTouchData: BarTouchData(
             enabled: true,
             touchTooltipData: BarTouchTooltipData(
@@ -701,8 +718,10 @@ class _TripStatusChartState extends State<TripStatusChart> {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: isSmall ? 35 : 40,
+                reservedSize: isSmall ? 40 : 50,
+                interval: _getInterval(maxValue),
                 getTitlesWidget: (value, meta) {
+                  if (value == 0) return const Text('');
                   return Padding(
                     padding: const EdgeInsets.only(right: 4),
                     child: Text(
@@ -726,6 +745,7 @@ class _TripStatusChartState extends State<TripStatusChart> {
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
+            horizontalInterval: _getInterval(maxValue),
             getDrawingHorizontalLine: (value) {
               return FlLine(
                 color: AppTheme.getCardBorder(0.15),
@@ -749,7 +769,7 @@ class _TripStatusChartState extends State<TripStatusChart> {
                       const BorderRadius.vertical(top: Radius.circular(6)),
                   backDrawRodData: BackgroundBarChartRodData(
                     show: true,
-                    toY: maxValue * 1.2,
+                    toY: _getMaxY(maxValue),
                     color: AppTheme.getCardBorder(0.05),
                   ),
                 ),
@@ -759,6 +779,20 @@ class _TripStatusChartState extends State<TripStatusChart> {
         ),
       ),
     );
+  }
+
+  double _getInterval(double max) {
+    if (max <= 0) return 5;
+    if (max < 10) return 2;
+    if (max < 50) return 10;
+    if (max < 100) return 20;
+    if (max < 500) return 100;
+    return (max / 4).ceilToDouble();
+  }
+
+  double _getMaxY(double max) {
+    if (max <= 0) return 10;
+    return (max * 1.2).ceilToDouble();
   }
 }
 
@@ -803,6 +837,7 @@ class _UtilizationGaugeChartState extends State<UtilizationGaugeChart> {
         final gaugeSize = isSmall ? 160.0 : 200.0;
 
         return Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Gauge
             SizedBox(

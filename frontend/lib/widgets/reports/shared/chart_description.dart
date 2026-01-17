@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:responsive_sizer/responsive_sizer.dart';
 import '../../../theme/app_theme.dart';
 
 /// A widget for displaying auto-generated chart insights and descriptions
@@ -62,7 +61,7 @@ class ChartDescription extends StatelessWidget {
               ],
             ),
             if (insights.isNotEmpty)
-              SizedBox(height: isCompact ? Adaptive.h(0.5) : Adaptive.h(0.5)),
+              const SizedBox(height: 8),
           ],
           // Individual insights
           if (insights.isNotEmpty)
@@ -234,7 +233,7 @@ class PeriodComparison extends StatelessWidget {
           label,
           style: TextStyle(
             color: AppTheme.textSecondary,
-            fontSize: 11.sp,
+            fontSize: 12,
           ),
           textAlign: TextAlign.center,
         ),
@@ -243,7 +242,7 @@ class PeriodComparison extends StatelessWidget {
           value,
           style: TextStyle(
             color: isCurrent ? AppTheme.textPrimary : AppTheme.textSecondary,
-            fontSize: isCurrent ? 11.sp : 9.sp,
+            fontSize: isCurrent ? 14 : 12,
             fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
           ),
           textAlign: TextAlign.center,

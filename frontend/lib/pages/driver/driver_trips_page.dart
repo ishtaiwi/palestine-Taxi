@@ -1224,9 +1224,11 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     }
 
     final isCheckedIn = status == 'checked_in';
+    final isCancelled = status == 'cancelled' || status == 'no_show';
 
-    final cardBgColor =
-        _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50;
+    final cardBgColor = isCancelled
+        ? (_isDarkMode ? Colors.red.withOpacity(0.1) : Colors.red.shade50)
+        : (_isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50);
     final textPrimaryColor =
         _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
     final textSecondaryColor =
@@ -1286,11 +1288,28 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                   ],
                 ),
               ),
-              Text(
-                status,
-                style: TextStyle(
-                  color: textSecondaryColor,
-                  fontSize: isSmallScreen ? 11.0 : 12.0,
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 8.0 : 10.0,
+                  vertical: isSmallScreen ? 3.0 : 4.0,
+                ),
+                decoration: BoxDecoration(
+                  color: isCancelled
+                      ? Colors.redAccent.withOpacity(0.2)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
+                ),
+                child: Text(
+                  isCancelled
+                      ? (_isArabic ? 'ملغي' : 'Cancelled')
+                      : status,
+                  style: TextStyle(
+                    color: isCancelled
+                        ? Colors.redAccent
+                        : textSecondaryColor,
+                    fontSize: isSmallScreen ? 11.0 : 12.0,
+                    fontWeight: isCancelled ? FontWeight.bold : FontWeight.normal,
+                  ),
                 ),
               ),
             ],
@@ -1343,7 +1362,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                               TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
                         ),
                 ),
-              if (driverStatus == 'approved' && status != 'checked_in')
+              if (driverStatus == 'approved' && status != 'checked_in' && status != 'cancelled' && status != 'no_show')
                 FilledButton.tonal(
                   onPressed: isMutating
                       ? null

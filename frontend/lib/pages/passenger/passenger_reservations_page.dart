@@ -109,6 +109,60 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
 
   String t(String key) => _texts[_isArabic ? 'ar' : 'en']![key]!;
 
+  /// Get direction label with station names from line name and trip direction
+  String _getTripDirectionLabel(Map<String, dynamic>? line, String? direction) {
+    if (direction == null) {
+      return '';
+    }
+
+    final lineName = _isArabic
+        ? (line?['name_ar']?.toString() ??
+            line?['linename']?.toString() ??
+            line?['name_en']?.toString() ??
+            '')
+        : (line?['name_en']?.toString() ??
+            line?['linename']?.toString() ??
+            line?['name_ar']?.toString() ??
+            '');
+
+    if (lineName.isEmpty) {
+      // Fallback to default labels if line name not available
+      return direction == 'going' ? 'Going' : 'Return';
+    }
+
+    // Split line name by "-" to get station names
+    final parts = lineName
+        .split('-')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    if (parts.length < 2) {
+      // If line name doesn't have "-" separator, fallback to default labels
+      return direction == 'going' ? 'Going' : 'Return';
+    }
+
+    // First part is the first station, second part is the second station
+    final firstStation = parts[0];
+    final secondStation = parts[1];
+
+    String fromStation, toStation;
+    if (direction == 'going') {
+      // Going: From first station to second station
+      fromStation = firstStation;
+      toStation = secondStation;
+    } else {
+      // Returning: From second station to first station
+      fromStation = secondStation;
+      toStation = firstStation;
+    }
+
+    // Format: "From [station1] to [station2]"
+    return _isArabic
+        ? 'من $fromStation إلى $toStation'
+        : 'From $fromStation to $toStation';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1077,6 +1131,7 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     final trip = reservation['trip'] as Map<String, dynamic>?;
     final line = trip?['line'] as Map<String, dynamic>? ??
         reservation['line'] as Map<String, dynamic>?;
+    final direction = trip?['direction']?.toString();
     final deptime = trip?['deptime']?.toString() ??
         reservation['scheduled_trip_time']?.toString() ??
         '';
@@ -1091,16 +1146,21 @@ class _PassengerReservationsPageState extends State<PassengerReservationsPage> {
     final borderColor =
         _isDarkMode ? const Color(0xFF2C3E50) : Colors.grey.shade200;
 
-    // Get line name based on current language
-    final lineName = _isArabic
-        ? (line?['name_ar']?.toString() ??
-            line?['linename']?.toString() ??
-            line?['name_en']?.toString() ??
-            '')
-        : (line?['name_en']?.toString() ??
-            line?['linename']?.toString() ??
-            line?['name_ar']?.toString() ??
-            '');
+    // Get direction label with station names (e.g., "From Nablus to Beit Iba")
+    final tripDirectionLabel = _getTripDirectionLabel(line, direction);
+    
+    // Fallback to line name if direction label is not available
+    final lineName = tripDirectionLabel.isNotEmpty
+        ? tripDirectionLabel
+        : (_isArabic
+            ? (line?['name_ar']?.toString() ??
+                line?['linename']?.toString() ??
+                line?['name_en']?.toString() ??
+                '')
+            : (line?['name_en']?.toString() ??
+                line?['linename']?.toString() ??
+                line?['name_ar']?.toString() ??
+                ''));
 
     DateTime? departureTime;
     try {

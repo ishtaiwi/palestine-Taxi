@@ -175,6 +175,16 @@ class Trip {
     return addTimeFlagsToTrip(data);
   }
 
+  static async delete(tripid) {
+    const { error } = await supabase
+      .from('trip')
+      .delete()
+      .eq('tripid', tripid);
+
+    if (error) throw error;
+    return true;
+  }
+
   static async updateAvailableSeats(tripid, seats) {
     const { data, error } = await supabase
       .from('trip')

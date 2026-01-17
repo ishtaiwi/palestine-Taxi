@@ -58,6 +58,35 @@ class _PassengerFutureReservationPageState
     }
   }
 
+  String _getNormalizedTime(Map<String, dynamic> trip) {
+    final time = trip['time'] as String?;
+    final hour = trip['hour'] as int?;
+    final minute = trip['minute'] as int?;
+
+    if (hour != null && minute != null) {
+      return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+    } else if (time != null) {
+      try {
+        final dt = DateTime.parse(time);
+        return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      } catch (e) {
+        return time;
+      }
+    }
+    return trip['deptime']?.toString() ?? '';
+  }
+
+  List<Map<String, dynamic>> _removeDuplicateTimes(List<Map<String, dynamic>> trips) {
+    final Map<String, Map<String, dynamic>> uniqueTrips = {};
+    for (final trip in trips) {
+      final normalizedTime = _getNormalizedTime(trip);
+      if (!uniqueTrips.containsKey(normalizedTime)) {
+        uniqueTrips[normalizedTime] = trip;
+      }
+    }
+    return uniqueTrips.values.toList();
+  }
+
   Future<void> _loadTrips() async {
     if (_selectedLineId == null || _selectedDate == null) return;
 
@@ -74,11 +103,16 @@ class _PassengerFutureReservationPageState
       );
 
       if (mounted) {
+        final allTrips = (result['trips'] as List?)
+                ?.map((t) => t as Map<String, dynamic>)
+                .toList() ??
+            [];
+        
+        // Remove duplicate trips with the same departure time
+        final uniqueTrips = _removeDuplicateTimes(allTrips);
+        
         setState(() {
-          _availableTrips = (result['trips'] as List?)
-                  ?.map((t) => t as Map<String, dynamic>)
-                  .toList() ??
-              [];
+          _availableTrips = uniqueTrips;
           _isLoadingTrips = false;
         });
       }
@@ -213,8 +247,10 @@ class _PassengerFutureReservationPageState
         ),
         body: SafeArea(
           child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Line Selection

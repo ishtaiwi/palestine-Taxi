@@ -8,6 +8,102 @@ import logger from '../utils/logger.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
+ * Transfer payment from one driver to another when a reservation is reassigned
+ * This reverses the payment from the original driver and transfers to the new driver
+ * @param {string} paymentid - The payment ID
+ * @param {string} fromDriverid - The original driver ID (to reverse payment from)
+ * @param {string} toDriverid - The new driver ID (to transfer payment to)
+ * @returns {Promise<object>} - Transfer result
+ */
+export const reassignPaymentToDriver = async (paymentid, fromDriverid, toDriverid) => {
+  try {
+    logger.info(`[PaymentService] 🔄 Reassigning payment ${paymentid} from driver ${fromDriverid} to driver ${toDriverid}`);
+
+    // Get the payment
+    const payment = await Payment.findById(paymentid);
+    if (!payment) {
+      logger.error(`[PaymentService] ❌ Payment ${paymentid} not found`);
+      return { success: false, error: 'Payment not found' };
+    }
+
+    // Check if payment is completed
+    if (payment.status !== PAYMENT_STATUS.COMPLETED) {
+      logger.warn(`[PaymentService] ⚠️ Payment ${paymentid} is not completed (status: ${payment.status})`);
+      return { success: false, error: 'Payment not completed' };
+    }
+
+    const transferAmount = payment.amount;
+
+    // Step 1: Reverse payment from original driver (if it was already transferred)
+    if (payment.towalletid && fromDriverid) {
+      try {
+        // Subtract from original driver's wallet
+        await Wallet.updateBalance(payment.towalletid, transferAmount, 'subtract');
+        logger.info(`[PaymentService] ✅ Reversed ${transferAmount} from original driver wallet ${payment.towalletid}`);
+      } catch (error) {
+        logger.error(`[PaymentService] ❌ Failed to reverse payment from original driver:`, error);
+        return { success: false, error: 'Failed to reverse payment from original driver' };
+      }
+    }
+
+    // Step 2: Transfer to new driver
+    const newDriver = await Driver.findById(toDriverid);
+    if (!newDriver) {
+      logger.error(`[PaymentService] ❌ New driver ${toDriverid} not found`);
+      // Try to restore original driver's wallet if we already subtracted
+      if (payment.towalletid && fromDriverid) {
+        await Wallet.updateBalance(payment.towalletid, transferAmount, 'add').catch(() => {});
+      }
+      return { success: false, error: 'New driver not found' };
+    }
+
+    if (!newDriver.userid) {
+      logger.error(`[PaymentService] ❌ New driver ${toDriverid} has no userid`);
+      // Try to restore original driver's wallet if we already subtracted
+      if (payment.towalletid && fromDriverid) {
+        await Wallet.updateBalance(payment.towalletid, transferAmount, 'add').catch(() => {});
+      }
+      return { success: false, error: 'New driver has no user ID' };
+    }
+
+    // Get or create new driver's wallet
+    let newDriverWallets = await Wallet.findByUserId(newDriver.userid, 'main');
+    let newDriverWallet = newDriverWallets?.[0];
+
+    if (!newDriverWallet) {
+      logger.info(`[PaymentService] 📝 Creating wallet for new driver ${toDriverid} (userid: ${newDriver.userid})`);
+      newDriverWallet = await Wallet.create({
+        walletid: uuidv4(),
+        userid: newDriver.userid,
+        type: 'main',
+        balance: 0,
+      });
+    }
+
+    // Add amount to new driver's wallet
+    await Wallet.updateBalance(newDriverWallet.walletid, transferAmount, 'add');
+    logger.info(`[PaymentService] ✅ Added ${transferAmount} to new driver wallet ${newDriverWallet.walletid}`);
+
+    // Update payment with new towalletid
+    await Payment.update(paymentid, {
+      towalletid: newDriverWallet.walletid,
+    });
+    logger.info(`[PaymentService] ✅ Updated payment ${paymentid} towalletid to ${newDriverWallet.walletid}`);
+
+    return {
+      success: true,
+      payment: await Payment.findById(paymentid),
+      fromWallet: payment.towalletid,
+      toWallet: newDriverWallet.walletid,
+      amount: transferAmount,
+    };
+  } catch (error) {
+    logger.error(`[PaymentService] ❌ Error reassigning payment ${paymentid}:`, error);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
  * Transfer a payment to a driver's wallet
  * @param {string} paymentid - The payment ID
  * @param {string} driverid - The driver ID

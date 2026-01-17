@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 class AppConfig {
-  static const Duration requestTimeout = Duration(seconds: 30);
+  static const Duration requestTimeout = Duration(seconds: 60); // Increased for complex operations like booking
 
   static String get _baseUrl {
     if (kIsWeb) {

@@ -23,35 +23,21 @@ export const getAllTrips = async (req, res, next) => {
 
     const allTrips = await Trip.findAll(filters);
 
-    // Group trips by deptime and show only the first trip for each time
-    // This ensures frontend shows one trip per time, even though backend may have multiple
-    const tripsByTime = new Map();
-
-    for (const trip of allTrips) {
-      const deptime = trip.deptime;
-      if (!tripsByTime.has(deptime)) {
-        tripsByTime.set(deptime, trip);
-      } else {
-        // If multiple trips exist for same time, prefer the one with more bookings or earlier created
-        const existingTrip = tripsByTime.get(deptime);
-        const existingBookings = existingTrip.totalbookings || 0;
-        const currentBookings = trip.totalbookings || 0;
-
-        // Prefer trip with more bookings, or if equal, keep the existing one (first found)
-        if (currentBookings > existingBookings) {
-          tripsByTime.set(deptime, trip);
-        }
-      }
-    }
-
-    // Convert map values back to array and sort by deptime
-    const uniqueTrips = Array.from(tripsByTime.values()).sort((a, b) => {
+    // Return all trips - don't filter out trips with same time but different direction or line
+    // Admin needs to see all trips for all lines and all directions
+    const sortedTrips = allTrips.sort((a, b) => {
       const timeA = new Date(a.deptime).getTime();
       const timeB = new Date(b.deptime).getTime();
+      // If same time, sort by lineid then direction for consistent ordering
+      if (timeA === timeB) {
+        const lineCompare = (a.lineid || '').localeCompare(b.lineid || '');
+        if (lineCompare !== 0) return lineCompare;
+        return (a.direction || '').localeCompare(b.direction || '');
+      }
       return timeA - timeB;
     });
 
-    res.json(uniqueTrips);
+    res.json(sortedTrips);
   } catch (error) {
     next(error);
   }
@@ -70,35 +56,25 @@ export const getUpcomingTrips = async (req, res, next) => {
 
     const allTrips = await Trip.findUpcoming(filters);
 
-    // Group trips by deptime and show only the first trip for each time
-    // This ensures frontend shows one trip per time, even though backend may have multiple
-    const tripsByTime = new Map();
-
-    for (const trip of allTrips) {
-      const deptime = trip.deptime;
-      if (!tripsByTime.has(deptime)) {
-        tripsByTime.set(deptime, trip);
-      } else {
-        // If multiple trips exist for same time, prefer the one with more bookings or earlier created
-        const existingTrip = tripsByTime.get(deptime);
-        const existingBookings = existingTrip.totalbookings || 0;
-        const currentBookings = trip.totalbookings || 0;
-
-        // Prefer trip with more bookings, or if equal, keep the existing one (first found)
-        if (currentBookings > existingBookings) {
-          tripsByTime.set(deptime, trip);
-        }
-      }
-    }
-
-    // Convert map values back to array and sort by deptime
-    const uniqueTrips = Array.from(tripsByTime.values()).sort((a, b) => {
+    // Sort all trips by deptime, then lineid, then direction
+    // This ensures all trips for all lines and directions are shown when filters are not applied
+    const sortedTrips = allTrips.sort((a, b) => {
       const timeA = new Date(a.deptime).getTime();
       const timeB = new Date(b.deptime).getTime();
-      return timeA - timeB;
+      if (timeA !== timeB) return timeA - timeB;
+
+      // If same time, sort by lineid
+      const lineA = a.lineid || '';
+      const lineB = b.lineid || '';
+      if (lineA !== lineB) return lineA.localeCompare(lineB);
+
+      // If same line and time, sort by direction
+      const directionA = a.direction || '';
+      const directionB = b.direction || '';
+      return directionA.localeCompare(directionB);
     });
 
-    res.json(uniqueTrips);
+    res.json(sortedTrips);
   } catch (error) {
     next(error);
   }
@@ -271,6 +247,29 @@ export const updateTrip = async (req, res, next) => {
     res.json({
       message: req.t('trip.updated') || 'Trip updated successfully',
       trip,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteTrip = async (req, res, next) => {
+  try {
+    const { tripid } = req.params;
+
+    // Check if trip exists
+    const trip = await Trip.findById(tripid);
+    if (!trip) {
+      return res.status(404).json({
+        message: req.t('trip.not_found') || 'Trip not found'
+      });
+    }
+
+    // Delete the trip
+    await Trip.delete(tripid);
+
+    res.json({
+      message: req.t('trip.deleted') || 'Trip has been deleted successfully',
     });
   } catch (error) {
     next(error);

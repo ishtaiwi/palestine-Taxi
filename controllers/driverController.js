@@ -190,8 +190,18 @@ export const joinDriverQueue = async (req, res, next) => {
     if (existing && existing.direction === direction && existing.lineid === driverRecord.lineid) {
       const queue = await DriverQueue.getActiveByLine(driverRecord.lineid, direction);
       const response = buildQueueResponse(queue, driverRecord.driverid);
+      
+      // Get station information for the line
+      const BaseStation = (await import('../models/BaseStation.js')).default;
+      const mainStation = line?.main_stationid ? await BaseStation.findById(line.main_stationid) : null;
+      const returnStation = line?.return_stationid ? await BaseStation.findById(line.return_stationid) : null;
+      
       return res.status(200).json({
         message: req.t('driver.queue_exists') || 'Driver already in queue',
+        line: line, // Include line data in response
+        direction: direction, // Include direction used
+        mainStation: mainStation,
+        returnStation: returnStation,
         ...response,
       });
     }
@@ -200,6 +210,11 @@ export const joinDriverQueue = async (req, res, next) => {
     const entry = await DriverQueue.join(driverRecord.driverid, driverRecord.lineid, direction, stationid);
     const queue = await DriverQueue.getActiveByLine(driverRecord.lineid, direction);
     const response = buildQueueResponse(queue, driverRecord.driverid);
+
+    // Get station information for the line
+    const BaseStation = (await import('../models/BaseStation.js')).default;
+    const mainStation = line?.main_stationid ? await BaseStation.findById(line.main_stationid) : null;
+    const returnStation = line?.return_stationid ? await BaseStation.findById(line.return_stationid) : null;
 
     // Check for waiting trips and assign vehicle (event-driven assignment)
     try {
@@ -212,6 +227,10 @@ export const joinDriverQueue = async (req, res, next) => {
     res.status(201).json({
       message: req.t('driver.queue_joined') || 'Driver added to queue',
       entry,
+      line: line, // Include line data in response
+      direction: direction, // Include direction used
+      mainStation: mainStation,
+      returnStation: returnStation,
       ...response,
     });
   } catch (error) {

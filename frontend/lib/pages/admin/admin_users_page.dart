@@ -901,9 +901,18 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
 
     final result = await ApiService.deleteUser(userid);
     if (mounted) {
+      String message = result['message'] ?? '';
+      if (message.isEmpty) {
+        message = result['success'] == true 
+          ? 'User has been deleted successfully' 
+          : t('error');
+      }
+      // Remove any periods and clean up the message
+      message = message.replaceAll(RegExp(r'\.\s*$'), '');
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['message'] ?? (result['success'] == true ? 'User deleted' : t('error'))),
+          content: Text(message),
           backgroundColor: result['success'] == true ? Colors.green : Colors.red,
           behavior: SnackBarBehavior.floating,
         ),

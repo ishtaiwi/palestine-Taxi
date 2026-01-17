@@ -1,5 +1,6 @@
 import Line from '../models/Line.js';
 import { v4 as uuidv4 } from 'uuid';
+import logger from '../utils/logger.js';
 
 
 export const getAllLines = async (req, res, next) => {
@@ -128,11 +129,83 @@ export const deleteLine = async (req, res, next) => {
   try {
     const { lineid } = req.params;
     
+    // Check if line exists
+    const line = await Line.findById(lineid);
+    if (!line) {
+      return res.status(404).json({
+        message: req.t('line.not_found') || 'Line not found'
+      });
+    }
+
+    // Delete all related data before deleting the line
     
-    await Line.update(lineid, { active: false });
+    // 1. Remove lineid from all vehicles associated with this line
+    try {
+      const Vehicle = (await import('../models/Vehicle.js')).default;
+      const vehicles = await Vehicle.findByLineId(lineid);
+      for (const vehicle of vehicles) {
+        await Vehicle.update(vehicle.vehicleid, { lineid: null });
+      }
+      logger.info(`[LineController] ✅ Removed lineid from ${vehicles.length} vehicle(s)`);
+    } catch (vehicleError) {
+      logger.warn(`[LineController] ⚠️ Error updating vehicles:`, vehicleError);
+      // Continue with deletion even if vehicle update fails
+    }
+
+    // 2. Delete all schedule templates for this line
+    try {
+      const ScheduleTemplate = (await import('../models/ScheduleTemplate.js')).default;
+      const schedules = await ScheduleTemplate.findAll({ lineid });
+      for (const schedule of schedules) {
+        await ScheduleTemplate.delete(schedule.templateid);
+      }
+      logger.info(`[LineController] ✅ Deleted ${schedules.length} schedule template(s)`);
+    } catch (scheduleError) {
+      logger.warn(`[LineController] ⚠️ Error deleting schedules:`, scheduleError);
+      // Continue with deletion even if schedule deletion fails
+    }
+
+    // 3. Delete all trips for this line
+    try {
+      const Trip = (await import('../models/Trip.js')).default;
+      const trips = await Trip.findAll({ lineid });
+      for (const trip of trips) {
+        await Trip.delete(trip.tripid);
+      }
+      logger.info(`[LineController] ✅ Deleted ${trips.length} trip(s)`);
+    } catch (tripError) {
+      logger.warn(`[LineController] ⚠️ Error deleting trips:`, tripError);
+      // Continue with deletion even if trip deletion fails
+    }
+
+    // 4. Remove lineid from all drivers associated with this line
+    try {
+      const Driver = (await import('../models/Driver.js')).default;
+      const drivers = await Driver.findAll({ lineid });
+      for (const driver of drivers) {
+        await Driver.update(driver.driverid, { lineid: null });
+      }
+      logger.info(`[LineController] ✅ Removed lineid from ${drivers.length} driver(s)`);
+    } catch (driverError) {
+      logger.warn(`[LineController] ⚠️ Error updating drivers:`, driverError);
+      // Continue with deletion even if driver update fails
+    }
+
+    // 5. Delete line path if exists
+    try {
+      const LinePath = (await import('../models/LinePath.js')).default;
+      await LinePath.delete(lineid);
+      logger.info(`[LineController] ✅ Deleted line path for line ${lineid}`);
+    } catch (pathError) {
+      logger.warn(`[LineController] ⚠️ Error deleting line path:`, pathError);
+      // Continue with deletion even if path deletion fails
+    }
+    
+    // Now delete the line from the database
+    await Line.delete(lineid);
     
     res.json({
-      message: req.t('line.deleted') || 'Line deleted successfully',
+      message: req.t('line.deleted') || 'Line has been deleted successfully',
     });
   } catch (error) {
     next(error);

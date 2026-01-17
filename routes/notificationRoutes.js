@@ -18,8 +18,8 @@ router.use(authenticate);
 // Register FCM token
 router.post('/register-token', registerToken);
 
-// Get notifications (paginated)
-router.get('/', getNotifications);
+// Get notifications (paginated) - use userDataLimiter for higher limits
+router.get('/', userDataLimiter, getNotifications);
 
 // Get unread count - use more lenient rate limiter
 router.get('/unread-count', userDataLimiter, getUnreadCount);

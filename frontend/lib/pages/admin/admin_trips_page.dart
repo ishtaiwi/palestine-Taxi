@@ -20,6 +20,8 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String? _statusFilter;
+  String? _lineFilter;
+  List<Map<String, dynamic>> _lines = [];
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -47,6 +49,8 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
       'line': 'الخط',
       'vehicle': 'المركبة',
       'driver': 'السائق',
+      'going': 'ذهاب',
+      'return': 'إياب',
     },
     'en': {
       'title': 'Trips Management',
@@ -73,16 +77,73 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
       'line': 'Line',
       'vehicle': 'Vehicle',
       'driver': 'Driver',
+      'going': 'Going',
+      'return': 'Return',
     },
   };
 
   String t(String key) => _texts[_isArabic ? 'ar' : 'en']![key]!;
+
+  /// Get direction label with station names from line name and trip direction
+  String _getTripDirectionLabel(Map<String, dynamic>? line, String? direction) {
+    if (direction == null) {
+      return '';
+    }
+
+    final lineName = _isArabic
+        ? (line?['name_ar']?.toString() ??
+            line?['linename']?.toString() ??
+            line?['name_en']?.toString() ??
+            '')
+        : (line?['name_en']?.toString() ??
+            line?['linename']?.toString() ??
+            line?['name_ar']?.toString() ??
+            '');
+
+    if (lineName.isEmpty) {
+      // Fallback to default labels if line name not available
+      return direction == 'going' ? t('going') : t('return');
+    }
+
+    // Split line name by "-" to get station names
+    final parts = lineName
+        .split('-')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    if (parts.length < 2) {
+      // If line name doesn't have "-" separator, fallback to default labels
+      return direction == 'going' ? t('going') : t('return');
+    }
+
+    // First part is the first station, second part is the second station
+    final firstStation = parts[0];
+    final secondStation = parts[1];
+
+    String fromStation, toStation;
+    if (direction == 'going') {
+      // Going: From first station to second station
+      fromStation = firstStation;
+      toStation = secondStation;
+    } else {
+      // Returning: From second station to first station
+      fromStation = secondStation;
+      toStation = firstStation;
+    }
+
+    // Format: "From [station1] to [station2]"
+    return _isArabic
+        ? 'من $fromStation إلى $toStation'
+        : 'From $fromStation to $toStation';
+  }
 
   @override
   void initState() {
     super.initState();
     AppTheme.init();
     _loadData();
+    _loadLines();
     _loadLanguagePreference();
     _searchController.addListener(_onSearchChanged);
   }
@@ -135,6 +196,19 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
     }
   }
 
+  Future<void> _loadLines() async {
+    try {
+      final lines = await ApiService.getAllLines();
+      if (mounted) {
+        setState(() {
+          _lines = lines;
+        });
+      }
+    } catch (e) {
+      // Silently fail - lines filter is optional
+    }
+  }
+
   void _applyFilter() {
     _filteredTrips = _trips.where((trip) {
       final lineName =
@@ -150,6 +224,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
               .toString()
               .toLowerCase();
       final status = (trip['status'] ?? '').toString().toLowerCase();
+      final lineId = trip['line']?['lineid']?.toString();
 
       final matchesSearch = _searchQuery.isEmpty ||
           lineName.contains(_searchQuery) ||
@@ -161,7 +236,9 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
       final matchesStatus =
           _statusFilter == null || status == _statusFilter?.toLowerCase();
 
-      return matchesSearch && matchesStatus;
+      final matchesLine = _lineFilter == null || lineId == _lineFilter;
+
+      return matchesSearch && matchesStatus && matchesLine;
     }).toList();
   }
 
@@ -220,6 +297,53 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
     }
   }
 
+  Future<void> _handleDelete(String tripid) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
+        title: Text(t('deleteConfirm'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(t('no'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(t('yes'), style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final result = await ApiService.deleteTrip(tripid);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? (result['success'] == true ? t('tripDeleted') : t('error'))),
+          backgroundColor: result['success'] == true ? Colors.green : Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      if (result['success'] == true) _loadData();
+    }
+  }
+
+  String _getLineName(Map<String, dynamic>? line) {
+    if (line == null) return '';
+    final lineName = _isArabic
+        ? (line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString() ?? '')
+        : (line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString() ?? '');
+    return lineName.isEmpty ? 'Unknown' : lineName;
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection =
@@ -245,6 +369,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
             : Column(
                 children: [
                   _buildSearchBar(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                  _buildLineFilter(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                   _buildFilterSection(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                   Expanded(
                     child: _filteredTrips.isEmpty
@@ -375,6 +500,65 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
     );
   }
 
+  Widget _buildLineFilter({bool isSmallScreen = false, bool isMediumScreen = false}) {
+    return Container(
+      margin: EdgeInsets.fromLTRB(
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        8.0, 
+        isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0), 
+        0
+      ),
+      child: DropdownButtonFormField<String?>(
+        value: _lineFilter,
+        decoration: InputDecoration(
+          labelText: t('line'),
+          prefixIcon: Icon(Icons.directions_bus_rounded, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+          filled: true,
+          fillColor: AppTheme.cardBackground,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 15.0),
+            borderSide: BorderSide(color: AppTheme.isDarkMode ? Colors.white24 : AppTheme.textSecondary.withOpacity(0.3)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 15.0),
+            borderSide: BorderSide(color: AppTheme.isDarkMode ? Colors.white24 : AppTheme.textSecondary.withOpacity(0.3)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 15.0),
+            borderSide: BorderSide(color: AppTheme.appBarColor, width: 2),
+          ),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 16.0 : 20.0, 
+            vertical: isSmallScreen ? 12.0 : 15.0
+          ),
+        ),
+        items: [
+          DropdownMenuItem<String?>(
+            value: null,
+            child: Text(t('filterAll')),
+          ),
+          ..._lines.map((line) {
+            final lineId = line['lineid']?.toString();
+            final lineName = _getLineName(line);
+            return DropdownMenuItem<String?>(
+              value: lineId,
+              child: Text(lineName),
+            );
+          }),
+        ],
+        onChanged: (value) {
+          setState(() {
+            _lineFilter = value;
+            _applyFilter();
+          });
+        },
+        style: TextStyle(
+          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+        ),
+      ),
+    );
+  }
+
   Widget _buildFilterSection({bool isSmallScreen = false, bool isMediumScreen = false}) {
     return Container(
       padding: EdgeInsets.symmetric(
@@ -465,16 +649,10 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
     final line = trip['line'] as Map<String, dynamic>?;
     final vehicle = trip['vehicle'] as Map<String, dynamic>?;
     final driver = vehicle?['driver']?['user'] as Map<String, dynamic>?;
+    final direction = trip['direction']?.toString();
 
-    final lineName = _isArabic
-        ? (line?['name_ar']?.toString() ??
-            line?['linename']?.toString() ??
-            line?['name_en']?.toString() ??
-            '')
-        : (line?['name_en']?.toString() ??
-            line?['linename']?.toString() ??
-            line?['name_ar']?.toString() ??
-            '');
+    // Get direction label with station names (e.g., "From Nablus to Beit Iba")
+    final tripDirectionLabel = _getTripDirectionLabel(line, direction);
 
     final status = trip['status']?.toString();
     final statusColor = _getStatusColor(status);
@@ -524,7 +702,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          lineName.isNotEmpty ? lineName : 'Unknown Line',
+                          tripDirectionLabel.isNotEmpty ? tripDirectionLabel : 'Unknown Line',
                           style: TextStyle(
                             color: isDark ? Colors.white : AppTheme.textPrimary,
                             fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
@@ -592,6 +770,19 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                   _buildInfoColumn(Icons.event_seat_rounded, t('bookings'),
                       '${trip['totalbookings'] ?? 0}', isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
                 ],
+              ),
+              SizedBox(height: isSmallScreen ? 10.0 : 12.0),
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.redAccent,
+                    size: isSmallScreen ? 20.0 : 24.0,
+                  ),
+                  onPressed: () => _handleDelete(trip['tripid']),
+                  tooltip: t('delete'),
+                ),
               ),
             ],
           ),

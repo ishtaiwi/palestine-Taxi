@@ -141,6 +141,54 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
     } catch (e) {}
   }
 
+  // Create a unique key for deduplication based on line+date+time+direction
+  // This ensures:
+  // - Trips from different lines are NOT deduplicated (both shown when "All Lines")
+  // - Trips on different dates are NOT deduplicated
+  // - Trips with different directions at same time are NOT deduplicated (both shown)
+  // - Only duplicate trips with same line+date+time+direction are deduplicated
+  String _getTripDeduplicationKey(Map<String, dynamic> trip) {
+    final deptime = trip['deptime']?.toString() ?? '';
+    final direction = trip['direction']?.toString() ?? 'going';
+    final lineid = trip['lineid']?.toString() ?? '';
+    
+    if (deptime.isEmpty) return '';
+    
+    try {
+      // Normalize Supabase timestamp format to ISO 8601
+      String normalized = deptime;
+      normalized = normalized.replaceFirst(' ', 'T');
+      normalized = normalized.replaceFirst(RegExp(r'\+00:?00?$'), 'Z');
+      if (!normalized.contains('Z') &&
+          !normalized.contains('+') &&
+          !normalized.contains('-')) {
+        normalized += 'Z';
+      }
+      final dt = DateTime.parse(normalized).toLocal();
+      // Include line, date, AND direction in the key
+      // Format: lineid|YYYY-MM-DD HH:MM|direction
+      return '$lineid|${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}|$direction';
+    } catch (e) {
+      return '$lineid|$deptime|$direction';
+    }
+  }
+
+  // Remove duplicate trips with the same line+date+time+direction, keeping only the first one
+  // When "All Lines" is selected, this shows trips from each line
+  // When "All Directions" is selected, this shows one going AND one return trip for same time
+  // When specific filters are selected, this shows one trip per unique combination
+  List<Map<String, dynamic>> _removeDuplicateTimes(List<Map<String, dynamic>> trips) {
+    final Map<String, Map<String, dynamic>> uniqueTrips = {};
+    for (final trip in trips) {
+      final key = _getTripDeduplicationKey(trip);
+      if (key.isNotEmpty && !uniqueTrips.containsKey(key)) {
+        uniqueTrips[key] = trip;
+      }
+    }
+    // Convert back to list, maintaining insertion order (LinkedHashMap)
+    return uniqueTrips.values.toList();
+  }
+
   Future<void> _loadTrips() async {
     setState(() {
       _isLoading = true;
@@ -155,8 +203,11 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
       );
 
       if (mounted) {
+        // Remove duplicate trips with the same departure time
+        final uniqueTrips = _removeDuplicateTimes(trips);
+        
         setState(() {
-          _trips = trips;
+          _trips = uniqueTrips;
           _isLoading = false;
         });
       }
@@ -407,25 +458,35 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
           ),
         ),
         body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxContentWidth),
-              child: Column(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(basePadding),
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(13),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: maxContentWidth,
+                    maxHeight: constraints.maxHeight, 
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                  Flexible(
+                    flex: 0,
+                    child: Container(
+                      padding: EdgeInsets.all(basePadding),
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(13),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                         Column(
                           children: [
                             InkWell(
@@ -626,7 +687,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                                     const Divider(height: 1),
                                     ConstrainedBox(
                                       constraints: const BoxConstraints(
-                                        maxHeight: 260, // fits under button
+                                        maxHeight: 250, // fits under button with margin
                                       ),
                                       child: ListView.builder(
                                         shrinkWrap: true,
@@ -795,6 +856,7 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                         const SizedBox(height: 12),
                         _buildDirectionFilter(textPrimary),
                       ],
+                      ),
                     ),
                   ),
                   Expanded(
@@ -880,8 +942,10 @@ class _PassengerTripsPageState extends State<PassengerTripsPage> {
                                       ),
                   ),
                 ],
-              ),
-            ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
         bottomNavigationBar: PassengerBottomNavBar(

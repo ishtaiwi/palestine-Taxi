@@ -101,7 +101,21 @@ export const createReservation = async (req, res, next) => {
     }
 
     // Check for duplicate reservations - prevent passenger from booking same trip multiple times
-    const existingReservations = await Reservation.findByPassengerId(passengerid);
+    // Optimized: Only fetch active reservations for instant bookings to reduce query size
+    let existingReservations = [];
+    if (bookingType === BOOKING_TYPE.INSTANT && tripid) {
+      // For instant bookings, only check reservations for this specific trip (faster query)
+      try {
+        const tripReservations = await Reservation.findByTripId(tripid);
+        existingReservations = tripReservations.filter(r => r.passengerid === passengerid);
+      } catch (e) {
+        // Fallback to full query if trip-specific query fails
+        existingReservations = await Reservation.findByPassengerId(passengerid);
+      }
+    } else {
+      existingReservations = await Reservation.findByPassengerId(passengerid);
+    }
+    
     const activeStatuses = [RESERVATION_STATUS.CONFIRMED, RESERVATION_STATUS.CHECKED_IN];
 
     if (bookingType === BOOKING_TYPE.INSTANT && tripid) {
@@ -570,6 +584,7 @@ export const createReservation = async (req, res, next) => {
         // If found alternative trip, reassign booking to it
         if (targetTripForBooking) {
           const originalTripId = tripid;
+          const originalTrip = currentTrip;
           await Reservation.update(reservation.bookingid, {
             tripid: targetTripForBooking.tripid,
           });
@@ -583,6 +598,41 @@ export const createReservation = async (req, res, next) => {
             logger.info(`[ReservationController] ✅ Updated payment ${paymentRecord.paymentid} tripid to ${targetTripForBooking.tripid}`);
           } catch (error) {
             logger.warn(`[ReservationController] ⚠️ Failed to update payment.tripid after reassignment:`, error);
+          }
+
+          // CRITICAL: Transfer payment from original driver to new driver
+          // If payment was already transferred to original driver, we need to reverse it
+          const refreshedPayment = await Payment.findById(paymentRecord.paymentid);
+          if (refreshedPayment && refreshedPayment.towalletid && targetTripForBooking.assigned_driverid) {
+            try {
+              const { reassignPaymentToDriver } = await import('../services/paymentService.js');
+              const originalDriverId = originalTrip?.assigned_driverid;
+              if (originalDriverId && originalDriverId !== targetTripForBooking.assigned_driverid) {
+                const reassignResult = await reassignPaymentToDriver(
+                  paymentRecord.paymentid,
+                  originalDriverId,
+                  targetTripForBooking.assigned_driverid
+                );
+                if (reassignResult.success) {
+                  logger.info(`[ReservationController] ✅ Transferred payment from driver ${originalDriverId} to driver ${targetTripForBooking.assigned_driverid}`);
+                } else {
+                  logger.warn(`[ReservationController] ⚠️ Failed to transfer payment to new driver: ${reassignResult.error}`);
+                }
+              }
+            } catch (paymentError) {
+              logger.warn(`[ReservationController] ⚠️ Error transferring payment to new driver:`, paymentError);
+            }
+          } else if (targetTripForBooking.assigned_driverid && !refreshedPayment?.towalletid) {
+            // Payment not yet transferred to any driver, transfer to new driver
+            try {
+              const { transferPaymentToDriver } = await import('../services/paymentService.js');
+              const transferResult = await transferPaymentToDriver(paymentRecord.paymentid, targetTripForBooking.assigned_driverid);
+              if (transferResult.success) {
+                logger.info(`[ReservationController] ✅ Transferred payment to new driver ${targetTripForBooking.assigned_driverid}`);
+              }
+            } catch (paymentError) {
+              logger.warn(`[ReservationController] ⚠️ Error transferring payment to driver:`, paymentError);
+            }
           }
 
           // Update reservation object with new tripid for the rest of the function
@@ -614,6 +664,7 @@ export const createReservation = async (req, res, next) => {
 
               // IMPORTANT: Sync stats for the ORIGINAL full trip to remove this booking from its count
               const originalFullTripId = tripid;
+              const originalDriverId = currentTrip?.assigned_driverid;
               const { syncTripStats } = await import('../services/matchingService.js');
               await syncTripStats(originalFullTripId);
               logger.info(`[ReservationController] ✅ Synced stats for original full trip ${originalFullTripId} (removed booking ${reservation.bookingid} from count)`);
@@ -626,6 +677,40 @@ export const createReservation = async (req, res, next) => {
                 logger.info(`[ReservationController] ✅ Updated payment ${paymentRecord.paymentid} tripid to ${newTrip.tripid}`);
               } catch (error) {
                 logger.warn(`[ReservationController] ⚠️ Failed to update payment.tripid after new trip creation:`, error);
+              }
+
+              // CRITICAL: Transfer payment from original driver to new driver
+              // If payment was already transferred to original driver, we need to reverse it
+              const refreshedPayment = await Payment.findById(paymentRecord.paymentid);
+              if (refreshedPayment && refreshedPayment.towalletid && newTrip.assigned_driverid) {
+                try {
+                  const { reassignPaymentToDriver } = await import('../services/paymentService.js');
+                  if (originalDriverId && originalDriverId !== newTrip.assigned_driverid) {
+                    const reassignResult = await reassignPaymentToDriver(
+                      paymentRecord.paymentid,
+                      originalDriverId,
+                      newTrip.assigned_driverid
+                    );
+                    if (reassignResult.success) {
+                      logger.info(`[ReservationController] ✅ Transferred payment from driver ${originalDriverId} to driver ${newTrip.assigned_driverid}`);
+                    } else {
+                      logger.warn(`[ReservationController] ⚠️ Failed to transfer payment to new driver: ${reassignResult.error}`);
+                    }
+                  }
+                } catch (paymentError) {
+                  logger.warn(`[ReservationController] ⚠️ Error transferring payment to new driver:`, paymentError);
+                }
+              } else if (newTrip.assigned_driverid && !refreshedPayment?.towalletid) {
+                // Payment not yet transferred to any driver, transfer to new driver
+                try {
+                  const { transferPaymentToDriver } = await import('../services/paymentService.js');
+                  const transferResult = await transferPaymentToDriver(paymentRecord.paymentid, newTrip.assigned_driverid);
+                  if (transferResult.success) {
+                    logger.info(`[ReservationController] ✅ Transferred payment to new driver ${newTrip.assigned_driverid}`);
+                  }
+                } catch (paymentError) {
+                  logger.warn(`[ReservationController] ⚠️ Error transferring payment to driver:`, paymentError);
+                }
               }
 
               // Update reservation and tripid for rest of processing
@@ -684,6 +769,7 @@ export const createReservation = async (req, res, next) => {
                 }
 
                 if (targetTripForReassignment) {
+                  const originalDriverIdForFallback = currentTrip?.assigned_driverid;
                   await Reservation.update(reservation.bookingid, {
                     tripid: targetTripForReassignment.tripid,
                   });
@@ -696,6 +782,39 @@ export const createReservation = async (req, res, next) => {
                     logger.info(`[ReservationController] ✅ Updated payment ${paymentRecord.paymentid} tripid to ${targetTripForReassignment.tripid}`);
                   } catch (error) {
                     logger.warn(`[ReservationController] ⚠️ Failed to update payment.tripid after reassignment:`, error);
+                  }
+
+                  // CRITICAL: Transfer payment from original driver to new driver
+                  const refreshedPaymentFallback = await Payment.findById(paymentRecord.paymentid);
+                  if (refreshedPaymentFallback && refreshedPaymentFallback.towalletid && targetTripForReassignment.assigned_driverid) {
+                    try {
+                      const { reassignPaymentToDriver } = await import('../services/paymentService.js');
+                      if (originalDriverIdForFallback && originalDriverIdForFallback !== targetTripForReassignment.assigned_driverid) {
+                        const reassignResult = await reassignPaymentToDriver(
+                          paymentRecord.paymentid,
+                          originalDriverIdForFallback,
+                          targetTripForReassignment.assigned_driverid
+                        );
+                        if (reassignResult.success) {
+                          logger.info(`[ReservationController] ✅ Transferred payment from driver ${originalDriverIdForFallback} to driver ${targetTripForReassignment.assigned_driverid}`);
+                        } else {
+                          logger.warn(`[ReservationController] ⚠️ Failed to transfer payment to new driver: ${reassignResult.error}`);
+                        }
+                      }
+                    } catch (paymentError) {
+                      logger.warn(`[ReservationController] ⚠️ Error transferring payment to new driver:`, paymentError);
+                    }
+                  } else if (targetTripForReassignment.assigned_driverid && !refreshedPaymentFallback?.towalletid) {
+                    // Payment not yet transferred to any driver, transfer to new driver
+                    try {
+                      const { transferPaymentToDriver } = await import('../services/paymentService.js');
+                      const transferResult = await transferPaymentToDriver(paymentRecord.paymentid, targetTripForReassignment.assigned_driverid);
+                      if (transferResult.success) {
+                        logger.info(`[ReservationController] ✅ Transferred payment to new driver ${targetTripForReassignment.assigned_driverid}`);
+                      }
+                    } catch (paymentError) {
+                      logger.warn(`[ReservationController] ⚠️ Error transferring payment to driver:`, paymentError);
+                    }
                   }
 
                   reservation.tripid = targetTripForReassignment.tripid;
@@ -772,190 +891,176 @@ export const createReservation = async (req, res, next) => {
         }
       }
 
-      // IMMEDIATE DRIVER ASSIGNMENT: If trip has no driver and there's a driver in queue, assign immediately
-      // BUT: Skip if booking was already moved to a new trip (which already has a driver)
-      const currentTripAfterSync = await Trip.findById(tripid);
-      if (currentTripAfterSync && currentTripAfterSync.lineid) {
-        // If trip already has a driver, transfer payment immediately
-        if (currentTripAfterSync.assigned_driverid && currentTripAfterSync.vehicleid) {
-          logger.info(`[ReservationController] 💰 Trip ${tripid} already has driver ${currentTripAfterSync.assigned_driverid} - transferring payment immediately`);
-          try {
-            // Transfer the specific payment for this reservation
-            const { transferPaymentToDriver } = await import('../services/paymentService.js');
-            const transferResult = await transferPaymentToDriver(paymentRecord.paymentid, currentTripAfterSync.assigned_driverid);
-            if (transferResult.success) {
-              logger.info(`[ReservationController] ✅ Transferred payment ${paymentRecord.paymentid} (${transferResult.amount || paymentRecord.amount}) to driver ${currentTripAfterSync.assigned_driverid} for trip ${tripid}`);
-            } else {
-              logger.warn(`[ReservationController] ⚠️ Payment transfer failed for payment ${paymentRecord.paymentid}: ${transferResult.error}`);
-              // Also try the batch transfer method as fallback
-              const { transferPaymentsForTrip } = await import('../services/paymentService.js');
-              const batchResult = await transferPaymentsForTrip(tripid, currentTripAfterSync.assigned_driverid);
-              if (batchResult.success) {
-                logger.info(`[ReservationController] ✅ Batch transfer succeeded: ${batchResult.transferred} payment(s) transferred`);
-              }
-            }
-          } catch (paymentError) {
-            logger.error(`[ReservationController] ❌ Error transferring payments for trip ${tripid}:`, paymentError);
-            // Don't fail the reservation creation if payment transfer fails
-          }
-        } else {
-          try {
-            // Step 1: Assign first driver if trip has no driver
-            logger.info(`[ReservationController] 🔍 Checking for available driver in queue for trip ${tripid} (immediate assignment)`);
-            const assignmentResult = await assignVehicleFromQueue(tripid, currentTripAfterSync.lineid);
-
-            if (assignmentResult && assignmentResult.success) {
-              logger.info(`[ReservationController] ✅ Driver ${assignmentResult.driverid} immediately assigned to trip ${tripid} after booking creation`);
-
-              // Refresh trip after assignment
-              const tripAfterAssignment = await Trip.findById(tripid);
-
-              // Step 2: Distribute all bookings for this trip (this ensures the booking is assigned to the correct driver)
-              const { distributeAllBookings } = await import('../services/matchingService.js');
-              try {
-                await distributeAllBookings(tripid);
-                logger.info(`[ReservationController] ✅ Distributed bookings for trip ${tripid} after driver assignment`);
-              } catch (distError) {
-                logger.warn(`[ReservationController] ⚠️ Error distributing bookings after driver assignment:`, distError);
-                // Don't fail the reservation creation if distribution fails
-              }
-
-              // Step 3: Check if we need additional drivers due to capacity (only after distribution)
-              // CRITICAL: Only check if trip is full AND there are bookings that exceed capacity
-              // Don't create new trips if trip is full but all bookings fit
-              const refreshedTripAfterDist = await Trip.findById(tripid);
-              if (refreshedTripAfterDist && refreshedTripAfterDist.vehicleid && refreshedTripAfterDist.assigned_driverid) {
-                const Vehicle = (await import('../models/Vehicle.js')).default;
-                const { getAvailableSeats } = await import('../services/matchingService.js');
-                const vehicle = await Vehicle.findById(refreshedTripAfterDist.vehicleid);
-
-                if (vehicle) {
-                  const availableSeats = await getAvailableSeats(vehicle, tripid);
-
-                  // Only check for additional drivers if trip is actually full (no available seats)
-                  // AND there are bookings that exceed capacity (this booking just made it full)
-                  if (availableSeats <= 0) {
-                    logger.info(`[ReservationController] Trip ${tripid} is full after new booking - checking if additional drivers needed`);
-                    const { checkAndAssignAdditionalDrivers } = await import('../services/matchingService.js');
-                    const additionalDriversResult = await checkAndAssignAdditionalDrivers(tripid);
-
-                    if (additionalDriversResult.assigned > 0) {
-                      logger.info(`[ReservationController] ✅ Assigned ${additionalDriversResult.assigned} additional drivers to trip ${tripid} due to capacity`);
-
-                      // Redistribute bookings across all drivers if additional drivers were assigned
-                      try {
-                        await distributeAllBookings(tripid);
-                        logger.info(`[ReservationController] ✅ Redistributed bookings after additional driver assignment`);
-                      } catch (distError) {
-                        logger.warn(`[ReservationController] ⚠️ Error redistributing bookings after additional driver assignment:`, distError);
-                      }
-                    }
-                  }
-                }
-              }
-            } else {
-              logger.info(`[ReservationController] ℹ️ No driver available in queue for immediate assignment to trip ${tripid}`);
-            }
-          } catch (assignError) {
-            logger.error(`[ReservationController] ❌ Error assigning driver immediately after booking:`, assignError);
-            // Don't fail the reservation creation if driver assignment fails
-            // The driver will be assigned later when trip opens or driver joins queue
-          }
-        }
-      }
+      // Driver assignment and payment transfer moved to async after response (non-blocking)
+      // This significantly speeds up booking response time
     }
 
-
+    // Generate QR code (required for response)
     const qrCode = await generateQRCode(JSON.stringify({
       bookingid: reservation.bookingid,
       passengerid,
       tripid: reservation.tripid || tripid || null,
     }));
 
+    // Get payment details (required for response)
     const paymentDetails = await Payment.findById(paymentRecord.paymentid);
 
-    emitPredictionEvent({
-      reservation,
-      trip,
-      lineid: trip?.lineid || req.body.lineid || null,
-    });
-
-    // Send notification to passenger
-    try {
-      const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notificationService.js');
-      const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
-      const Line = (await import('../models/Line.js')).default;
-
-      // Ensure we have a complete line object with all fields (including name_en)
-      // Fetch fresh if we don't have lineid or if trip.line might be incomplete
-      let line = null;
-      const lineid = trip?.lineid || req.body.lineid;
-      if (lineid) {
-        line = await Line.findById(lineid);
-      } else if (trip?.line) {
-        // Use trip.line if no lineid available, but it might be incomplete
-        line = trip.line;
-      }
-
-      // Get trip direction if available
-      const tripDirection = trip?.direction || 'going';
-      
-      // Get line names using user's language preference (pass req for Accept-Language fallback)
-      const { fromName, toName, language } = await getLineNamesForNotification(line, req.user.userid, req, null, tripDirection);
-
-      // Format time based on language using Luxon for reliable locale formatting
-      let deptime = '';
-      if (trip?.deptime || scheduled_trip_time) {
-        const { DateTime } = await import('luxon');
-        const timeToFormat = trip?.deptime || scheduled_trip_time;
-        const date = DateTime.fromISO(new Date(timeToFormat).toISOString());
-
-        if (language === 'en') {
-          // Full English format: "January 12, 2026 at 07:00 PM"
-          deptime = date.setLocale('en').toLocaleString({
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-          });
-        } else {
-          // Arabic format
-          deptime = date.setLocale('ar').toLocaleString({
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          });
-        }
-      }
-
-      await sendNotification(
-        req.user.userid,
-        NOTIFICATION_TYPES.RESERVATION_CONFIRMED,
-        {
-          from: fromName,
-          to: toName,
-          time: deptime,
-          bookingid: reservation.bookingid,
-          tripid: reservation.tripid || '',
-        },
-        language,
-        { line, trip } // Pass raw data for separate Arabic/English formatting
-      );
-    } catch (notifError) {
-      logger.warn('[ReservationController] Failed to send reservation confirmation notification:', notifError);
-      // Don't fail the request if notification fails
-    }
-
+    // Send response immediately to avoid timeout - all critical operations are done
     res.status(201).json({
       message: req.t('reservation.created') || 'Reservation created successfully',
       reservation,
       payment: paymentDetails,
       qrCode,
     });
+
+    // Run non-critical operations asynchronously after response (non-blocking)
+    // This includes: driver assignment, payment transfer, additional driver checking
+    (async () => {
+      try {
+        if (tripid && bookingType === BOOKING_TYPE.INSTANT) {
+          const currentTripAfterSync = await Trip.findById(tripid);
+          
+          if (currentTripAfterSync && currentTripAfterSync.lineid) {
+            // If trip already has a driver, transfer payment
+            if (currentTripAfterSync.assigned_driverid && currentTripAfterSync.vehicleid) {
+              logger.info(`[ReservationController] 💰 Trip ${tripid} already has driver ${currentTripAfterSync.assigned_driverid} - transferring payment`);
+              try {
+                const { transferPaymentToDriver } = await import('../services/paymentService.js');
+                const transferResult = await transferPaymentToDriver(paymentRecord.paymentid, currentTripAfterSync.assigned_driverid);
+                if (transferResult.success) {
+                  logger.info(`[ReservationController] ✅ Transferred payment ${paymentRecord.paymentid} to driver ${currentTripAfterSync.assigned_driverid}`);
+                } else {
+                  // Fallback to batch transfer
+                  const { transferPaymentsForTrip } = await import('../services/paymentService.js');
+                  await transferPaymentsForTrip(tripid, currentTripAfterSync.assigned_driverid);
+                }
+              } catch (paymentError) {
+                logger.error(`[ReservationController] ❌ Error transferring payments:`, paymentError);
+              }
+            } else {
+              // Assign driver from queue if available
+              try {
+                const { assignVehicleFromQueue } = await import('../services/tripOpeningService.js');
+                const assignmentResult = await assignVehicleFromQueue(tripid, currentTripAfterSync.lineid);
+
+                if (assignmentResult && assignmentResult.success) {
+                  logger.info(`[ReservationController] ✅ Driver ${assignmentResult.driverid} assigned to trip ${tripid}`);
+
+                  // Distribute bookings
+                  const { distributeAllBookings } = await import('../services/matchingService.js');
+                  try {
+                    await distributeAllBookings(tripid);
+                  } catch (distError) {
+                    logger.warn(`[ReservationController] ⚠️ Error distributing bookings:`, distError);
+                  }
+
+                  // Check for additional drivers if trip is full
+                  const refreshedTrip = await Trip.findById(tripid);
+                  if (refreshedTrip?.vehicleid && refreshedTrip?.assigned_driverid) {
+                    const Vehicle = (await import('../models/Vehicle.js')).default;
+                    const { getAvailableSeats, checkAndAssignAdditionalDrivers } = await import('../services/matchingService.js');
+                    const vehicle = await Vehicle.findById(refreshedTrip.vehicleid);
+
+                    if (vehicle) {
+                      const availableSeats = await getAvailableSeats(vehicle, tripid);
+                      if (availableSeats <= 0) {
+                        const additionalResult = await checkAndAssignAdditionalDrivers(tripid);
+                        if (additionalResult.assigned > 0) {
+                          await distributeAllBookings(tripid).catch(() => {});
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (assignError) {
+                logger.error(`[ReservationController] ❌ Error assigning driver:`, assignError);
+              }
+            }
+          }
+        }
+      } catch (asyncError) {
+        logger.error(`[ReservationController] ❌ Error in async post-booking operations:`, asyncError);
+      }
+    })();
+
+    // Send notification asynchronously after response (non-blocking)
+    // This prevents timeout issues while still sending notifications
+    (async () => {
+      try {
+        emitPredictionEvent({
+          reservation,
+          trip,
+          lineid: trip?.lineid || req.body.lineid || null,
+        });
+
+        const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notificationService.js');
+        const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+        const Line = (await import('../models/Line.js')).default;
+
+        // Ensure we have a complete line object with all fields (including name_en)
+        // Fetch fresh if we don't have lineid or if trip.line might be incomplete
+        let line = null;
+        const lineid = trip?.lineid || req.body.lineid;
+        if (lineid) {
+          line = await Line.findById(lineid);
+        } else if (trip?.line) {
+          // Use trip.line if no lineid available, but it might be incomplete
+          line = trip.line;
+        }
+
+        // Get trip direction if available
+        const tripDirection = trip?.direction || 'going';
+        
+        // Get line names using user's language preference (pass req for Accept-Language fallback)
+        const { fromName, toName, language } = await getLineNamesForNotification(line, req.user.userid, req, null, tripDirection);
+
+        // Format time based on language using Luxon for reliable locale formatting
+        let deptime = '';
+        if (trip?.deptime || scheduled_trip_time) {
+          const { DateTime } = await import('luxon');
+          const timeToFormat = trip?.deptime || scheduled_trip_time;
+          const date = DateTime.fromISO(new Date(timeToFormat).toISOString());
+
+          if (language === 'en') {
+            // Full English format: "January 12, 2026 at 07:00 PM"
+            deptime = date.setLocale('en').toLocaleString({
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true
+            });
+          } else {
+            // Arabic format
+            deptime = date.setLocale('ar').toLocaleString({
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          }
+        }
+
+        await sendNotification(
+          req.user.userid,
+          NOTIFICATION_TYPES.RESERVATION_CONFIRMED,
+          {
+            from: fromName,
+            to: toName,
+            time: deptime,
+            bookingid: reservation.bookingid,
+            tripid: reservation.tripid || '',
+          },
+          language,
+          { line, trip } // Pass raw data for separate Arabic/English formatting
+        );
+      } catch (notifError) {
+        logger.warn('[ReservationController] Failed to send reservation confirmation notification:', notifError);
+        // Don't fail the request if notification fails
+      }
+    })();
   } catch (error) {
     if (walletUsed && walletChargeAmount > 0) {
       await Wallet.updateBalance(walletUsed, walletChargeAmount, 'add').catch(() => { });
@@ -1027,25 +1132,33 @@ export const cancelReservation = async (req, res, next) => {
       });
     }
 
-    const now = new Date();
-    const minutesUntilDeparture = (deptime - now) / (1000 * 60);
-    const hoursUntilDeparture = minutesUntilDeparture / 60;
-
-
-    const { CANCELLATION_POLICY } = await import('../utils/constants.js');
-    const { calculateRefund } = await import('../utils/helpers.js');
-
-    const refundAmount = calculateRefund(
-      reservation.bookingprice,
-      hoursUntilDeparture,
-      CANCELLATION_POLICY
-    );
+    // Fixed refund policy: Always refund 75% of booking price when passenger cancels
+    const refundAmount = reservation.bookingprice * 0.75;
 
 
 
     if (refundAmount > 0 && reservation.paymentid) {
       const payment = await Payment.findById(reservation.paymentid);
       if (payment && payment.status === PAYMENT_STATUS.COMPLETED) {
+        // Check if payment was transferred to driver's wallet (towalletid exists)
+        const driverWalletId = payment.towalletid;
+        
+        // If payment was transferred to driver, deduct refund amount from driver's wallet
+        if (driverWalletId) {
+          try {
+            const driverWallet = await Wallet.findById(driverWalletId);
+            if (driverWallet) {
+              // Deduct the refund amount from driver's wallet
+              await Wallet.updateBalance(driverWalletId, refundAmount, 'subtract');
+              logger.info(`[ReservationController] ✅ Deducted ${refundAmount} from driver wallet ${driverWalletId} due to passenger cancellation`);
+            }
+          } catch (driverWalletError) {
+            logger.error(`[ReservationController] ❌ Error deducting from driver wallet:`, driverWalletError);
+            // Continue with passenger refund even if driver wallet deduction fails
+          }
+        }
+
+        // Refund to passenger's wallet
         const wallets = await Wallet.findByUserId(req.user.userid, 'main');
         if (wallets.length > 0) {
           await Wallet.updateBalance(wallets[0].walletid, refundAmount, 'add');
@@ -1057,8 +1170,8 @@ export const cancelReservation = async (req, res, next) => {
             method: PAYMENT_METHOD.WALLET,
             status: PAYMENT_STATUS.REFUNDED,
             type: 'refund',
-            fromwalletid: wallets[0].walletid,
-            towalletid: wallets[0].walletid,
+            fromwalletid: driverWalletId || null, // Driver wallet if payment was transferred, null if not
+            towalletid: wallets[0].walletid, // Passenger wallet (refund destination)
             tripid: reservation.tripid || null, // Include tripid to track which trip was cancelled
             time: new Date().toISOString(), // Explicitly set refund time
             external_reference: 'cancelled_by_passenger', // Track that passenger cancelled the reservation
@@ -1110,30 +1223,42 @@ export const cancelReservation = async (req, res, next) => {
         { line, trip } // Pass raw data for separate Arabic/English formatting
       );
 
-      // Notify driver if trip has driver assigned
+      // Notify driver if trip has driver assigned (check both assigned_driverid and vehicle driver)
+      let driverUserid = null;
       if (trip?.assigned_driverid) {
         const Driver = (await import('../models/Driver.js')).default;
         const driver = await Driver.findById(trip.assigned_driverid);
-        if (driver?.userid) {
-          const Passenger = (await import('../models/Passenger.js')).default;
-          const passenger = await Passenger.findById(reservation.passengerid);
-          const passengerName = passenger?.user?.fullname || 'Passenger';
+        driverUserid = driver?.userid || null;
+      } else if (trip?.vehicle?.driver?.userid) {
+        // Fallback: check if vehicle has a driver assigned
+        driverUserid = trip.vehicle.driver.userid;
+      } else if (trip?.vehicle?.driver?.user?.userid) {
+        // Alternative path for nested user object
+        driverUserid = trip.vehicle.driver.user.userid;
+      }
 
-          // Get line names for driver (pass req for Accept-Language fallback if available)
-          const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid, req, null, tripDirection);
+      if (driverUserid) {
+        const Passenger = (await import('../models/Passenger.js')).default;
+        const passenger = await Passenger.findById(reservation.passengerid);
+        const passengerName = passenger?.user?.fullname || 'Passenger';
 
-          await sendNotification(
-            driver.userid,
-            NOTIFICATION_TYPES.RESERVATION_CANCELLED,
-            {
-              passengerName,
-              from: driverFromName,
-              to: driverToName,
-            },
-            driverLanguage,
-            { line, trip } // Pass raw data for separate Arabic/English formatting
-          );
-        }
+        // Get line names for driver (pass req for Accept-Language fallback if available)
+        const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driverUserid, req, null, tripDirection);
+
+        await sendNotification(
+          driverUserid,
+          NOTIFICATION_TYPES.RESERVATION_CANCELLED,
+          {
+            passengerName,
+            bookingid: reservation.bookingid, // Include bookingid so driver knows which reservation was cancelled
+            from: driverFromName,
+            to: driverToName,
+          },
+          driverLanguage,
+          { line, trip, reservation } // Pass raw data for separate Arabic/English formatting
+        );
+        
+        logger.info(`[ReservationController] ✅ Sent cancellation notification to driver ${driverUserid} for reservation ${reservation.bookingid}`);
       }
     } catch (notifError) {
       logger.warn('[ReservationController] Failed to send cancellation notification:', notifError);
@@ -1181,6 +1306,28 @@ export const checkInReservation = async (req, res, next) => {
       });
     }
 
+    // Check if reservation is already cancelled or no-show - cannot check in cancelled reservations
+    if (reservation.status === RESERVATION_STATUS.CANCELLED) {
+      return res.status(400).json({
+        message: req.t('reservation.already_cancelled') || 'Cannot check in: This reservation has been cancelled',
+        reservation,
+      });
+    }
+
+    if (reservation.status === RESERVATION_STATUS.NO_SHOW) {
+      return res.status(400).json({
+        message: req.t('reservation.marked_no_show') || 'Cannot check in: This reservation is marked as no-show',
+        reservation,
+      });
+    }
+
+    // Check if reservation is already checked in
+    if (reservation.status === RESERVATION_STATUS.CHECKED_IN) {
+      return res.status(400).json({
+        message: req.t('reservation.already_checked_in') || 'This reservation is already checked in',
+        reservation,
+      });
+    }
 
     if (reservation.tripid) {
       const Trip = (await import('../models/Trip.js')).default;
@@ -1196,6 +1343,17 @@ export const checkInReservation = async (req, res, next) => {
     await Reservation.update(finalBookingId, { status: RESERVATION_STATUS.CHECKED_IN });
 
     const updatedReservation = await Reservation.findById(finalBookingId);
+
+    // Sync trip stats to update seat counts and booking counts
+    if (reservation.tripid) {
+      try {
+        const { syncTripStats } = await import('../services/matchingService.js');
+        await syncTripStats(reservation.tripid);
+      } catch (syncError) {
+        logger.warn(`[ReservationController] Failed to sync trip stats after check-in:`, syncError);
+        // Don't fail check-in if sync fails
+      }
+    }
 
     // Send notification to driver about passenger check-in
     try {

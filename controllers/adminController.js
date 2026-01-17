@@ -127,7 +127,7 @@ export const updateUser = async (req, res, next) => {
 
     const user = await User.update(userid, updates);
     res.json({
-      message: req.t('user.updated') || 'User updated successfully',
+      message: req.t('user.updated') || 'User has been updated successfully',
       user,
     });
   } catch (error) {
@@ -266,8 +266,13 @@ export const deleteUser = async (req, res, next) => {
 
     await User.delete(userid);
 
+    const translatedMessage = req.t('user.deleted');
+    const message = (translatedMessage && translatedMessage !== 'user.deleted') 
+      ? translatedMessage 
+      : 'User has been deleted successfully';
+    
     res.json({
-      message: req.t('user.deleted') || 'User deleted successfully',
+      message: message,
     });
   } catch (error) {
     next(error);
@@ -323,7 +328,7 @@ export const updateAdminPermissions = async (req, res, next) => {
 
     const admin = await Admin.updatePermissions(adminid, permissions);
     res.json({
-      message: req.t('admin.permissions_updated') || 'Permissions updated successfully',
+      message: req.t('admin.permissions_updated') || 'Permissions have been updated successfully',
       admin,
     });
   } catch (error) {
@@ -412,7 +417,7 @@ export const applyScheduleRecommendation = async (req, res, next) => {
 
     const result = await applyScheduleRec(recommendation);
     res.json({
-      message: req.t('recommendation.applied') || 'Recommendation applied successfully',
+      message: req.t('recommendation.applied') || 'Recommendation has been applied successfully',
       result,
     });
   } catch (error) {
@@ -432,7 +437,7 @@ export const triggerModelRetrain = async (req, res, next) => {
     });
 
     res.json({
-      message: req.t('prediction.retrained') || 'Prediction model retraining started',
+      message: req.t('prediction.retrained') || 'Prediction model retraining has been started',
       summary,
     });
   } catch (error) {
@@ -1370,7 +1375,7 @@ export const approveDriver = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: req.t('driver.approved') || 'Driver approved successfully',
+      message: req.t('driver.approved') || 'Driver has been approved successfully',
       driver: updatedDriver,
     });
   } catch (error) {
@@ -1457,7 +1462,7 @@ export const rejectDriver = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: req.t('driver.rejected') || 'Driver rejected successfully',
+      message: req.t('driver.rejected') || 'Driver has been rejected successfully',
       driver: updatedDriver,
     });
   } catch (error) {

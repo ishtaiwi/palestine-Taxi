@@ -5,6 +5,7 @@ import {
   getTripById,
   createTrip,
   updateTrip,
+  deleteTrip,
   startTrip,
   endTrip,
   getTripSeatMap,
@@ -38,6 +39,7 @@ router.put('/:tripid/end', authenticate, requireDriver, endTrip);
 
 router.post('/', authenticate, requireAdmin, createTrip);
 router.put('/:tripid', authenticate, requireAdmin, updateTrip);
+router.delete('/:tripid', authenticate, requireAdmin, deleteTrip);
 
 export default router;
 

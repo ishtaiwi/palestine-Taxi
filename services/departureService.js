@@ -448,11 +448,32 @@ export const checkAndDepartTrips = async () => {
               console.log(`[DepartureService] ⚠️ Trip ${trip.tripid} scheduled time arrived but no trip ID`);
             } else {
               const reservations = await Reservation.findByTripId(trip.tripid);
-              if (reservations.length > 0) {
+              const activeReservations = reservations.filter(
+                r => r.status === 'confirmed' || r.status === 'checked_in'
+              );
+              
+              if (activeReservations.length > 0) {
                 shouldDepart = true;
                 reason = 'scheduled_departure_with_bookings';
               } else {
-                console.log(`[DepartureService] ⚠️ Trip ${trip.tripid} scheduled time arrived but no bookings`);
+                // Trip has passed departure time with no reservations - cancel it
+                const now = getUtcNow();
+                const deptime = parseUtcDate(trip.deptime);
+                if (deptime && deptime.getTime() <= now.getTime()) {
+                  await Trip.update(trip.tripid, {
+                    status: TRIP_STATUS.CANCELLED
+                  });
+                  logger.info(`[DepartureService] 🚫 Cancelled trip ${trip.tripid} - departure time passed with no reservations`);
+                  results.push({
+                    tripid: trip.tripid,
+                    success: true,
+                    reason: 'cancelled_no_reservations',
+                    cancelled: true,
+                  });
+                  continue; // Skip to next trip
+                } else {
+                  console.log(`[DepartureService] ⚠️ Trip ${trip.tripid} scheduled time arrived but no bookings`);
+                }
               }
             }
           }

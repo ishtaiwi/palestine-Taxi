@@ -2974,6 +2974,32 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> deleteTrip(String tripid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final response = await http.delete(
+        Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripid'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'message': decoded['message'] ??
+            (response.statusCode == 200 ? 'Trip deleted successfully' : 'Failed'),
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getAllPayments({
     String? status,
     String? method,

@@ -72,7 +72,8 @@ export const markNoShowForTrip = async (tripid) => {
 
           // Notify passenger
           if (passenger?.userid) {
-            const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid);
+            const tripDirection = trip?.direction || 'going';
+            const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid, null, null, tripDirection);
             await sendNotification(
               passenger.userid,
               NOTIFICATION_TYPES.NO_SHOW_WARNING,
@@ -89,7 +90,8 @@ export const markNoShowForTrip = async (tripid) => {
           if (trip?.assigned_driverid) {
             const driver = await Driver.findById(trip.assigned_driverid);
             if (driver?.userid) {
-              const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid);
+              const tripDirection = trip?.direction || 'going';
+              const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid, null, null, tripDirection);
               await sendNotification(
                 driver.userid,
                 NOTIFICATION_TYPES.NO_SHOW_MARKED,

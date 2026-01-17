@@ -439,6 +439,8 @@ export const createNewTripForFullTripBooking = async (fullTripId, bookingId) => 
       auto_departure_enabled: true,
       early_departure_allowed: true,
       scheduled_departure_enforced: true,
+      direction: fullTrip.direction || 'going', // Copy direction from the full trip
+      origin_stationid: fullTrip.origin_stationid || null, // Copy origin_stationid if available
     };
 
     const newTrip = await Trip.create(newTripData);
@@ -494,7 +496,8 @@ export const createNewTripForFullTripBooking = async (fullTripId, bookingId) => 
 
       // Notify driver
       if (driver?.userid) {
-        const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid);
+        const tripDirection = finalTrip.direction || 'going';
+        const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid, null, null, tripDirection);
         const { DateTime } = await import('luxon');
         const deptime = DateTime.fromISO(new Date(finalTrip.deptime).toISOString())
           .setLocale(driverLanguage === 'en' ? 'en' : 'ar')
@@ -523,7 +526,8 @@ export const createNewTripForFullTripBooking = async (fullTripId, bookingId) => 
 
       // Notify passenger
       if (passenger?.userid) {
-        const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid);
+        const tripDirection = finalTrip.direction || 'going';
+        const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid, null, null, tripDirection);
         const { DateTime } = await import('luxon');
         const deptime = DateTime.fromISO(new Date(finalTrip.deptime).toISOString())
           .setLocale(passengerLanguage === 'en' ? 'en' : 'ar')

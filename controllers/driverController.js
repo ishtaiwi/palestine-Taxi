@@ -521,8 +521,11 @@ export const updateDriverReservationStatus = async (req, res, next) => {
             line = await Line.findById(reservation.lineid);
           }
           
+          // Get trip direction if available
+          const tripDirection = trip?.direction || 'going';
+          
           // Get line names for passenger's language
-          const { fromName, toName, language } = await getLineNamesForNotification(line, passenger.userid, req);
+          const { fromName, toName, language } = await getLineNamesForNotification(line, passenger.userid, req, null, tripDirection);
           
           // Format time if trip exists
           let deptime = '';

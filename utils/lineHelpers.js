@@ -64,15 +64,16 @@ export const getUserLanguage = async (userid, req = null) => {
 };
 
 /**
- * Get line names for notification based on user's language preference
+ * Get line names for notification based on user's language preference and trip direction
  * This uses the same logic as notificationService to determine language
  * @param {object} line - Line object
  * @param {string} userid - User ID to get language preference
  * @param {object} req - Optional Express request object to check Accept-Language header
  * @param {string} preferredLanguage - Optional language to use (if provided, will use this instead of fetching from DB)
+ * @param {string} direction - Trip direction ('going' or 'return') to determine origin/destination stations
  * @returns {Promise<object>} - Object with fromName and toName in user's language, and language code
  */
-export const getLineNamesForNotification = async (line, userid, req = null, preferredLanguage = null) => {
+export const getLineNamesForNotification = async (line, userid, req = null, preferredLanguage = null, direction = null) => {
   // Determine language - use preferredLanguage if provided, otherwise get from user
   let language = preferredLanguage;
   if (!language) {
@@ -88,7 +89,159 @@ export const getLineNamesForNotification = async (line, userid, req = null, pref
     return { fromName: 'Unknown', toName: 'Unknown', language };
   }
   
-  // Line name represents the route, so use the same name for both from and to
+  // If direction is provided, get station names based on direction
+  // For 'going': from = main_station, to = return_station
+  // For 'return': from = return_station, to = main_station
+  if (direction && (direction === 'going' || direction === 'return')) {
+    try {
+      const BaseStation = (await import('../models/BaseStation.js')).default;
+      
+      let originStation = null;
+      let destinationStation = null;
+      
+      if (direction === 'going') {
+        // Going: from main_station to return_station
+        if (line.main_stationid) {
+          try {
+            originStation = await BaseStation.findById(line.main_stationid);
+          } catch (err) {
+            const logger = (await import('../utils/logger.js')).default;
+            logger.warn(`[LineHelpers] Error fetching main station ${line.main_stationid} for line ${line.lineid}:`, err);
+          }
+        }
+        if (line.return_stationid) {
+          try {
+            destinationStation = await BaseStation.findById(line.return_stationid);
+          } catch (err) {
+            const logger = (await import('../utils/logger.js')).default;
+            logger.warn(`[LineHelpers] Error fetching return station ${line.return_stationid} for line ${line.lineid}:`, err);
+          }
+        }
+      } else {
+        // Return: from return_station to main_station
+        if (line.return_stationid) {
+          try {
+            originStation = await BaseStation.findById(line.return_stationid);
+          } catch (err) {
+            const logger = (await import('../utils/logger.js')).default;
+            logger.warn(`[LineHelpers] Error fetching return station ${line.return_stationid} for line ${line.lineid}:`, err);
+          }
+        }
+        if (line.main_stationid) {
+          try {
+            destinationStation = await BaseStation.findById(line.main_stationid);
+          } catch (err) {
+            const logger = (await import('../utils/logger.js')).default;
+            logger.warn(`[LineHelpers] Error fetching main station ${line.main_stationid} for line ${line.lineid}:`, err);
+          }
+        }
+      }
+      
+      // Only use station names if they exist and are valid
+      let fromName = (originStation && originStation.name && originStation.name.trim()) ? originStation.name.trim() : null;
+      let toName = (destinationStation && destinationStation.name && destinationStation.name.trim()) ? destinationStation.name.trim() : null;
+      
+      // Validate station names - reject obviously corrupted data
+      // Reject names that are too short, corrupted patterns, or generic placeholders
+      const corruptedPatterns = /^(ijn|ij|station|unknown|n\/a|na|main)$/i;
+      if (fromName && (fromName.length < 3 || corruptedPatterns.test(fromName))) {
+        const logger = (await import('../utils/logger.js')).default;
+        logger.warn(`[LineHelpers] Rejected corrupted station name "${fromName}" for origin station. Setting to null.`);
+        fromName = null;
+      }
+      if (toName && (toName.length < 3 || corruptedPatterns.test(toName))) {
+        const logger = (await import('../utils/logger.js')).default;
+        logger.warn(`[LineHelpers] Rejected corrupted station name "${toName}" for destination station. Setting to null.`);
+        toName = null;
+      }
+      
+      // If both station names are valid, return them
+      if (fromName && toName) {
+        const logger = (await import('../utils/logger.js')).default;
+        logger.info(`[LineHelpers] Successfully retrieved station names for line ${line.lineid} (direction: ${direction}, language: ${language}). From: ${fromName}, To: ${toName}`);
+        return { fromName, toName, language };
+      }
+      
+      // If direction is provided but stations are missing/invalid, fall back to line name
+      // Split line name by "-" to get station names
+      const logger = (await import('../utils/logger.js')).default;
+      if (!fromName || !toName) {
+        logger.warn(`[LineHelpers] Missing or invalid station names for line ${line.lineid} (direction: ${direction}, language: ${language}). From: ${fromName || 'missing'}, To: ${toName || 'missing'}. Main station ID: ${line.main_stationid}, Return station ID: ${line.return_stationid}. Falling back to line name.`);
+        
+        // Fallback: Use line name and split by "-"
+        const lineName = getLineName(line, language);
+        
+        // Split line name by "-" to get station names
+        if (lineName && lineName.includes('-')) {
+          const parts = lineName.split('-').map(part => part.trim()).filter(part => part.length > 0);
+          
+          if (parts.length >= 2) {
+            // For "going": from = first part, to = second part
+            // For "return": from = second part, to = first part
+            if (direction === 'going') {
+              return { 
+                fromName: parts[0], 
+                toName: parts[1], 
+                language 
+              };
+            } else if (direction === 'return') {
+              return { 
+                fromName: parts[1], 
+                toName: parts[0], 
+                language 
+              };
+            }
+          }
+        }
+        
+        // If line name doesn't have "-" or can't be split, return Unknown
+        logger.warn(`[LineHelpers] Line name "${lineName}" cannot be split by "-" for line ${line.lineid}. Returning Unknown.`);
+        return { 
+          fromName: fromName || 'Unknown', 
+          toName: toName || 'Unknown', 
+          language 
+        };
+      }
+    } catch (error) {
+      const logger = (await import('../utils/logger.js')).default;
+      logger.error(`[LineHelpers] Error fetching station names for line ${line.lineid} (direction: ${direction}):`, error);
+      
+      // Fallback: Use line name and split by "-"
+      try {
+        const lineName = getLineName(line, language);
+        
+        // Split line name by "-" to get station names
+        if (lineName && lineName.includes('-')) {
+          const parts = lineName.split('-').map(part => part.trim()).filter(part => part.length > 0);
+          
+          if (parts.length >= 2) {
+            // For "going": from = first part, to = second part
+            // For "return": from = second part, to = first part
+            if (direction === 'going') {
+              return { 
+                fromName: parts[0], 
+                toName: parts[1], 
+                language 
+              };
+            } else if (direction === 'return') {
+              return { 
+                fromName: parts[1], 
+                toName: parts[0], 
+                language 
+              };
+            }
+          }
+        }
+      } catch (fallbackError) {
+        logger.error(`[LineHelpers] Error in fallback to line name for line ${line.lineid}:`, fallbackError);
+      }
+      
+      return { fromName: 'Unknown', toName: 'Unknown', language };
+    }
+  }
+  
+  // Fallback: If direction was NOT provided or invalid, use line name
+  // Split line name by "-" to get station names if possible
   const lineName = getLineName(line, language);
   
   // Log for debugging if English name is missing
@@ -97,6 +250,33 @@ export const getLineNamesForNotification = async (line, userid, req = null, pref
     logger.warn(`[LineHelpers] Line ${line.lineid || 'unknown'} has no name_en, but language is 'en'. Line name will be: ${lineName}`);
   }
   
+  // Try to split line name by "-" to get station names
+  if (lineName && lineName.includes('-')) {
+    const parts = lineName.split('-').map(part => part.trim()).filter(part => part.length > 0);
+    
+    if (parts.length >= 2) {
+      // If direction is provided and valid, use it; otherwise default to 'going'
+      const tripDirection = direction && (direction === 'going' || direction === 'return') ? direction : 'going';
+      
+      // For "going": from = first part, to = second part
+      // For "return": from = second part, to = first part
+      if (tripDirection === 'going') {
+        return { 
+          fromName: parts[0], 
+          toName: parts[1], 
+          language 
+        };
+      } else if (tripDirection === 'return') {
+        return { 
+          fromName: parts[1], 
+          toName: parts[0], 
+          language 
+        };
+      }
+    }
+  }
+  
+  // If line name doesn't have "-" or can't be split, use line name for both
   return { fromName: lineName, toName: lineName, language };
 };
 

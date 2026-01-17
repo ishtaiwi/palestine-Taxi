@@ -158,7 +158,8 @@ export const departTrip = async (tripid) => {
       if (updatedTrip.assigned_driverid) {
         const driver = await Driver.findById(updatedTrip.assigned_driverid);
         if (driver?.userid) {
-          const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid);
+          const tripDirection = updatedTrip.direction || 'going';
+          const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid, null, null, tripDirection);
           await sendNotification(
             driver.userid,
             NOTIFICATION_TYPES.TRIP_DEPARTED,
@@ -184,7 +185,8 @@ export const departTrip = async (tripid) => {
           const passenger = await Passenger.findById(reservation.passengerid);
           if (passenger?.userid) {
             try {
-              const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid);
+              const tripDirection = updatedTrip.direction || 'going';
+              const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid, null, null, tripDirection);
               await sendNotification(
                 passenger.userid,
                 NOTIFICATION_TYPES.TRIP_DEPARTED,
@@ -311,7 +313,8 @@ const sendDepartureReminderForMinutes = async (minutesBefore) => {
         if (trip.assigned_driverid) {
           const driver = await Driver.findById(trip.assigned_driverid);
           if (driver?.userid) {
-            const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid);
+            const tripDirection = trip.direction || 'going';
+            const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid, null, null, tripDirection);
             await sendNotification(
               driver.userid,
               NOTIFICATION_TYPES.TRIP_DEPARTURE_SOON,
@@ -338,7 +341,8 @@ const sendDepartureReminderForMinutes = async (minutesBefore) => {
             const passenger = await Passenger.findById(reservation.passengerid);
             if (passenger?.userid) {
               try {
-                const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid);
+                const tripDirection = trip.direction || 'going';
+                const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid, null, null, tripDirection);
                 await sendNotification(
                   passenger.userid,
                   NOTIFICATION_TYPES.TRIP_DEPARTURE_SOON,

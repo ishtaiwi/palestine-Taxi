@@ -32,13 +32,69 @@ class ResponsiveChartContainer extends StatelessWidget {
         final screenSize = _getScreenSize(constraints.maxWidth);
         final chartHeight = _getChartHeight(screenSize);
         final legendPosition = _getLegendPosition(screenSize);
-
         final showFullLegend = screenSize != ScreenSize.small;
+        
+        // Check if we have a finite height constraint (e.g., inside Expanded)
+        final hasHeightConstraint = constraints.maxHeight.isFinite && constraints.maxHeight > 0;
+
+        // Build the chart widget - use Expanded when constrained, fixed height otherwise
+        Widget buildChartWidget() {
+          if (hasHeightConstraint) {
+            return Expanded(child: chart);
+          }
+          return SizedBox(height: chartHeight, child: chart);
+        }
+
+        // Build chart section with optional side legends
+        Widget chartSection;
+        if (legend != null && legendPosition == LegendPosition.left) {
+          chartSection = hasHeightConstraint
+              ? Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(width: 120, child: _buildVerticalLegend()),
+                      const SizedBox(width: 16),
+                      Expanded(child: chart),
+                    ],
+                  ),
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(width: 120, child: _buildVerticalLegend()),
+                    const SizedBox(width: 16),
+                    Expanded(child: SizedBox(height: chartHeight, child: chart)),
+                  ],
+                );
+        } else if (legend != null && legendPosition == LegendPosition.right) {
+          chartSection = hasHeightConstraint
+              ? Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: chart),
+                      const SizedBox(width: 16),
+                      SizedBox(width: 120, child: _buildVerticalLegend()),
+                    ],
+                  ),
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: SizedBox(height: chartHeight, child: chart)),
+                    const SizedBox(width: 16),
+                    SizedBox(width: 120, child: _buildVerticalLegend()),
+                  ],
+                );
+        } else {
+          chartSection = buildChartWidget();
+        }
 
         return Padding(
           padding: _getResponsivePadding(screenSize),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: hasHeightConstraint ? MainAxisSize.max : MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Header (if any)
@@ -53,46 +109,8 @@ class ResponsiveChartContainer extends StatelessWidget {
                 SizedBox(height: _getSpacing(screenSize)),
               ],
 
-              // Chart with optional side legend
-              if (legend != null && legendPosition == LegendPosition.left)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 120,
-                      child: _buildVerticalLegend(),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: SizedBox(
-                        height: chartHeight,
-                        child: chart,
-                      ),
-                    ),
-                  ],
-                )
-              else if (legend != null && legendPosition == LegendPosition.right)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: chartHeight,
-                        child: chart,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    SizedBox(
-                      width: 120,
-                      child: _buildVerticalLegend(),
-                    ),
-                  ],
-                )
-              else
-                SizedBox(
-                  height: chartHeight,
-                  child: chart,
-                ),
+              // Chart section (adapts based on height constraint)
+              chartSection,
 
               // Bottom legend position
               if (legend != null &&
@@ -318,6 +336,7 @@ class ResponsiveStatCard extends StatelessWidget {
         return GestureDetector(
           onTap: onTap,
           child: Container(
+            width: double.infinity,
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AppTheme.isDarkMode
@@ -333,6 +352,7 @@ class ResponsiveStatCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       padding: EdgeInsets.all(isCompact ? 6 : 8),
@@ -354,11 +374,14 @@ class ResponsiveStatCard extends StatelessWidget {
                           color: AppTheme.textSecondary,
                           fontSize: isCompact ? 11 : 12,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (percentageChange != null) _buildTrendBadge(isCompact),
+                    if (percentageChange != null) ...[
+                      const SizedBox(width: 4),
+                      _buildTrendBadge(isCompact),
+                    ],
                   ],
                 ),
                 SizedBox(height: isCompact ? 8 : 12),

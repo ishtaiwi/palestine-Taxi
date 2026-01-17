@@ -274,12 +274,46 @@ class _VehicleUtilizationChartState extends State<VehicleUtilizationChart> {
     Map<String, dynamic>? percentageChange,
     bool isSmall,
   ) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+    if (isSmall) {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'إجمالي المركبات' : 'Total Vehicles',
+              value: (fleetStats['totalVehicles'] ?? 0).toString(),
+              icon: Icons.directions_car,
+              color: Colors.blue,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'نشطة' : 'Active',
+              value: (fleetStats['activeVehicles'] ?? 0).toString(),
+              icon: Icons.check_circle,
+              color: Colors.green,
+              percentageChange: percentageChange?['activeVehicles']?.toDouble(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'خاملة' : 'Idle',
+              value: (fleetStats['idleVehicles'] ?? 0).toString(),
+              icon: Icons.pause_circle,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      );
+    }
+    
+    return Row(
       children: [
-        SizedBox(
-          width: isSmall ? double.infinity : 140,
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'إجمالي المركبات' : 'Total Vehicles',
             value: (fleetStats['totalVehicles'] ?? 0).toString(),
@@ -287,8 +321,8 @@ class _VehicleUtilizationChartState extends State<VehicleUtilizationChart> {
             color: Colors.blue,
           ),
         ),
-        SizedBox(
-          width: isSmall ? double.infinity : 140,
+        const SizedBox(width: 12),
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'نشطة' : 'Active',
             value: (fleetStats['activeVehicles'] ?? 0).toString(),
@@ -297,8 +331,8 @@ class _VehicleUtilizationChartState extends State<VehicleUtilizationChart> {
             percentageChange: percentageChange?['activeVehicles']?.toDouble(),
           ),
         ),
-        SizedBox(
-          width: isSmall ? double.infinity : 140,
+        const SizedBox(width: 12),
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'خاملة' : 'Idle',
             value: (fleetStats['idleVehicles'] ?? 0).toString(),

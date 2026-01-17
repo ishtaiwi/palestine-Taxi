@@ -293,12 +293,48 @@ class _UserGrowthChartState extends State<UserGrowthChart> {
     Map<String, dynamic>? percentageChange,
     required bool isSmall,
   }) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+    if (isSmall) {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'إجمالي المستخدمين' : 'Total Users',
+              value: total.toString(),
+              icon: Icons.people,
+              color: Colors.blue,
+              percentageChange: percentageChange?['total']?.toDouble(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'السائقين' : 'Drivers',
+              value: (byRole['drivers'] ?? 0).toString(),
+              icon: Icons.drive_eta,
+              color: Colors.orange,
+              percentageChange: percentageChange?['drivers']?.toDouble(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'الركاب' : 'Passengers',
+              value: (byRole['passengers'] ?? 0).toString(),
+              icon: Icons.person,
+              color: Colors.green,
+              percentageChange: percentageChange?['passengers']?.toDouble(),
+            ),
+          ),
+        ],
+      );
+    }
+    
+    return Row(
       children: [
-        SizedBox(
-          width: isSmall ? double.infinity : 150,
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'إجمالي المستخدمين' : 'Total Users',
             value: total.toString(),
@@ -307,8 +343,8 @@ class _UserGrowthChartState extends State<UserGrowthChart> {
             percentageChange: percentageChange?['total']?.toDouble(),
           ),
         ),
-        SizedBox(
-          width: isSmall ? double.infinity : 150,
+        const SizedBox(width: 12),
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'السائقين' : 'Drivers',
             value: (byRole['drivers'] ?? 0).toString(),
@@ -317,8 +353,8 @@ class _UserGrowthChartState extends State<UserGrowthChart> {
             percentageChange: percentageChange?['drivers']?.toDouble(),
           ),
         ),
-        SizedBox(
-          width: isSmall ? double.infinity : 150,
+        const SizedBox(width: 12),
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'الركاب' : 'Passengers',
             value: (byRole['passengers'] ?? 0).toString(),

@@ -33,9 +33,10 @@ export async function generateScheduleRecommendations(options = {}) {
         ]);
 
         const utilizationMap = buildUtilizationMap(utilizationBuckets);
-        const template = templates?.[0] || null;
+        const activeTemplates = templates?.filter(t => t.active) || [];
+        const template = activeTemplates[0] || null;
 
-        const lineRecs = await buildLineRecommendations(lineid, predictionData, utilizationMap, template);
+        const lineRecs = await buildLineRecommendations(lineid, predictionData, utilizationMap, template, activeTemplates);
         recommendations.push(...lineRecs);
     }
 
@@ -145,12 +146,22 @@ export async function applyRecommendation(recommendation) {
     };
 }
 
-async function buildLineRecommendations(lineid, predictionData, utilizationMap, template) {
+async function buildLineRecommendations(lineid, predictionData, utilizationMap, template, allTemplates = []) {
     if (!predictionData?.predictions?.length) return [];
 
     const recommendations = [];
 
     for (const prediction of predictionData.predictions) {
+        // Check if any active schedule will create a trip at this time - skip if so
+        if (willAnyScheduleCreateTripAtTime(allTemplates, prediction.hour)) {
+            logger.debug('Skipping recommendation - schedule will create trip at this time', {
+                lineid,
+                date: prediction.date,
+                hour: prediction.hour,
+                templatesCount: allTemplates.length,
+            });
+            continue;
+        }
         
         const totalAvailableSeats = await getTotalAvailableSeatsForTimeSlot(
             lineid,
@@ -202,6 +213,29 @@ async function buildLineRecommendations(lineid, predictionData, utilizationMap, 
     }
 
     return recommendations;
+}
+
+/**
+ * Check if any active schedule template will create a trip at the given hour
+ * A line can have multiple schedules (e.g., going and return directions)
+ * @param {Array} templates - Array of schedule template objects
+ * @param {number} hour - Hour to check (0-23)
+ * @returns {boolean} True if any schedule will create a trip at this hour
+ */
+function willAnyScheduleCreateTripAtTime(templates, hour) {
+    if (!templates || templates.length === 0) {
+        return false;
+    }
+
+    // Check if any active template covers this hour
+    return templates.some(template => {
+        if (!template || !template.active) {
+            return false;
+        }
+        // Check if the hour falls within the schedule's operating hours
+        // The schedule creates trips from start_hour to end_hour (inclusive)
+        return hour >= template.start_hour && hour <= template.end_hour;
+    });
 }
 
 function buildUtilizationMap(buckets = []) {

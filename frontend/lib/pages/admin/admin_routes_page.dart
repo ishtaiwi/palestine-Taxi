@@ -608,6 +608,7 @@ class _AdminRoutesPageState extends State<AdminRoutesPage> {
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // Header
                 Row(
@@ -628,6 +629,7 @@ class _AdminRoutesPageState extends State<AdminRoutesPage> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             lineName,
@@ -683,11 +685,12 @@ class _AdminRoutesPageState extends State<AdminRoutesPage> {
                   ],
                 ),
                 
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Divider(
                   color: AppTheme.isDarkMode ? Colors.white12 : AppTheme.borderColor,
+                  height: 1,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Stats
                 if (hasPath) ...[
@@ -706,7 +709,7 @@ class _AdminRoutesPageState extends State<AdminRoutesPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                 ],
 
                 // Actions
@@ -723,7 +726,7 @@ class _AdminRoutesPageState extends State<AdminRoutesPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),

@@ -707,6 +707,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
     final textPrimary = isDark ? Colors.white : const Color(0xFF1E3A5F);
 
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: cardColor,
@@ -746,6 +747,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -776,6 +778,8 @@ class _AdminReportsPageState extends State<AdminReportsPage>
                   Text(
                     'Failed to load',
                     style: TextStyle(color: textPrimary, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   TextButton(
                     onPressed: onRetry,
@@ -790,7 +794,10 @@ class _AdminReportsPageState extends State<AdminReportsPage>
               ),
             )
           else
-            child,
+            SizedBox(
+              width: double.infinity,
+              child: child,
+            ),
         ],
       ),
     );
@@ -798,9 +805,11 @@ class _AdminReportsPageState extends State<AdminReportsPage>
 
   // Desktop content builders - Compact layout
   Widget _buildRevenueDesktop(Color cardColor, Color textPrimary) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return SizedBox(
+      width: double.infinity,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         Expanded(
           flex: 3,
           child: _buildDesktopCard(
@@ -834,13 +843,16 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           ),
         ),
       ],
+      ),
     );
   }
 
   Widget _buildBookingDesktop(Color cardColor, Color textPrimary) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return SizedBox(
+      width: double.infinity,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         Expanded(
           flex: 3,
           child: _buildDesktopCard(
@@ -872,13 +884,16 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           ),
         ),
       ],
+      ),
     );
   }
 
   Widget _buildTripDesktop(Color cardColor, Color textPrimary) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return SizedBox(
+      width: double.infinity,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         Expanded(
           flex: 2,
           child: _buildDesktopCard(
@@ -926,13 +941,16 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           ),
         ),
       ],
+      ),
     );
   }
 
   Widget _buildUserDesktop(Color cardColor, Color textPrimary) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return SizedBox(
+      width: double.infinity,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         Expanded(
           flex: 3,
           child: _buildDesktopCard(
@@ -963,13 +981,16 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           ),
         ),
       ],
+      ),
     );
   }
 
   Widget _buildVehicleDesktop(Color cardColor, Color textPrimary) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return SizedBox(
+      width: double.infinity,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         Expanded(
           flex: 3,
           child: _buildDesktopCard(
@@ -1001,13 +1022,16 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           ),
         ),
       ],
+      ),
     );
   }
 
   Widget _buildLineDesktop(Color cardColor, Color textPrimary) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return SizedBox(
+      width: double.infinity,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         Expanded(
           child: _buildDesktopCard(
             title: _isArabic ? 'الإيرادات حسب الخط' : 'Revenue by Line',
@@ -1056,6 +1080,7 @@ class _AdminReportsPageState extends State<AdminReportsPage>
           ),
         ),
       ],
+      ),
     );
   }
 

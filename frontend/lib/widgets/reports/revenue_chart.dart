@@ -62,10 +62,11 @@ class _RevenueChartState extends State<RevenueChart> {
 
     return LayoutBuilder(builder: (context, constraints) {
       final isSmall = constraints.maxWidth < 400;
+      final isConstrained = constraints.maxHeight.isFinite && constraints.maxHeight > 0;
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: isConstrained ? MainAxisSize.max : MainAxisSize.min,
         children: [
           // Summary statistics with comparison
           if (widget.showSummary) ...[
@@ -95,10 +96,12 @@ class _RevenueChartState extends State<RevenueChart> {
           ],
 
           // Chart with responsive height
-          ResponsiveChartContainer(
-            preferredSize: isSmall ? ChartSize.medium : widget.preferredSize,
-            chart: LineChart(
-              LineChartData(
+          if (isConstrained)
+            Expanded(
+              child: ResponsiveChartContainer(
+                preferredSize: isSmall ? ChartSize.medium : widget.preferredSize,
+                chart: LineChart(
+                  LineChartData(
                 lineTouchData: LineTouchData(
                   enabled: true,
                   touchTooltipData: LineTouchTooltipData(
@@ -277,9 +280,196 @@ class _RevenueChartState extends State<RevenueChart> {
                     ),
                   ),
                 ],
+                ),
+              ),
+              ),
+            )
+          else
+            ResponsiveChartContainer(
+              preferredSize: isSmall ? ChartSize.medium : widget.preferredSize,
+              chart: LineChart(
+                LineChartData(
+                  lineTouchData: LineTouchData(
+                    enabled: true,
+                    touchTooltipData: LineTouchTooltipData(
+                      fitInsideHorizontally: true,
+                      fitInsideVertically: true,
+                      tooltipRoundedRadius: 12,
+                      tooltipPadding:
+                          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      getTooltipColor: (touchedSpot) => AppTheme.isDarkMode
+                          ? const Color(0xFF1A1F35)
+                          : Colors.white,
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          final idx = spot.x.toInt();
+                          if (idx >= 0 && idx < chartData.length) {
+                            final dataPoint = chartData[idx];
+                            final date = dataPoint['date'] as String? ?? '';
+                            final revenue =
+                                (dataPoint['revenue'] as num?)?.toDouble() ?? 0;
+                            final transactions = dataPoint['transactions'] ?? 0;
+
+                            // Calculate change from previous day
+                            String changeText = '';
+                            if (idx > 0) {
+                              final prevRevenue =
+                                  (chartData[idx - 1]['revenue'] as num?)
+                                          ?.toDouble() ??
+                                      0;
+                              if (prevRevenue > 0) {
+                                final change =
+                                    ((revenue - prevRevenue) / prevRevenue * 100);
+                                changeText =
+                                    '\n${change >= 0 ? '+' : ''}${change.toStringAsFixed(1)}% from prev';
+                              }
+                            }
+
+                            return LineTooltipItem(
+                              '${ChartTooltipHelper.formatDate(date)}\n${ReportDataProcessor.formatCurrencyCompact(revenue)}\n$transactions txns$changeText',
+                              TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            );
+                          }
+                          return null;
+                        }).toList();
+                      },
+                    ),
+                    touchCallback: (event, response) {
+                      setState(() {
+                        if (event.isInterestedForInteractions &&
+                            response?.lineBarSpots != null &&
+                            response!.lineBarSpots!.isNotEmpty) {
+                          _touchedIndex = response.lineBarSpots!.first.x.toInt();
+                        } else {
+                          _touchedIndex = null;
+                        }
+                      });
+                    },
+                  ),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: _getInterval(_getMaxRevenue(chartData)),
+                    getDrawingHorizontalLine: (value) {
+                      return FlLine(
+                        color: AppTheme.getCardBorder(0.15),
+                        strokeWidth: 1,
+                        dashArray: [5, 5],
+                      );
+                    },
+                  ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: isSmall ? 22 : 26,
+                        interval: chartData.length > 10
+                            ? (chartData.length / (isSmall ? 4 : 6)).ceilToDouble()
+                            : 1,
+                        getTitlesWidget: (value, meta) {
+                          final idx = value.toInt();
+                          if (idx >= 0 && idx < chartData.length) {
+                            final date = chartData[idx]['date'] as String;
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                date.length >= 10 ? date.substring(5, 10) : date,
+                                style: TextStyle(
+                                  color: _touchedIndex == idx
+                                      ? Colors.green
+                                      : AppTheme.textSecondary,
+                                  fontSize: isSmall ? 9 : 10,
+                                  fontWeight: _touchedIndex == idx
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            );
+                          }
+                          return const Text('');
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: isSmall ? 45 : 55,
+                        interval: _getInterval(_getMaxRevenue(chartData)),
+                        getTitlesWidget: (value, meta) {
+                          if (value == 0) return const Text('');
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: Text(
+                              ReportDataProcessor.formatCurrencyCompact(value),
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: isSmall ? 9 : 10,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  minX: 0,
+                  maxX: (chartData.length - 1).toDouble(),
+                  minY: 0,
+                  maxY: _getMaxY(_getMaxRevenue(chartData)),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: chartData.asMap().entries.map((entry) {
+                        return FlSpot(
+                          entry.key.toDouble(),
+                          (entry.value['revenue'] as num).toDouble(),
+                        );
+                      }).toList(),
+                      isCurved: true,
+                      curveSmoothness: 0.25,
+                      color: Colors.green,
+                      barWidth: isSmall ? 2.5 : 3,
+                      isStrokeCapRound: true,
+                      dotData: FlDotData(
+                        show: true,
+                        getDotPainter: (spot, percent, barData, index) {
+                          final isHighlighted = index == _touchedIndex;
+                          return FlDotCirclePainter(
+                            radius: isHighlighted
+                                ? 6
+                                : (chartData.length < 15 ? 3 : 0),
+                            color: Colors.green,
+                            strokeWidth: isHighlighted ? 3 : 2,
+                            strokeColor: Colors.white,
+                          );
+                        },
+                      ),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.green.withOpacity(0.25),
+                            Colors.green.withOpacity(0.05),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
           // Insights section
           if (widget.showInsights && stats != null) ...[
@@ -301,12 +491,37 @@ class _RevenueChartState extends State<RevenueChart> {
     Map<String, dynamic>? percentageChange,
     required bool isSmall,
   }) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+    if (isSmall) {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'إجمالي الإيرادات' : 'Total Revenue',
+              value: ReportDataProcessor.formatCurrencyCompact(totalRevenue),
+              icon: Icons.attach_money,
+              color: Colors.green,
+              percentageChange: percentageChange?['revenue']?.toDouble(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'المعاملات' : 'Transactions',
+              value: totalTransactions.toString(),
+              icon: Icons.receipt_long,
+              color: Colors.blue,
+              percentageChange: percentageChange?['transactions']?.toDouble(),
+            ),
+          ),
+        ],
+      );
+    }
+    
+    return Row(
       children: [
-        SizedBox(
-          width: isSmall ? double.infinity : (percentageChange != null ? 180 : 150),
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'إجمالي الإيرادات' : 'Total Revenue',
             value: ReportDataProcessor.formatCurrencyCompact(totalRevenue),
@@ -315,8 +530,8 @@ class _RevenueChartState extends State<RevenueChart> {
             percentageChange: percentageChange?['revenue']?.toDouble(),
           ),
         ),
-        SizedBox(
-          width: isSmall ? double.infinity : (percentageChange != null ? 180 : 150),
+        const SizedBox(width: 12),
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'المعاملات' : 'Transactions',
             value: totalTransactions.toString(),

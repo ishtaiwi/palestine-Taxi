@@ -2388,7 +2388,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final totalTransactions = _revenueStats?['totalTransactions'] ?? 0;
 
     return Column(
-      mainAxisSize: MainAxisSize.max,
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
@@ -2421,17 +2421,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ],
         ),
         const SizedBox(height: 4),
-        Flexible(
-          child: SizedBox(
-            height: 200,
-            child: RevenueChart(
-              data: _revenueChartData ?? const {},
-              isArabic: _isArabic,
-              showSummary: false,
-              showInsights: false,
-              showComparison: false,
-              preferredSize: ChartSize.small,
-            ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SizedBox(
+                height: constraints.maxHeight,
+                width: double.infinity,
+                child: ClipRect(
+                  clipBehavior: Clip.hardEdge,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: RevenueChart(
+                      data: _revenueChartData ?? const {},
+                      isArabic: _isArabic,
+                      showSummary: false,
+                      showInsights: false,
+                      showComparison: false,
+                      preferredSize: ChartSize.small,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ],
@@ -2443,7 +2454,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final completed = _dashboardStats?['completedTrips'] ?? 0;
 
     return Column(
-      mainAxisSize: MainAxisSize.max,
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
@@ -2476,16 +2487,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ],
         ),
         const SizedBox(height: 4),
-        Flexible(
-          child: SizedBox(
-            height: 200,
-            child: TripTimeSeriesChart(
-              data: _tripChartData ?? const {},
-              isArabic: _isArabic,
-              showSummary: false,
-              showInsights: false,
-              preferredSize: ChartSize.small,
-            ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SizedBox(
+                height: constraints.maxHeight,
+                width: double.infinity,
+                child: ClipRect(
+                  clipBehavior: Clip.hardEdge,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: TripTimeSeriesChart(
+                      data: _tripChartData ?? const {},
+                      isArabic: _isArabic,
+                      showSummary: false,
+                      showInsights: false,
+                      preferredSize: ChartSize.small,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ],

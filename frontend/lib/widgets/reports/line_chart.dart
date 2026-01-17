@@ -274,12 +274,49 @@ class _LinePerformanceChartState extends State<LinePerformanceChart> {
     Map<String, dynamic>? percentageChange,
     bool isSmall,
   ) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+    if (isSmall) {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'إجمالي الإيرادات' : 'Total Revenue',
+              value: ReportDataProcessor.formatCurrencyCompact(
+                  totals['revenue'] ?? 0),
+              icon: Icons.attach_money,
+              color: Colors.green,
+              percentageChange: percentageChange?['revenue']?.toDouble(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'الحجوزات' : 'Bookings',
+              value: (totals['bookings'] ?? 0).toString(),
+              icon: Icons.book_online,
+              color: Colors.blue,
+              percentageChange: percentageChange?['bookings']?.toDouble(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'الرحلات' : 'Trips',
+              value: (totals['trips'] ?? 0).toString(),
+              icon: Icons.directions_bus,
+              color: Colors.purple,
+              percentageChange: percentageChange?['trips']?.toDouble(),
+            ),
+          ),
+        ],
+      );
+    }
+    
+    return Row(
       children: [
-        SizedBox(
-          width: isSmall ? double.infinity : 150,
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'إجمالي الإيرادات' : 'Total Revenue',
             value: ReportDataProcessor.formatCurrencyCompact(
@@ -289,8 +326,8 @@ class _LinePerformanceChartState extends State<LinePerformanceChart> {
             percentageChange: percentageChange?['revenue']?.toDouble(),
           ),
         ),
-        SizedBox(
-          width: isSmall ? double.infinity : 150,
+        const SizedBox(width: 12),
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'الحجوزات' : 'Bookings',
             value: (totals['bookings'] ?? 0).toString(),
@@ -299,8 +336,8 @@ class _LinePerformanceChartState extends State<LinePerformanceChart> {
             percentageChange: percentageChange?['bookings']?.toDouble(),
           ),
         ),
-        SizedBox(
-          width: isSmall ? double.infinity : 150,
+        const SizedBox(width: 12),
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'الرحلات' : 'Trips',
             value: (totals['trips'] ?? 0).toString(),

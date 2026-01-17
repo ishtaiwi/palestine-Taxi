@@ -297,12 +297,47 @@ class _BookingTimeSeriesChartState extends State<BookingTimeSeriesChart> {
     Map<String, dynamic>? percentageChange,
     required bool isSmall,
   }) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+    if (isSmall) {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'إجمالي الحجوزات' : 'Total Bookings',
+              value: totalBookings.toString(),
+              icon: Icons.book_online,
+              color: Colors.blue,
+              percentageChange: percentageChange?['bookings']?.toDouble(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'مؤكد' : 'Confirmed',
+              value: (byStatus['confirmed'] ?? 0).toString(),
+              icon: Icons.check_circle,
+              color: Colors.green,
+              percentageChange: percentageChange?['confirmed']?.toDouble(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ResponsiveStatCard(
+              label: widget.isArabic ? 'معدل التأكيد' : 'Rate',
+              value: '${confirmationRate.toStringAsFixed(1)}%',
+              icon: Icons.percent,
+              color: confirmationRate >= 80 ? Colors.green : Colors.orange,
+            ),
+          ),
+        ],
+      );
+    }
+    
+    return Row(
       children: [
-        SizedBox(
-          width: isSmall ? double.infinity : 160,
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'إجمالي الحجوزات' : 'Total Bookings',
             value: totalBookings.toString(),
@@ -311,8 +346,8 @@ class _BookingTimeSeriesChartState extends State<BookingTimeSeriesChart> {
             percentageChange: percentageChange?['bookings']?.toDouble(),
           ),
         ),
-        SizedBox(
-          width: isSmall ? double.infinity : 160,
+        const SizedBox(width: 12),
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'مؤكد' : 'Confirmed',
             value: (byStatus['confirmed'] ?? 0).toString(),
@@ -321,8 +356,8 @@ class _BookingTimeSeriesChartState extends State<BookingTimeSeriesChart> {
             percentageChange: percentageChange?['confirmed']?.toDouble(),
           ),
         ),
-        SizedBox(
-          width: isSmall ? double.infinity : 160,
+        const SizedBox(width: 12),
+        Expanded(
           child: ResponsiveStatCard(
             label: widget.isArabic ? 'معدل التأكيد' : 'Rate',
             value: '${confirmationRate.toStringAsFixed(1)}%',

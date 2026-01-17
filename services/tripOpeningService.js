@@ -188,7 +188,8 @@ export const assignVehicleFromQueue = async (tripid, lineid) => {
 
       // Notify driver
       if (driver?.userid) {
-        const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid);
+        const tripDirection = updatedTrip.direction || 'going';
+        const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid, null, null, tripDirection);
         const { DateTime } = await import('luxon');
         const deptime = DateTime.fromISO(new Date(updatedTrip.deptime).toISOString())
           .setLocale(driverLanguage === 'en' ? 'en' : 'ar')
@@ -227,7 +228,8 @@ export const assignVehicleFromQueue = async (tripid, lineid) => {
           const passenger = await Passenger.findById(reservation.passengerid);
           if (passenger?.userid) {
             try {
-              const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid);
+              const tripDirection = updatedTrip.direction || 'going';
+              const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid, null, null, tripDirection);
               const { DateTime } = await import('luxon');
               const deptime = DateTime.fromISO(new Date(updatedTrip.deptime).toISOString())
                 .setLocale(passengerLanguage === 'en' ? 'en' : 'ar')

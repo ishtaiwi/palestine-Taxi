@@ -897,8 +897,11 @@ export const createReservation = async (req, res, next) => {
         line = trip.line;
       }
 
+      // Get trip direction if available
+      const tripDirection = trip?.direction || 'going';
+      
       // Get line names using user's language preference (pass req for Accept-Language fallback)
-      const { fromName, toName, language } = await getLineNamesForNotification(line, req.user.userid, req);
+      const { fromName, toName, language } = await getLineNamesForNotification(line, req.user.userid, req, null, tripDirection);
 
       // Format time based on language using Luxon for reliable locale formatting
       let deptime = '';
@@ -1089,8 +1092,11 @@ export const cancelReservation = async (req, res, next) => {
         line = trip.line;
       }
 
+      // Get trip direction if available
+      const tripDirection = trip?.direction || 'going';
+      
       // Get line names for passenger (pass req for Accept-Language fallback)
-      const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, req.user.userid, req);
+      const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, req.user.userid, req, null, tripDirection);
 
       await sendNotification(
         req.user.userid,
@@ -1114,7 +1120,7 @@ export const cancelReservation = async (req, res, next) => {
           const passengerName = passenger?.user?.fullname || 'Passenger';
 
           // Get line names for driver (pass req for Accept-Language fallback if available)
-          const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid, req);
+          const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid, req, null, tripDirection);
 
           await sendNotification(
             driver.userid,

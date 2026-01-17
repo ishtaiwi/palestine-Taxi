@@ -50,13 +50,108 @@ export const sendNotification = async (userid, notificationType, data = {}, lang
       const trip = rawData.trip;
       
       if (line) {
+        // Get trip direction if available
+        const tripDirection = trip?.direction || 'going';
+        
         // Format for Arabic
-        const { fromName: fromNameAr, toName: toNameAr } = await getLineNamesForNotification(line, userid, null, 'ar');
-        dataAr = { ...data, from: fromNameAr, to: toNameAr };
+        try {
+          const { fromName: fromNameAr, toName: toNameAr } = await getLineNamesForNotification(line, userid, null, 'ar', tripDirection);
+          // Only use re-fetched values if they are valid (not null, not empty, not 'Unknown')
+          // Check for corrupted data like ".ijn" or very short strings that might be partial names
+          // Also check if both values are the same (which means it's the line name fallback)
+          // More strict validation: names must be at least 3 chars, not start with '.', not be common corrupted patterns
+          const isValidFromAr = fromNameAr && 
+            fromNameAr !== 'Unknown' && 
+            fromNameAr.trim().length >= 3 && 
+            !fromNameAr.trim().startsWith('.') &&
+            !fromNameAr.trim().toLowerCase().match(/^(ijn|ij|main|station|unknown)$/i);
+          const isValidToAr = toNameAr && 
+            toNameAr !== 'Unknown' && 
+            toNameAr.trim().length >= 3 && 
+            !toNameAr.trim().startsWith('.') &&
+            !toNameAr.trim().toLowerCase().match(/^(ijn|ij|main|station|unknown)$/i);
+          const isLineNameFallback = fromNameAr && toNameAr && fromNameAr.trim() === toNameAr.trim();
+          
+          // If both values are valid AND different (not line name fallback), use them
+          // Otherwise, prefer values from data object if they exist and are different
+          if (isValidFromAr && isValidToAr && !isLineNameFallback) {
+            dataAr = { ...data, from: fromNameAr.trim(), to: toNameAr.trim() };
+          } else if (isLineNameFallback && data.from && data.to && data.from !== data.to) {
+            // If re-fetch returned line name (same for both), but data has different values, use data
+            dataAr = { ...data };
+            logger.warn(`[NotificationService] Re-fetch returned line name fallback (Arabic). Using values from data object instead. From: ${data.from}, To: ${data.to}`);
+          } else {
+            // Fallback to values from data if re-fetch returns invalid values
+            // Use data.from and data.to if they exist and are valid, otherwise keep the invalid values for debugging
+            // Also validate data values - reject common corrupted patterns
+            const isDataFromValid = data.from && data.from.trim().length >= 3 && 
+              !data.from.trim().toLowerCase().match(/^(ijn|ij|main|station|unknown)$/i);
+            const isDataToValid = data.to && data.to.trim().length >= 3 && 
+              !data.to.trim().toLowerCase().match(/^(ijn|ij|main|station|unknown)$/i);
+            
+            if (isDataFromValid && isDataToValid) {
+              dataAr = { ...data };
+            } else {
+              // If both re-fetch and data are invalid, use re-fetched values anyway (better than empty)
+              dataAr = { ...data, from: (fromNameAr && fromNameAr.trim()) || data.from || 'Unknown', to: (toNameAr && toNameAr.trim()) || data.to || 'Unknown' };
+            }
+            logger.warn(`[NotificationService] Invalid station names from getLineNamesForNotification (Arabic). From: ${fromNameAr}, To: ${toNameAr}. Data object has: From: ${data.from}, To: ${data.to}`);
+          }
+        } catch (error) {
+          // Fallback to values from data if re-fetch fails
+          dataAr = { ...data };
+          logger.warn(`[NotificationService] Error fetching station names for Arabic:`, error);
+        }
         
         // Format for English
-        const { fromName: fromNameEn, toName: toNameEn } = await getLineNamesForNotification(line, userid, null, 'en');
-        dataEn = { ...data, from: fromNameEn, to: toNameEn };
+        try {
+          const { fromName: fromNameEn, toName: toNameEn } = await getLineNamesForNotification(line, userid, null, 'en', tripDirection);
+          // Only use re-fetched values if they are valid (not null, not empty, not 'Unknown')
+          // Check for corrupted data like ".ijn" or very short strings that might be partial names
+          // Also check if both values are the same (which means it's the line name fallback)
+          // More strict validation: names must be at least 3 chars, not start with '.', not be common corrupted patterns
+          const isValidFromEn = fromNameEn && 
+            fromNameEn !== 'Unknown' && 
+            fromNameEn.trim().length >= 3 && 
+            !fromNameEn.trim().startsWith('.') &&
+            !fromNameEn.trim().toLowerCase().match(/^(ijn|ij|main|station|unknown)$/i);
+          const isValidToEn = toNameEn && 
+            toNameEn !== 'Unknown' && 
+            toNameEn.trim().length >= 3 && 
+            !toNameEn.trim().startsWith('.') &&
+            !toNameEn.trim().toLowerCase().match(/^(ijn|ij|main|station|unknown)$/i);
+          const isLineNameFallback = fromNameEn && toNameEn && fromNameEn.trim() === toNameEn.trim();
+          
+          // If both values are valid AND different (not line name fallback), use them
+          // Otherwise, prefer values from data object if they exist and are different
+          if (isValidFromEn && isValidToEn && !isLineNameFallback) {
+            dataEn = { ...data, from: fromNameEn.trim(), to: toNameEn.trim() };
+          } else if (isLineNameFallback && data.from && data.to && data.from !== data.to) {
+            // If re-fetch returned line name (same for both), but data has different values, use data
+            dataEn = { ...data };
+            logger.warn(`[NotificationService] Re-fetch returned line name fallback (English). Using values from data object instead. From: ${data.from}, To: ${data.to}`);
+          } else {
+            // Fallback to values from data if re-fetch returns invalid values
+            // Use data.from and data.to if they exist and are valid, otherwise keep the invalid values for debugging
+            // Also validate data values - reject common corrupted patterns
+            const isDataFromValid = data.from && data.from.trim().length >= 3 && 
+              !data.from.trim().toLowerCase().match(/^(ijn|ij|main|station|unknown)$/i);
+            const isDataToValid = data.to && data.to.trim().length >= 3 && 
+              !data.to.trim().toLowerCase().match(/^(ijn|ij|main|station|unknown)$/i);
+            
+            if (isDataFromValid && isDataToValid) {
+              dataEn = { ...data };
+            } else {
+              // If both re-fetch and data are invalid, use re-fetched values anyway (better than empty)
+              dataEn = { ...data, from: (fromNameEn && fromNameEn.trim()) || data.from || 'Unknown', to: (toNameEn && toNameEn.trim()) || data.to || 'Unknown' };
+            }
+            logger.warn(`[NotificationService] Invalid station names from getLineNamesForNotification (English). From: ${fromNameEn}, To: ${toNameEn}. Data object has: From: ${data.from}, To: ${data.to}`);
+          }
+        } catch (error) {
+          // Fallback to values from data if re-fetch fails
+          dataEn = { ...data };
+          logger.warn(`[NotificationService] Error fetching station names for English:`, error);
+        }
         
         // Format time if trip is provided (only use trip.deptime, not data.time which is already formatted)
         if (trip?.deptime) {

@@ -145,6 +145,7 @@ async function createTripsForDate(template, targetDate) {
           .from('trip')
           .select('tripid')
           .eq('lineid', lineid)
+          .eq('direction', tripDirection)
           .gte('deptime', timeWindowStart.toISOString())
           .lte('deptime', timeWindowEnd.toISOString())
           .limit(1);

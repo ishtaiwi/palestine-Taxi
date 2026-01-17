@@ -11,6 +11,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/responsive_layout.dart';
 import '../../widgets/reports/revenue_chart.dart';
 import '../../widgets/reports/trip_chart.dart';
+import '../../widgets/reports/shared/shared.dart';
 import 'admin_schedules_page.dart';
 import 'admin_lines_page.dart';
 import 'admin_users_page.dart';

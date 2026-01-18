@@ -18,6 +18,7 @@ class _PassengerFutureReservationPageState
   bool _isDarkMode = false;
   List<Map<String, dynamic>> _lines = [];
   String? _selectedLineId;
+  String? _selectedDirection;
   DateTime? _selectedDate;
   List<Map<String, dynamic>> _availableTrips = [];
   bool _isLoadingTrips = false;
@@ -58,6 +59,82 @@ class _PassengerFutureReservationPageState
     }
   }
 
+  Map<String, dynamic>? _getSelectedLine() {
+    if (_selectedLineId == null) return null;
+    try {
+      return _lines.firstWhere(
+        (line) => line['lineid']?.toString() == _selectedLineId,
+        orElse: () => {},
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  String _getDirectionLabel(String direction) {
+    final line = _getSelectedLine();
+    
+    if (line == null || line.isEmpty) {
+      // Fallback to default labels if line not available
+      return direction == 'going'
+          ? (_isArabic ? 'ذهاب' : 'Going')
+          : (_isArabic ? 'عودة' : 'Return');
+    }
+
+    // Get line name (prefer name_ar for Arabic, name_en for English, fallback to linename)
+    String? lineName;
+    if (_isArabic) {
+      lineName = line['name_ar']?.toString() ??
+          line['linename']?.toString() ??
+          line['name_en']?.toString();
+    } else {
+      lineName = line['name_en']?.toString() ??
+          line['linename']?.toString() ??
+          line['name_ar']?.toString();
+    }
+
+    if (lineName == null || lineName.isEmpty) {
+      // Fallback to default labels if line name not available
+      return direction == 'going'
+          ? (_isArabic ? 'ذهاب' : 'Going')
+          : (_isArabic ? 'عودة' : 'Return');
+    }
+
+    // Split line name by "-" to get station names
+    final parts = lineName
+        .split('-')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    if (parts.length < 2) {
+      // If line name doesn't have "-" separator, fallback to default labels
+      return direction == 'going'
+          ? (_isArabic ? 'ذهاب' : 'Going')
+          : (_isArabic ? 'عودة' : 'Return');
+    }
+
+    // First part is the first station, second part is the second station
+    final firstStation = parts[0];
+    final secondStation = parts[1];
+
+    String fromStation, toStation;
+    if (direction == 'going') {
+      // Going: From first station to second station
+      fromStation = firstStation;
+      toStation = secondStation;
+    } else {
+      // Returning: From second station to first station
+      fromStation = secondStation;
+      toStation = firstStation;
+    }
+
+    // Format: "From [station1] to [station2]"
+    return _isArabic
+        ? 'من $fromStation إلى $toStation'
+        : 'From $fromStation to $toStation';
+  }
+
   String _getNormalizedTime(Map<String, dynamic> trip) {
     final time = trip['time'] as String?;
     final hour = trip['hour'] as int?;
@@ -88,7 +165,7 @@ class _PassengerFutureReservationPageState
   }
 
   Future<void> _loadTrips() async {
-    if (_selectedLineId == null || _selectedDate == null) return;
+    if (_selectedLineId == null || _selectedDirection == null || _selectedDate == null) return;
 
     setState(() {
       _isLoadingTrips = true;
@@ -100,6 +177,7 @@ class _PassengerFutureReservationPageState
       final result = await ApiService.getAvailableTripTimes(
         lineId: _selectedLineId!,
         date: dateStr,
+        direction: _selectedDirection!,
       );
 
       if (mounted) {
@@ -246,13 +324,16 @@ class _PassengerFutureReservationPageState
           ),
         ),
         body: SafeArea(
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.all(isSmallScreen ? 16.0 : 20.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                 // Line Selection
                 Container(
                   padding: EdgeInsets.all(isSmallScreen ? 14.0 : 16.0),
@@ -305,6 +386,7 @@ class _PassengerFutureReservationPageState
                     onChanged: (value) {
                       setState(() {
                         _selectedLineId = value;
+                        _selectedDirection = null;
                         _selectedDate = null;
                         _availableTrips = [];
                         _selectedTripTime = null;
@@ -315,6 +397,63 @@ class _PassengerFutureReservationPageState
                   ),
                 ),
                 const SizedBox(height: 16),
+                // Direction Selection
+                if (_selectedLineId != null)
+                  Container(
+                    padding: EdgeInsets.all(isSmallScreen ? 14.0 : 16.0),
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _isDarkMode
+                            ? const Color(0xFF2C5F8D)
+                            : Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedDirection,
+                      decoration: InputDecoration(
+                        labelText: _isArabic ? 'اختر الاتجاه' : 'Select Direction',
+                        labelStyle: TextStyle(color: textSecondary),
+                        border: InputBorder.none,
+                        prefixIcon: Icon(
+                          Icons.swap_horiz,
+                          color: _isDarkMode
+                              ? const Color(0xFF64B5F6)
+                              : const Color(0xFF1E3A5F),
+                        ),
+                      ),
+                      items: [
+                        DropdownMenuItem<String>(
+                          value: 'going',
+                          child: Text(_getDirectionLabel('going')),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: 'return',
+                          child: Text(_getDirectionLabel('return')),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedDirection = value;
+                          _selectedDate = null;
+                          _availableTrips = [];
+                          _selectedTripTime = null;
+                        });
+                      },
+                      style: TextStyle(color: textPrimary),
+                      dropdownColor: cardColor,
+                    ),
+                  ),
+                if (_selectedLineId != null) const SizedBox(height: 16),
                 // Date Selection
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -404,7 +543,7 @@ class _PassengerFutureReservationPageState
                 ),
                 const SizedBox(height: 24),
                 // Trips List
-                if (_selectedLineId != null && _selectedDate != null) ...[
+                if (_selectedLineId != null && _selectedDirection != null && _selectedDate != null) ...[
                   Text(
                     _isArabic ? 'الرحلات المتاحة' : 'Available Trips',
                     style: TextStyle(
@@ -609,49 +748,71 @@ class _PassengerFutureReservationPageState
                         ),
                       );
                     }),
+                  ],
                 ],
-                const SizedBox(height: 24),
-                // Book Button
-                if (_selectedLineId != null &&
-                    _selectedDate != null &&
-                    _selectedTripTime != null)
-                  FilledButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PassengerBookTripPage(
-                            lineId: _selectedLineId,
-                            bookingType: 'future',
-                            scheduledTripTime: _selectedTripTime,
+              ),
+            ),
+          ),
+          // Fixed Book Button at bottom
+              if (_selectedLineId != null &&
+                  _selectedDirection != null &&
+                  _selectedDate != null &&
+                  _selectedTripTime != null)
+                Container(
+                  padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PassengerBookTripPage(
+                                lineId: _selectedLineId,
+                                bookingType: 'future',
+                                scheduledTripTime: _selectedTripTime,
+                              ),
+                            ),
+                          ).then((result) {
+                            if (result == true) {
+                              Navigator.pop(context, true);
+                            }
+                          });
+                        },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFF57C00),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            vertical: isSmallScreen ? 14.0 : 16.0,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                      ).then((result) {
-                        if (result == true) {
-                          Navigator.pop(context, true);
-                        }
-                      });
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFF57C00),
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        vertical: isSmallScreen ? 14.0 : 16.0,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(
-                      _isArabic ? 'احجز الآن' : 'Book Now',
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 16.0 : 18.0,
-                        fontWeight: FontWeight.bold,
+                        child: Text(
+                          _isArabic ? 'احجز الآن' : 'Book Now',
+                          style: TextStyle(
+                            fontSize: isSmallScreen ? 16.0 : 18.0,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),

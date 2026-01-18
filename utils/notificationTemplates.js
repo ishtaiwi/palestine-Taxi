@@ -67,8 +67,8 @@ const templates = {
   [NOTIFICATION_TYPES.NEW_BOOKING_ASSIGNED]: {
     title_ar: 'حجز جديد',
     title_en: 'New Booking',
-    body_ar: 'تم حجز مقعد جديد في رحلتك. الراكب: {passengerName}',
-    body_en: 'A new seat has been booked on your trip. Passenger: {passengerName}',
+    body_ar: 'تم حجز مقعد جديد في رحلتك. الراكب: {passengerName}. المبلغ: {amount} شيكل',
+    body_en: 'A new seat has been booked on your trip. Passenger: {passengerName}. Amount: {amount} ILS',
   },
   [NOTIFICATION_TYPES.TRIP_ASSIGNED]: {
     title_ar: 'تم تعيين رحلة جديدة',

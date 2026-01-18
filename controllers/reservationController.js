@@ -1389,6 +1389,62 @@ export const checkInReservation = async (req, res, next) => {
 
     const updatedReservation = await Reservation.findById(finalBookingId);
 
+    // Transfer payment to driver's wallet for walk-in passengers when QR code is scanned
+    // This happens at check-in, not at booking time
+    if (reservation.paymentid && reservation.passenger_type === 'walk_in') {
+      try {
+        const payment = await Payment.findById(reservation.paymentid);
+        
+        // Only transfer if payment hasn't been transferred yet
+        if (payment && payment.status === PAYMENT_STATUS.COMPLETED && !payment.towalletid) {
+          // Get driver from trip
+          let driverUserid = null;
+          if (reservation.tripid) {
+            const Trip = (await import('../models/Trip.js')).default;
+            const trip = await Trip.findById(reservation.tripid);
+            
+            if (trip && trip.assigned_driverid) {
+              const Driver = (await import('../models/Driver.js')).default;
+              const driver = await Driver.findById(trip.assigned_driverid);
+              driverUserid = driver?.userid || null;
+            }
+          }
+
+          if (driverUserid) {
+            // Get or create driver's wallet
+            let driverWallets = await Wallet.findByUserId(driverUserid, 'main');
+            let driverWallet = driverWallets?.[0];
+
+            if (!driverWallet) {
+              // Create wallet for driver if doesn't exist
+              driverWallet = await Wallet.create({
+                walletid: uuidv4(),
+                userid: driverUserid,
+                type: 'main',
+                balance: 0,
+              });
+              logger.info(`[ReservationController] Created wallet for driver during walk-in check-in`);
+            }
+
+            // Add payment amount to driver wallet
+            await Wallet.updateBalance(driverWallet.walletid, payment.amount, 'add');
+
+            // Update payment with towalletid
+            await Payment.update(payment.paymentid, {
+              towalletid: driverWallet.walletid,
+            });
+
+            logger.info(`[ReservationController] Transferred ${payment.amount} to driver wallet for walk-in check-in ${finalBookingId}`);
+          } else {
+            logger.warn(`[ReservationController] No driver assigned to trip for walk-in check-in ${finalBookingId}`);
+          }
+        }
+      } catch (walletError) {
+        logger.warn(`[ReservationController] Error transferring payment to driver wallet during check-in:`, walletError);
+        // Don't fail check-in if wallet transfer fails
+      }
+    }
+
     // Sync trip stats to update seat counts and booking counts
     if (reservation.tripid) {
       try {

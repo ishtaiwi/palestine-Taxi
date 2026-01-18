@@ -50,6 +50,7 @@ export const PAYMENT_STATUS = {
 export const PAYMENT_METHOD = {
   WALLET: 'wallet',
   CARD: 'card',
+  CASH: 'cash',
 };
 
 export const PASSENGER_TYPE = {

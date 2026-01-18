@@ -63,6 +63,25 @@ class Passenger {
     if (error) throw error;
     return true;
   }
+
+  static async findOrCreateByPhone(phone, userid) {
+    // First try to find existing passenger for this user
+    let passenger = await this.findByUserId(userid);
+    
+    if (passenger) {
+      return passenger;
+    }
+
+    // Create new passenger record
+    const { v4: uuidv4 } = await import('uuid');
+    const passengerData = {
+      passengerid: uuidv4(),
+      userid: userid,
+    };
+
+    passenger = await this.create(passengerData);
+    return passenger;
+  }
 }
 
 export default Passenger;

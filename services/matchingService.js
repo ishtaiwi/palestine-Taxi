@@ -482,13 +482,13 @@ export const createNewTripForFullTripBooking = async (fullTripId, bookingId) => 
       const Driver = (await import('../models/Driver.js')).default;
       const Line = (await import('../models/Line.js')).default;
       const Passenger = (await import('../models/Passenger.js')).default;
-      
+
       // Get driver, line, and passenger info
       const driver = await Driver.findById(driverid);
       const line = await Line.findById(finalTrip.lineid);
       const reservation = await Reservation.findById(bookingId);
       const passenger = reservation ? await Passenger.findById(reservation.passengerid) : null;
-      
+
       const driverName = driver?.user?.fullname || 'Driver';
       const vehicle = await Vehicle.findById(vehicle.vehicleid);
       const plateNumber = vehicle?.plateno || 'N/A';
@@ -501,11 +501,11 @@ export const createNewTripForFullTripBooking = async (fullTripId, bookingId) => 
         const { DateTime } = await import('luxon');
         const deptime = DateTime.fromISO(new Date(finalTrip.deptime).toISOString())
           .setLocale(driverLanguage === 'en' ? 'en' : 'ar')
-          .toLocaleString({ 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric', 
-            hour: '2-digit', 
+          .toLocaleString({
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
             minute: '2-digit',
             hour12: driverLanguage === 'en'
           });
@@ -531,11 +531,11 @@ export const createNewTripForFullTripBooking = async (fullTripId, bookingId) => 
         const { DateTime } = await import('luxon');
         const deptime = DateTime.fromISO(new Date(finalTrip.deptime).toISOString())
           .setLocale(passengerLanguage === 'en' ? 'en' : 'ar')
-          .toLocaleString({ 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric', 
-            hour: '2-digit', 
+          .toLocaleString({
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
             minute: '2-digit',
             hour12: passengerLanguage === 'en'
           });
@@ -732,7 +732,7 @@ const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWa
     // Get line to determine origin_stationid
     const Line = (await import('../models/Line.js')).default;
     const line = await Line.findById(lineid);
-    
+
     // Set origin_stationid based on direction
     let origin_stationid = null;
     if (direction === 'going') {
@@ -1072,7 +1072,7 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
 
       const driverid = driverQueueEntry.driverid;
       const queueEntryDirection = driverQueueEntry.direction || queueDirection;
-      
+
       // Map queue direction to trip direction
       const { mapQueueDirectionToTripDirection } = await import('../utils/tripDirectionUtils.js');
       const tripDirection = mapQueueDirectionToTripDirection(queueEntryDirection);
@@ -1368,7 +1368,7 @@ export const distributeInstantBookings = async (lineid, nextTripTime = null, tri
 
       const driverid = driverQueueEntry.driverid;
       const queueEntryDirection = driverQueueEntry.direction || queueDirection;
-      
+
       // Map queue direction to trip direction
       const { mapQueueDirectionToTripDirection } = await import('../utils/tripDirectionUtils.js');
       const tripDirection = mapQueueDirectionToTripDirection(queueEntryDirection);
@@ -1627,7 +1627,7 @@ export const adjustReservationsForScheduleChange = async (
         }
 
         // Find the next available trip time (equal or after the old scheduled time)
-        const nextAvailableTime = newTripTimes.find(time => 
+        const nextAvailableTime = newTripTimes.find(time =>
           time.getTime() >= oldScheduledTime.getTime()
         ) || newTripTimes[newTripTimes.length - 1]; // If no time found, use the last one
 

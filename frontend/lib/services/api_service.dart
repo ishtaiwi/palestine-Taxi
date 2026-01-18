@@ -2087,6 +2087,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getRushHourPredictionsAdmin({
     required String lineId,
+    String? direction,
     int? daysAhead,
   }) async {
     final token = await getToken();
@@ -2095,6 +2096,7 @@ class ApiService {
     }
 
     final queryParams = <String, String>{'lineid': lineId};
+    if (direction != null) queryParams['direction'] = direction;
     if (daysAhead != null) queryParams['daysAhead'] = daysAhead.toString();
 
     final uri =
@@ -2993,7 +2995,9 @@ class ApiService {
       return {
         'success': response.statusCode == 200,
         'message': decoded['message'] ??
-            (response.statusCode == 200 ? 'Trip deleted successfully' : 'Failed'),
+            (response.statusCode == 200
+                ? 'Trip deleted successfully'
+                : 'Failed'),
       };
     } catch (exception) {
       return {'success': false, 'message': exception.toString()};

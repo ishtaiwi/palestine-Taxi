@@ -174,19 +174,19 @@ app.listen(PORT, async () => {
   logger.info(`API Base URL: http://localhost:${PORT}/api`);
 
 
-    logger.info('Testing database connection...');
-    const dbTest = await testConnection();
-    if (dbTest.connected) {
-      logger.info('✅ Database connection verified');
+  logger.info('Testing database connection...');
+  const dbTest = await testConnection();
+  if (dbTest.connected) {
+    logger.info('✅ Database connection verified');
 
-      // Initialize Firebase
-      logger.info('Initializing Firebase...');
-      const firebaseInitialized = initializeFirebase();
-      if (firebaseInitialized) {
-        logger.info('✅ Firebase initialized successfully');
-      } else {
-        logger.warn('⚠️ Firebase initialization failed or not configured');
-      }
+    // Initialize Firebase
+    logger.info('Initializing Firebase...');
+    const firebaseInitialized = initializeFirebase();
+    if (firebaseInitialized) {
+      logger.info('✅ Firebase initialized successfully');
+    } else {
+      logger.warn('⚠️ Firebase initialization failed or not configured');
+    }
 
 
     logger.info('Starting background jobs...');

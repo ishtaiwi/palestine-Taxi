@@ -447,23 +447,21 @@ export const checkAndDepartTrips = async () => {
             if (!trip.tripid) {
               console.log(`[DepartureService] ⚠️ Trip ${trip.tripid} scheduled time arrived but no trip ID`);
             } else {
-              const reservations = await Reservation.findByTripId(trip.tripid);
-              const activeReservations = reservations.filter(
-                r => r.status === 'confirmed' || r.status === 'checked_in'
-              );
+              // Check totalbookings field directly from trip table
+              const totalBookings = trip.totalbookings || 0;
               
-              if (activeReservations.length > 0) {
+              if (totalBookings > 0) {
                 shouldDepart = true;
                 reason = 'scheduled_departure_with_bookings';
               } else {
-                // Trip has passed departure time with no reservations - cancel it
+                // Trip has passed departure time with no bookings - cancel it
                 const now = getUtcNow();
                 const deptime = parseUtcDate(trip.deptime);
                 if (deptime && deptime.getTime() <= now.getTime()) {
                   await Trip.update(trip.tripid, {
                     status: TRIP_STATUS.CANCELLED
                   });
-                  logger.info(`[DepartureService] 🚫 Cancelled trip ${trip.tripid} - departure time passed with no reservations`);
+                  logger.info(`[DepartureService] 🚫 Cancelled trip ${trip.tripid} - departure time passed with no bookings`);
                   results.push({
                     tripid: trip.tripid,
                     success: true,

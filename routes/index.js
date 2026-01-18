@@ -9,6 +9,7 @@ import walletRoutes from './walletRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import driverRoutes from './driverRoutes.js';
 import routingRoutes from './routingRoutes.js';
+import walkinRoutes from './walkinRoutes.js';
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ router.use('/wallets', walletRoutes);
 router.use('/admin', adminRoutes);
 router.use('/drivers', driverRoutes);
 router.use('/routing', routingRoutes);
+router.use('/walkin', walkinRoutes);
 
 export default router;
 

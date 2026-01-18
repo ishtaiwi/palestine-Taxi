@@ -12,19 +12,25 @@ import {
     getLineDemandSnapshot,
     getModelSummary,
     getTrackedLines,
+    DIRECTIONS,
 } from './rushHourPredictionService.js';
 
 const CAPACITY_UTILIZATION_THRESHOLD = 0.8;
 
+// Directions to generate recommendations for
+const RECOMMENDATION_DIRECTIONS = DIRECTIONS || ['going', 'return'];
+
 export async function generateScheduleRecommendations(options = {}) {
     const lineIds = options.lineIds && options.lineIds.length ? options.lineIds : getTrackedLines();
     const daysAhead = options.daysAhead || 7;
+    // Allow filtering by direction, default to both directions
+    const directions = options.direction ? [options.direction] : RECOMMENDATION_DIRECTIONS;
 
     const recommendations = [];
 
     for (const lineid of lineIds) {
-        const [predictionData, utilizationBuckets, templates] = await Promise.all([
-            getRushHourPredictions({ lineid, daysAhead }),
+        // Get templates and utilization once per line
+        const [utilizationBuckets, templates] = await Promise.all([
             getLineDemandSnapshot(lineid, {
                 startDate: options.utilizationStartDate,
                 endDate: options.utilizationEndDate,
@@ -34,10 +40,24 @@ export async function generateScheduleRecommendations(options = {}) {
 
         const utilizationMap = buildUtilizationMap(utilizationBuckets);
         const activeTemplates = templates?.filter(t => t.active) || [];
-        const template = activeTemplates[0] || null;
 
-        const lineRecs = await buildLineRecommendations(lineid, predictionData, utilizationMap, template, activeTemplates);
-        recommendations.push(...lineRecs);
+        // Generate recommendations for each direction separately
+        for (const direction of directions) {
+            // Get predictions for this specific direction
+            const predictionData = await getRushHourPredictions({ lineid, direction, daysAhead });
+
+            // Get template for this specific direction
+            const directionTemplate = activeTemplates.find(t => t.direction === direction) || null;
+
+            const lineRecs = await buildLineRecommendations(
+                lineid,
+                direction,
+                predictionData,
+                utilizationMap,
+                directionTemplate
+            );
+            recommendations.push(...lineRecs);
+        }
     }
 
     return recommendations.sort((a, b) => b.priority - a.priority);
@@ -61,24 +81,24 @@ export async function applyRecommendation(recommendation) {
         throw new Error('Recommendation is required');
     }
 
-    const { actionType, actionPayload, lineid, templateId } = recommendation;
+    const { actionType, actionPayload, lineid, templateId, direction } = recommendation;
 
-    
     if (actionType === 'insert_buffer_trip') {
         if (!actionPayload?.deptime) {
             throw new Error('insert_buffer_trip requires deptime in payload');
         }
 
-        
         const deptime = parseUtcDate(actionPayload.deptime);
         if (!deptime) {
             throw new Error('Invalid deptime format');
         }
 
-        
+        // Use direction from recommendation or payload, default to 'going'
+        const tripDirection = direction || actionPayload.direction || 'going';
+
         let autoDepartureEnabled = false;
         let scheduledDepartureEnforced = false;
-        let intervalMinutes = 60; 
+        let intervalMinutes = 60;
         if (templateId) {
             try {
                 const template = await ScheduleTemplate.findById(templateId);
@@ -92,19 +112,16 @@ export async function applyRecommendation(recommendation) {
             }
         }
 
-        
         const openingWindowMinutes = getOpeningWindowMinutes(intervalMinutes);
         const openingTime = new Date(deptime.getTime() - openingWindowMinutes * 60 * 1000);
 
-        
-        
         const vehicles = await Vehicle.findAll({ lineid, status: 'active' });
         const defaultSeats = vehicles && vehicles.length > 0 ? vehicles[0].seatnum : 5;
 
         const tripData = {
             tripid: uuidv4(),
             lineid,
-            vehicleid: null, 
+            vehicleid: null,
             deptime: deptime.toISOString(),
             status: 'scheduled',
             availableseats: calculateAvailablePassengerSeats(defaultSeats, 0, 0),
@@ -114,6 +131,7 @@ export async function applyRecommendation(recommendation) {
             early_departure_allowed: true,
             scheduled_departure_enforced: scheduledDepartureEnforced,
             templateid: templateId || null,
+            direction: tripDirection,
         };
 
         const createdTrip = await Trip.create(tripData);
@@ -121,6 +139,7 @@ export async function applyRecommendation(recommendation) {
         logger.info('Buffer trip created from recommendation', {
             tripid: createdTrip.tripid,
             lineid,
+            direction: tripDirection,
             deptime: deptime.toISOString(),
         });
 
@@ -130,7 +149,6 @@ export async function applyRecommendation(recommendation) {
         };
     }
 
-    
     if (!templateId || !actionPayload) {
         throw new Error('Recommendation is missing template context or action payload');
     }
@@ -146,30 +164,32 @@ export async function applyRecommendation(recommendation) {
     };
 }
 
-async function buildLineRecommendations(lineid, predictionData, utilizationMap, template, allTemplates = []) {
+async function buildLineRecommendations(lineid, direction, predictionData, utilizationMap, template) {
     if (!predictionData?.predictions?.length) return [];
 
     const recommendations = [];
 
     for (const prediction of predictionData.predictions) {
-        // Check if any active schedule will create a trip at this time - skip if so
-        if (willAnyScheduleCreateTripAtTime(allTemplates, prediction.hour)) {
-            logger.debug('Skipping recommendation - schedule will create trip at this time', {
+        // Check if this direction's schedule covers this time - skip if so
+        if (willScheduleCoverTime(template, prediction.hour)) {
+            logger.debug('Skipping recommendation - schedule covers this time for direction', {
                 lineid,
+                direction,
                 date: prediction.date,
                 hour: prediction.hour,
-                templatesCount: allTemplates.length,
+                templateStartHour: template?.start_hour,
+                templateEndHour: template?.end_hour,
             });
             continue;
         }
-        
+
         const totalAvailableSeats = await getTotalAvailableSeatsForTimeSlot(
             lineid,
             prediction.date,
             prediction.hour,
+            direction,
         );
 
-        
         if (prediction.expectedBookings <= totalAvailableSeats) {
             continue;
         }
@@ -184,14 +204,16 @@ async function buildLineRecommendations(lineid, predictionData, utilizationMap, 
             prediction,
             highUtilization,
             lineid,
+            direction,
             totalAvailableSeats,
         });
 
         const priority = prediction.confidence + (highUtilization ? 0.5 : 0) + utilization;
 
         recommendations.push({
-            id: `rec_${lineid}_${prediction.date}_${prediction.hour}`,
+            id: `rec_${lineid}_${direction}_${prediction.date}_${prediction.hour}`,
             lineid,
+            direction,
             targetDate: prediction.date,
             hour: prediction.hour,
             expectedBookings: prediction.expectedBookings,
@@ -208,6 +230,7 @@ async function buildLineRecommendations(lineid, predictionData, utilizationMap, 
             metadata: {
                 threshold: predictionData.metadata?.threshold,
                 modelUpdatedAt: predictionData.metadata?.updatedAt,
+                direction,
             },
         });
     }
@@ -216,26 +239,22 @@ async function buildLineRecommendations(lineid, predictionData, utilizationMap, 
 }
 
 /**
- * Check if any active schedule template will create a trip at the given hour
- * A line can have multiple schedules (e.g., going and return directions)
- * @param {Array} templates - Array of schedule template objects
+ * Check if an active schedule template covers the given hour
+ * Now that predictions are direction-specific, we only check the specific direction's template
+ * 
+ * @param {Object} template - Schedule template for the specific direction
  * @param {number} hour - Hour to check (0-23)
- * @returns {boolean} True if any schedule will create a trip at this hour
+ * @returns {boolean} True if the schedule covers this hour
  */
-function willAnyScheduleCreateTripAtTime(templates, hour) {
-    if (!templates || templates.length === 0) {
+function willScheduleCoverTime(template, hour) {
+    // If no template or template is not active, schedule won't create trips
+    if (!template || !template.active) {
         return false;
     }
 
-    // Check if any active template covers this hour
-    return templates.some(template => {
-        if (!template || !template.active) {
-            return false;
-        }
-        // Check if the hour falls within the schedule's operating hours
-        // The schedule creates trips from start_hour to end_hour (inclusive)
-        return hour >= template.start_hour && hour <= template.end_hour;
-    });
+    // Check if the hour falls within the schedule's operating hours
+    // The schedule creates trips from start_hour to end_hour (inclusive)
+    return hour >= template.start_hour && hour <= template.end_hour;
 }
 
 function buildUtilizationMap(buckets = []) {
@@ -253,22 +272,25 @@ function buildUtilizationMap(buckets = []) {
     return map;
 }
 
-async function getTotalAvailableSeatsForTimeSlot(lineid, date, hour) {
+async function getTotalAvailableSeatsForTimeSlot(lineid, date, hour, direction = null) {
     try {
-        
         const targetDate = new Date(`${date}T${String(hour).padStart(2, '0')}:00:00Z`);
         const startTime = new Date(targetDate);
         startTime.setMinutes(0, 0, 0);
         const endTime = new Date(targetDate);
         endTime.setMinutes(59, 59, 999);
 
-        
-        const trips = await Trip.findAll({
+        // Build filter with optional direction
+        const filter = {
             lineid,
             date: date,
-        });
+        };
+        if (direction) {
+            filter.direction = direction;
+        }
 
-        
+        const trips = await Trip.findAll(filter);
+
         let totalAvailable = 0;
         for (const trip of trips || []) {
             const tripDeptime = parseUtcDate(trip.deptime);
@@ -286,6 +308,7 @@ async function getTotalAvailableSeatsForTimeSlot(lineid, date, hour) {
     } catch (error) {
         logger.error('Error calculating available seats for time slot', {
             lineid,
+            direction,
             date,
             hour,
             error: error.message,
@@ -294,14 +317,18 @@ async function getTotalAvailableSeatsForTimeSlot(lineid, date, hour) {
     }
 }
 
-async function determineActionPlan({ template, prediction, highUtilization, lineid, totalAvailableSeats }) {
+async function determineActionPlan({ template, prediction, highUtilization, lineid, direction, totalAvailableSeats }) {
+    const directionLabel = direction === 'return' ? 'returning' : 'going';
+
     if (!template) {
         return {
             actionType: 'deploy_ad_hoc_vehicle',
             templateId: null,
-            payload: null,
-            summary: 'Deploy a standby vehicle for this time block',
-            details: `No schedule template found. Consider adding an ad-hoc trip around ${formatHour(
+            payload: {
+                direction,
+            },
+            summary: `Deploy a standby vehicle for ${directionLabel} trips`,
+            details: `No ${directionLabel} schedule template found. Consider adding an ad-hoc trip around ${formatHour(
                 prediction.hour,
             )} UTC on ${prediction.date}.`,
         };
@@ -315,8 +342,8 @@ async function determineActionPlan({ template, prediction, highUtilization, line
             payload: {
                 interval_minutes: newInterval,
             },
-            summary: 'Increase trip frequency during predicted rush hour',
-            details: `Reduce interval from ${template.interval_minutes} to ${newInterval} minutes to handle expected demand at ${formatHour(
+            summary: `Increase ${directionLabel} trip frequency during predicted rush hour`,
+            details: `Reduce interval from ${template.interval_minutes} to ${newInterval} minutes to handle expected ${directionLabel} demand at ${formatHour(
                 prediction.hour,
             )}.`,
         };
@@ -330,8 +357,8 @@ async function determineActionPlan({ template, prediction, highUtilization, line
             payload: {
                 end_hour: extendedHour,
             },
-            summary: 'Extend operating hours to cover late rush hour',
-            details: `Extend end hour from ${template.end_hour} to ${extendedHour} to cover demand peaking at ${formatHour(
+            summary: `Extend ${directionLabel} operating hours to cover late rush hour`,
+            details: `Extend end hour from ${template.end_hour} to ${extendedHour} to cover ${directionLabel} demand peaking at ${formatHour(
                 prediction.hour,
             )}.`,
         };
@@ -343,9 +370,10 @@ async function determineActionPlan({ template, prediction, highUtilization, line
         templateId: template.templateid,
         payload: {
             deptime: additionalTripTime.toISOString(),
+            direction,
         },
-        summary: 'Insert buffer trip',
-        details: `Add a buffer trip at ${formatHour(prediction.hour)} on ${prediction.date} to absorb ${prediction.expectedBookings.toFixed(
+        summary: `Insert buffer ${directionLabel} trip`,
+        details: `Add a buffer ${directionLabel} trip at ${formatHour(prediction.hour)} on ${prediction.date} to absorb ${prediction.expectedBookings.toFixed(
             1,
         )} projected bookings (${totalAvailableSeats} seats currently available).`,
     };

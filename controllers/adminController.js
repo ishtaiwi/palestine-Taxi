@@ -338,7 +338,7 @@ export const updateAdminPermissions = async (req, res, next) => {
 
 export const getRushHourPredictionsReport = async (req, res, next) => {
   try {
-    const { lineid, daysAhead } = req.query;
+    const { lineid, direction, daysAhead } = req.query;
 
     if (!lineid) {
       return res.status(400).json({
@@ -349,6 +349,7 @@ export const getRushHourPredictionsReport = async (req, res, next) => {
     const days = daysAhead ? parseInt(daysAhead, 10) : undefined;
     const result = await fetchRushHourPredictions({
       lineid,
+      direction: direction || 'going', // Default to 'going' if not specified
       daysAhead: days,
     });
 

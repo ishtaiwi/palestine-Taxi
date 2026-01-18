@@ -40,6 +40,20 @@ class User {
     return data;
   }
 
+  static async findByPhone(phone) {
+    const { data, error } = await supabase
+      .from('user')
+      .select('*')
+      .eq('phone', phone)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') throw error;
+    if (data && data.password) {
+      delete data.password;
+    }
+    return data;
+  }
+
   static async update(userid, updates) {
     const { data, error } = await supabase
       .from('user')

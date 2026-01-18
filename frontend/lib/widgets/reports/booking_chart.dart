@@ -203,7 +203,8 @@ class _BookingTimeSeriesChartState extends State<BookingTimeSeriesChart> {
                       showTitles: true,
                       reservedSize: isSmall ? 22 : 26,
                       interval: chartData.length > 10
-                          ? (chartData.length / (isSmall ? 4 : 6)).ceilToDouble()
+                          ? (chartData.length / (isSmall ? 4 : 6))
+                              .ceilToDouble()
                           : 1,
                       getTitlesWidget: (value, meta) {
                         final idx = value.toInt();
@@ -334,7 +335,7 @@ class _BookingTimeSeriesChartState extends State<BookingTimeSeriesChart> {
         ],
       );
     }
-    
+
     return Row(
       children: [
         Expanded(

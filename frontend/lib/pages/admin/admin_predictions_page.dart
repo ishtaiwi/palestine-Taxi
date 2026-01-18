@@ -15,8 +15,10 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
   bool _isRetraining = false;
   String? _error;
   String? _selectedLineId;
+  String _selectedDirection = 'going'; // Direction filter: 'going' or 'return'
   List<Map<String, dynamic>> _lines = [];
   Map<String, dynamic>? _predictionData;
+  Map<String, dynamic>? _returnPredictionData; // Separate predictions for return direction
   List<Map<String, dynamic>> _recommendations = [];
   List<Map<String, dynamic>> _filteredRecommendations = [];
   Map<String, dynamic>? _insights;
@@ -26,6 +28,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
   TimeOfDay? _filterStartTime;
   TimeOfDay? _filterEndTime;
   bool _isFilterActive = false;
+  String? _directionFilter; // Filter recommendations by direction
 
   @override
   void initState() {
@@ -44,12 +47,19 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       final lines = await ApiService.getAllLines();
       final selectedLine =
           lines.isNotEmpty ? lines.first['lineid'] as String? : null;
-      Map<String, dynamic>? predictions;
+      Map<String, dynamic>? goingPredictions;
+      Map<String, dynamic>? returnPredictions;
       List<Map<String, dynamic>> recommendations = [];
 
       if (selectedLine != null) {
-        predictions = await ApiService.getRushHourPredictionsAdmin(
+        // Fetch predictions for both directions
+        goingPredictions = await ApiService.getRushHourPredictionsAdmin(
           lineId: selectedLine,
+          direction: 'going',
+        );
+        returnPredictions = await ApiService.getRushHourPredictionsAdmin(
+          lineId: selectedLine,
+          direction: 'return',
         );
         recommendations = await ApiService.getScheduleRecommendationsAdmin(
           lineIds: [selectedLine],
@@ -61,9 +71,10 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       setState(() {
         _lines = lines;
         _selectedLineId = selectedLine;
-        _predictionData = predictions?['data'] ?? predictions;
+        _predictionData = goingPredictions?['data'] ?? goingPredictions;
+        _returnPredictionData = returnPredictions?['data'] ?? returnPredictions;
         _recommendations = recommendations;
-        _filteredRecommendations = _applyDateFilter(recommendations);
+        _filteredRecommendations = _applyFilters(recommendations);
         _insights = insights['data'] ?? insights;
         _isLoading = false;
       });
@@ -84,17 +95,24 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     });
 
     try {
-      final predictions = await ApiService.getRushHourPredictionsAdmin(
+      // Fetch predictions for both directions
+      final goingPredictions = await ApiService.getRushHourPredictionsAdmin(
         lineId: lineId,
+        direction: 'going',
+      );
+      final returnPredictions = await ApiService.getRushHourPredictionsAdmin(
+        lineId: lineId,
+        direction: 'return',
       );
       final recommendations = await ApiService.getScheduleRecommendationsAdmin(
         lineIds: [lineId],
       );
 
       setState(() {
-        _predictionData = predictions['data'] ?? predictions;
+        _predictionData = goingPredictions['data'] ?? goingPredictions;
+        _returnPredictionData = returnPredictions['data'] ?? returnPredictions;
         _recommendations = recommendations;
-        _filteredRecommendations = _applyDateFilter(recommendations);
+        _filteredRecommendations = _applyFilters(recommendations);
         _isLoading = false;
       });
     } catch (error) {
@@ -149,80 +167,91 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
     }
   }
 
-  List<Map<String, dynamic>> _applyDateFilter(
+  List<Map<String, dynamic>> _applyFilters(
       List<Map<String, dynamic>> recommendations) {
-    if (!_isFilterActive) {
-      return recommendations;
+    var filtered = recommendations;
+
+    // Filter by direction if specified
+    if (_directionFilter != null) {
+      filtered = filtered.where((rec) {
+        final recDirection = rec['direction']?.toString();
+        return recDirection == _directionFilter;
+      }).toList();
     }
 
-    return recommendations.where((rec) {
-      final targetDateStr = rec['targetDate']?.toString();
-      final hour = rec['hour'];
+    // Apply date/time filter if active
+    if (_isFilterActive) {
+      filtered = filtered.where((rec) {
+        final targetDateStr = rec['targetDate']?.toString();
+        final hour = rec['hour'];
 
-      if (targetDateStr == null) return false;
+        if (targetDateStr == null) return false;
 
-      DateTime? targetDate;
-      try {
-        // Try parsing as ISO date string (YYYY-MM-DD)
-        targetDate = DateTime.parse(targetDateStr);
-      } catch (e) {
-        return false;
-      }
-
-      // Check date range
-      if (_filterStartDate != null) {
-        final startDate = DateTime(
-          _filterStartDate!.year,
-          _filterStartDate!.month,
-          _filterStartDate!.day,
-        );
-        final targetDateOnly = DateTime(
-          targetDate.year,
-          targetDate.month,
-          targetDate.day,
-        );
-        if (targetDateOnly.isBefore(startDate)) {
+        DateTime? targetDate;
+        try {
+          // Try parsing as ISO date string (YYYY-MM-DD)
+          targetDate = DateTime.parse(targetDateStr);
+        } catch (e) {
           return false;
         }
-      }
 
-      if (_filterEndDate != null) {
-        final endDate = DateTime(
-          _filterEndDate!.year,
-          _filterEndDate!.month,
-          _filterEndDate!.day,
-        );
-        final targetDateOnly = DateTime(
-          targetDate.year,
-          targetDate.month,
-          targetDate.day,
-        );
-        if (targetDateOnly.isAfter(endDate)) {
-          return false;
-        }
-      }
-
-      // Check time range if specified
-      if (_filterStartTime != null || _filterEndTime != null) {
-        final recHour = hour is num
-            ? hour.toInt()
-            : int.tryParse(hour?.toString() ?? '0') ?? 0;
-
-        if (_filterStartTime != null) {
-          if (recHour < _filterStartTime!.hour) {
+        // Check date range
+        if (_filterStartDate != null) {
+          final startDate = DateTime(
+            _filterStartDate!.year,
+            _filterStartDate!.month,
+            _filterStartDate!.day,
+          );
+          final targetDateOnly = DateTime(
+            targetDate.year,
+            targetDate.month,
+            targetDate.day,
+          );
+          if (targetDateOnly.isBefore(startDate)) {
             return false;
           }
         }
 
-        if (_filterEndTime != null) {
-          if (recHour > _filterEndTime!.hour) {
+        if (_filterEndDate != null) {
+          final endDate = DateTime(
+            _filterEndDate!.year,
+            _filterEndDate!.month,
+            _filterEndDate!.day,
+          );
+          final targetDateOnly = DateTime(
+            targetDate.year,
+            targetDate.month,
+            targetDate.day,
+          );
+          if (targetDateOnly.isAfter(endDate)) {
             return false;
           }
         }
-      }
 
-      return true;
-    }).toList();
+        // Check time range if specified
+        if (_filterStartTime != null || _filterEndTime != null) {
+          final recHour = hour is num
+              ? hour.toInt()
+              : int.tryParse(hour?.toString() ?? '0') ?? 0;
+
+          if (_filterStartTime != null) {
+            if (recHour < _filterStartTime!.hour) {
+              return false;
+            }
+          }
+
+          if (_filterEndTime != null) {
+            if (recHour > _filterEndTime!.hour) {
+              return false;
+            }
+          }
+        }
+
+        return true;
+      }).toList();
+    }
+
+    return filtered;
   }
 
   Future<void> _selectStartDate() async {
@@ -250,7 +279,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       setState(() {
         _filterStartDate = picked;
         _isFilterActive = true;
-        _filteredRecommendations = _applyDateFilter(_recommendations);
+        _filteredRecommendations = _applyFilters(_recommendations);
       });
     }
   }
@@ -281,7 +310,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       setState(() {
         _filterEndDate = picked;
         _isFilterActive = true;
-        _filteredRecommendations = _applyDateFilter(_recommendations);
+        _filteredRecommendations = _applyFilters(_recommendations);
       });
     }
   }
@@ -310,7 +339,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       setState(() {
         _filterStartTime = picked;
         _isFilterActive = true;
-        _filteredRecommendations = _applyDateFilter(_recommendations);
+        _filteredRecommendations = _applyFilters(_recommendations);
       });
     }
   }
@@ -339,7 +368,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       setState(() {
         _filterEndTime = picked;
         _isFilterActive = true;
-        _filteredRecommendations = _applyDateFilter(_recommendations);
+        _filteredRecommendations = _applyFilters(_recommendations);
       });
     }
   }
@@ -351,6 +380,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       _filterStartTime = null;
       _filterEndTime = null;
       _isFilterActive = false;
+      _directionFilter = null;
       _filteredRecommendations = _recommendations;
     });
   }
@@ -617,78 +647,185 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
   }
 
   Widget _buildPredictionsSection({bool isSmallScreen = false, bool isMediumScreen = false}) {
+    // Get predictions based on selected direction
+    final currentPredictionData = _selectedDirection == 'going' 
+        ? _predictionData 
+        : _returnPredictionData;
     final predictions =
-        (_predictionData?['predictions'] as List<dynamic>?) ?? [];
+        (currentPredictionData?['predictions'] as List<dynamic>?) ?? [];
 
     return _buildPanel(
       title: 'Upcoming Rush Hours',
       isSmallScreen: isSmallScreen,
       isMediumScreen: isMediumScreen,
-      child: predictions.isEmpty
-          ? Text(
-              'No rush hour predictions available.',
-              style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
-            )
-          : ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemBuilder: (context, index) {
-                final prediction = predictions[index] as Map<String, dynamic>;
-                return Container(
-                  padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
-                  decoration: BoxDecoration(
-                    color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
-                    border: Border.all(
-                      color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Direction Toggle
+          Container(
+            margin: EdgeInsets.only(bottom: isSmallScreen ? 12.0 : 16.0),
+            decoration: BoxDecoration(
+              color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedDirection = 'going'),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 12.0),
+                      decoration: BoxDecoration(
+                        color: _selectedDirection == 'going'
+                            ? Colors.green
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: isSmallScreen ? 16.0 : 18.0,
+                            color: _selectedDirection == 'going'
+                                ? Colors.white
+                                : (AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'Going',
+                            style: TextStyle(
+                              color: _selectedDirection == 'going'
+                                  ? Colors.white
+                                  : (AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                              fontWeight: _selectedDirection == 'going' ? FontWeight.bold : FontWeight.normal,
+                              fontSize: isSmallScreen ? 13.0 : 14.0,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
-                        decoration: BoxDecoration(
-                          color: Colors.orangeAccent.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.trending_up_rounded,
-                          color: Colors.orangeAccent,
-                          size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
-                        ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedDirection = 'return'),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10.0 : 12.0),
+                      decoration: BoxDecoration(
+                        color: _selectedDirection == 'return'
+                            ? Colors.blue
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      SizedBox(width: isSmallScreen ? 12.0 : 16.0),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${prediction['date']} • ${_formatHour(prediction['hour'])}',
-                              style: TextStyle(
-                                color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
-                              ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.arrow_back_rounded,
+                            size: isSmallScreen ? 16.0 : 18.0,
+                            color: _selectedDirection == 'return'
+                                ? Colors.white
+                                : (AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'Return',
+                            style: TextStyle(
+                              color: _selectedDirection == 'return'
+                                  ? Colors.white
+                                  : (AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                              fontWeight: _selectedDirection == 'return' ? FontWeight.bold : FontWeight.normal,
+                              fontSize: isSmallScreen ? 13.0 : 14.0,
                             ),
-                            SizedBox(height: isSmallScreen ? 2.0 : 4.0),
-                            Text(
-                              'Expected bookings: ${prediction['expectedBookings']?.toStringAsFixed(1) ?? prediction['expectedBookings']}\n'
-                              'Confidence: ${(((prediction['confidence'] ?? 0) as num) * 100).toStringAsFixed(0)}%',
-                              style: TextStyle(
-                                color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
-                                fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                );
-              },
-              separatorBuilder: (_, __) => SizedBox(height: isSmallScreen ? 10.0 : 12.0),
-              itemCount: predictions.length.clamp(0, 5),
+                ),
+              ],
             ),
+          ),
+          // Predictions list
+          predictions.isEmpty
+              ? Text(
+                  'No rush hour predictions for ${_selectedDirection == 'going' ? 'going' : 'return'} trips.',
+                  style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemBuilder: (context, index) {
+                    final prediction = predictions[index] as Map<String, dynamic>;
+                    final direction = prediction['direction'] ?? _selectedDirection;
+                    final isGoing = direction == 'going';
+                    
+                    return Container(
+                      padding: EdgeInsets.all(isSmallScreen ? 10.0 : 12.0),
+                      decoration: BoxDecoration(
+                        color: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                        border: Border.all(
+                          color: isGoing 
+                              ? Colors.green.withOpacity(0.3) 
+                              : Colors.blue.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(isSmallScreen ? 8.0 : 10.0),
+                            decoration: BoxDecoration(
+                              color: (isGoing ? Colors.green : Colors.blue).withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isGoing ? Icons.arrow_forward_rounded : Icons.arrow_back_rounded,
+                              color: isGoing ? Colors.green : Colors.blue,
+                              size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
+                            ),
+                          ),
+                          SizedBox(width: isSmallScreen ? 12.0 : 16.0),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${prediction['date']} • ${_formatHour(prediction['hour'])}',
+                                        style: TextStyle(
+                                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: isSmallScreen ? 2.0 : 4.0),
+                                Text(
+                                  'Expected bookings: ${prediction['expectedBookings']?.toStringAsFixed(1) ?? prediction['expectedBookings']}\n'
+                                  'Confidence: ${(((prediction['confidence'] ?? 0) as num) * 100).toStringAsFixed(0)}%',
+                                  style: TextStyle(
+                                    color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                                    fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  separatorBuilder: (_, __) => SizedBox(height: isSmallScreen ? 10.0 : 12.0),
+                  itemCount: predictions.length.clamp(0, 5),
+                ),
+        ],
+      ),
     );
   }
 
@@ -823,6 +960,62 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
+                    // Direction filter
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        _directionFilter != null 
+                            ? (_directionFilter == 'going' ? Icons.arrow_forward_rounded : Icons.arrow_back_rounded)
+                            : Icons.swap_horiz_rounded,
+                        size: 20,
+                        color: _directionFilter != null 
+                            ? (_directionFilter == 'going' ? Colors.green : Colors.blue)
+                            : (AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                      ),
+                      tooltip: 'Filter by Direction',
+                      color: AppTheme.isDarkMode ? const Color(0xFF1C2541) : Colors.white,
+                      onSelected: (value) {
+                        setState(() {
+                          if (value == 'all') {
+                            _directionFilter = null;
+                          } else {
+                            _directionFilter = value;
+                          }
+                          _filteredRecommendations = _applyFilters(_recommendations);
+                        });
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'all',
+                          child: Row(
+                            children: [
+                              Icon(Icons.swap_horiz_rounded, size: 18, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
+                              const SizedBox(width: 8),
+                              Text('All Directions', style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'going',
+                          child: Row(
+                            children: [
+                              Icon(Icons.arrow_forward_rounded, size: 18, color: Colors.green),
+                              const SizedBox(width: 8),
+                              Text('Going Only', style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'return',
+                          child: Row(
+                            children: [
+                              Icon(Icons.arrow_back_rounded, size: 18, color: Colors.blue),
+                              const SizedBox(width: 8),
+                              Text('Return Only', style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                     // Quick filters
                     PopupMenuButton<String>(
                       icon: Icon(Icons.tune_rounded, size: 20, color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary),
@@ -856,7 +1049,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                           }
                           _isFilterActive = true;
                           _filteredRecommendations =
-                              _applyDateFilter(_recommendations);
+                              _applyFilters(_recommendations);
                         });
                       },
                       itemBuilder: (context) => [
@@ -992,6 +1185,12 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
+                          // Direction tag
+                          if (rec['direction'] != null)
+                            _buildTag(
+                              rec['direction'] == 'going' ? '→ Going' : '← Return',
+                              rec['direction'] == 'going' ? Colors.green : Colors.blue,
+                            ),
                           _buildTag(
                             'Confidence ${(rec['confidence'] ?? rec['priority'] ?? 0).toStringAsFixed(2)}',
                             Colors.orange,
@@ -1003,7 +1202,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
                           if (rec['totalAvailableSeats'] != null)
                             _buildTag(
                               'Available: ${rec['totalAvailableSeats']}',
-                              Colors.green,
+                              Colors.teal,
                             ),
                         ],
                       ),

@@ -306,6 +306,55 @@ export const startTrip = async (req, res, next) => {
       }
     }
 
+    // Send notifications to checked-in passengers asynchronously (non-blocking)
+    (async () => {
+      try {
+        const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notificationService.js');
+        const Line = (await import('../models/Line.js')).default;
+        const Passenger = (await import('../models/Passenger.js')).default;
+        const line = await Line.findById(updatedTrip.lineid);
+        const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+
+        // Get all reservations for this trip
+        const reservations = await Reservation.findByTripId(tripid);
+        
+        // Filter to only checked-in passengers
+        const checkedInReservations = reservations.filter(
+          r => r.status === 'checked_in'
+        );
+
+        if (checkedInReservations.length > 0) {
+          // Send notification to each checked-in passenger
+          for (const reservation of checkedInReservations) {
+            const passenger = await Passenger.findById(reservation.passengerid);
+            if (passenger?.userid) {
+              try {
+                const tripDirection = updatedTrip.direction || 'going';
+                const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid, null, null, tripDirection);
+                await sendNotification(
+                  passenger.userid,
+                  NOTIFICATION_TYPES.TRIP_DEPARTED,
+                  {
+                    from: passengerFromName,
+                    to: passengerToName,
+                    tripid: tripid,
+                  },
+                  passengerLanguage,
+                  { line, trip: updatedTrip } // Pass raw data for separate Arabic/English formatting
+                );
+                logger.info(`[TripController] ✅ Sent TRIP_DEPARTED notification to checked-in passenger ${passenger.userid}`);
+              } catch (notifError) {
+                logger.warn(`[TripController] Failed to send notification to passenger ${passenger.userid}:`, notifError);
+              }
+            }
+          }
+        }
+      } catch (notifError) {
+        logger.warn(`[TripController] Failed to send departure notifications for trip ${tripid}:`, notifError);
+        // Don't fail the trip start if notification fails
+      }
+    })();
+
     res.json({
       message: req.t('trip.started') || 'Trip started successfully',
       trip: updatedTrip,
@@ -599,7 +648,7 @@ function generateSeatMap(layout, totalSeats, reservations, brokenSeats = []) {
  */
 export const getAvailableTripTimes = async (req, res, next) => {
   try {
-    const { lineid, date } = req.query;
+    const { lineid, date, direction } = req.query;
 
     if (!lineid || !date) {
       return res.status(400).json({
@@ -607,15 +656,26 @@ export const getAvailableTripTimes = async (req, res, next) => {
       });
     }
 
-    // Get schedule for the line
-    const schedules = await ScheduleTemplate.findByLineId(lineid);
-    if (!schedules || schedules.length === 0) {
-      return res.status(404).json({
-        message: req.t('schedule.not_found') || 'No schedule found for this line',
+    // Direction is required to distinguish between going and returning schedules
+    if (!direction) {
+      return res.status(400).json({
+        message: req.t('trip.direction_required') || 'direction is required to fetch available trip times',
       });
     }
 
-    const schedule = schedules[0]; // Get first active schedule
+    // Get schedule for the line and direction
+    // Direction is required to distinguish between going and returning schedules
+    const schedules = await ScheduleTemplate.findByLineId(lineid, direction);
+    if (!schedules || schedules.length === 0) {
+      const directionLabel = direction === 'going' 
+        ? (req.t('schedule.going') || 'going') 
+        : (req.t('schedule.return') || 'return');
+      return res.status(404).json({
+        message: req.t('schedule.not_found_for_direction') || `No ${directionLabel} schedule found for this line`,
+      });
+    }
+
+    const schedule = schedules[0]; // Get the schedule for the specified direction
     const { start_hour, end_hour, interval_minutes } = schedule;
 
     // Parse the date
@@ -626,17 +686,24 @@ export const getAvailableTripTimes = async (req, res, next) => {
       });
     }
 
-    // First, try to get existing trips for this line and date
-    const existingTrips = await Trip.findAll({
+    // Build filters for trip queries
+    const tripFilters = {
       lineid,
       date,
+    };
+    if (direction) {
+      tripFilters.direction = direction;
+    }
+
+    // First, try to get existing trips for this line and date
+    const existingTrips = await Trip.findAll({
+      ...tripFilters,
       status: 'scheduled',
     });
 
     // Also get open trips
     const openTrips = await Trip.findAll({
-      lineid,
-      date,
+      ...tripFilters,
       status: 'open',
     });
 

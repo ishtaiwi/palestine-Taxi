@@ -1248,11 +1248,13 @@ class ApiService {
   static Future<Map<String, dynamic>> getAvailableTripTimes({
     required String lineId,
     required String date,
+    required String direction,
   }) async {
     try {
       final queryParams = <String, String>{
         'lineid': lineId,
         'date': date,
+        'direction': direction,
       };
 
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/trips/available-times')

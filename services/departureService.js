@@ -19,35 +19,35 @@ const shouldDepartEarly = async (trip) => {
       return false;
     }
 
-    
+
     if (!trip.tripid || !trip.vehicleid) {
       return false;
     }
 
-    
+
     const vehicle = await Vehicle.findById(trip.vehicleid);
     if (!vehicle) {
       return false;
     }
 
-    
+
     const reservations = await Reservation.findByTripId(trip.tripid);
     const confirmedReservations = reservations.filter(
       r => r.status === 'confirmed' || r.status === 'checked_in'
     );
 
-    
+
     const brokenSeats = (vehicle.broken_seats || []).length;
 
-    
-    
+
+
     const availableSeats = calculateAvailablePassengerSeats(
       vehicle.seatnum,
       confirmedReservations.length,
       0
     );
 
-    
+
     return availableSeats <= 0;
   } catch (error) {
     console.error('[DepartureService] Error checking early departure:', error);
@@ -71,7 +71,7 @@ const shouldDepartScheduled = async (trip) => {
 
     if (!deptime) return false;
 
-    
+
     return deptime.getTime() <= now.getTime();
   } catch (error) {
     console.error('[DepartureService] Error checking scheduled departure:', error);
@@ -86,7 +86,7 @@ const shouldDepartScheduled = async (trip) => {
  */
 const hasFutureBooking = async (trip) => {
   try {
-    
+
     if (!trip.tripid) {
       return false;
     }
@@ -112,13 +112,13 @@ export const departTrip = async (tripid) => {
   try {
     console.log(`[DepartureService] 🚗 Departing trip ${tripid}`);
 
-    
+
     const trip = await Trip.findById(tripid);
     if (!trip) {
       throw new Error(`Trip ${tripid} not found`);
     }
 
-    
+
     if (trip.status !== 'scheduled' && trip.status !== 'open' && trip.status !== 'delayed') {
       console.log(`[DepartureService] ⚠️ Trip ${tripid} is not in scheduled/open/delayed status: ${trip.status}`);
       return {
@@ -127,20 +127,20 @@ export const departTrip = async (tripid) => {
       };
     }
 
-    
+
     const updatedTrip = await Trip.update(tripid, {
       status: 'in_progress',
-      deptime: getUtcNow().toISOString(), 
+      deptime: getUtcNow().toISOString(),
     });
 
-    
+
     if (trip.assigned_driverid) {
       try {
         await DriverQueue.removeDriverFromQueue(trip.assigned_driverid);
         console.log(`[DepartureService] ✅ Removed driver ${trip.assigned_driverid} from queue`);
       } catch (error) {
         console.error(`[DepartureService] ⚠️ Error removing driver from queue:`, error);
-        
+
       }
     }
 
@@ -150,7 +150,7 @@ export const departTrip = async (tripid) => {
       const Driver = (await import('../models/Driver.js')).default;
       const Line = (await import('../models/Line.js')).default;
       const Passenger = (await import('../models/Passenger.js')).default;
-      
+
       const line = await Line.findById(updatedTrip.lineid);
       const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
 
@@ -228,13 +228,13 @@ const wasReminderSent = async (tripid, minutes) => {
   try {
     const Notification = (await import('../models/Notification.js')).default;
     const { NOTIFICATION_TYPES } = await import('../utils/notificationTemplates.js');
-    
+
     // Check if a TRIP_DEPARTURE_SOON notification was already sent for this trip with this minutes value
     const notifications = await Notification.findByTripId(tripid, NOTIFICATION_TYPES.TRIP_DEPARTURE_SOON);
     if (!notifications || notifications.length === 0) {
       return false;
     }
-    
+
     // Check if any notification matches the minutes value
     const matchingNotification = notifications.find(notif => {
       // Check if the notification data contains the minutes value
@@ -254,7 +254,7 @@ const wasReminderSent = async (tripid, minutes) => {
       }
       return false;
     });
-    
+
     return !!matchingNotification;
   } catch (error) {
     console.error(`[DepartureService] Error checking if reminder was sent:`, error);
@@ -270,14 +270,14 @@ const wasReminderSent = async (tripid, minutes) => {
 const sendDepartureReminderForMinutes = async (minutesBefore) => {
   try {
     const now = getUtcNow();
-    
+
     // Find trips departing in approximately the specified minutes
     const allTrips = await Trip.findAll({ status: TRIP_STATUS.OPEN });
     const tripsNeedingReminder = allTrips.filter(trip => {
       if (!trip.deptime) return false;
       const deptime = parseUtcDate(trip.deptime);
       if (!deptime) return false;
-      
+
       // Check if departure is within the time window (1 minute window)
       const diffMinutes = (deptime.getTime() - now.getTime()) / (1000 * 60);
       const lowerBound = minutesBefore - 1;
@@ -384,10 +384,10 @@ export const sendDepartureReminders = async () => {
   try {
     // Send 15-minute reminders
     const result15 = await sendDepartureReminderForMinutes(15);
-    
+
     // Send 5-minute reminders
     const result5 = await sendDepartureReminderForMinutes(5);
-    
+
     return {
       success: true,
       reminded15: result15.reminded || 0,
@@ -408,7 +408,7 @@ export const checkAndDepartTrips = async () => {
   try {
     console.log(`[DepartureService] 🔍 Checking trips that should depart`);
 
-    
+
     const tripsNeedingDeparture = await Trip.findTripsNeedingDeparture();
 
     if (tripsNeedingDeparture.length === 0) {
@@ -424,32 +424,32 @@ export const checkAndDepartTrips = async () => {
 
     const results = [];
 
-    
+
     for (const trip of tripsNeedingDeparture) {
       try {
         let shouldDepart = false;
         let reason = '';
 
-        
+
         if (await shouldDepartEarly(trip)) {
           shouldDepart = true;
           reason = 'early_departure_full';
         }
-        
+
         else if (await shouldDepartScheduled(trip)) {
-          
+
           const hasFuture = await hasFutureBooking(trip);
           if (hasFuture) {
             shouldDepart = true;
             reason = 'scheduled_departure_with_future_booking';
           } else {
-            
+
             if (!trip.tripid) {
               console.log(`[DepartureService] ⚠️ Trip ${trip.tripid} scheduled time arrived but no trip ID`);
             } else {
               // Check totalbookings field directly from trip table
               const totalBookings = trip.totalbookings || 0;
-              
+
               if (totalBookings > 0) {
                 shouldDepart = true;
                 reason = 'scheduled_departure_with_bookings';
@@ -480,13 +480,13 @@ export const checkAndDepartTrips = async () => {
         if (shouldDepart) {
           const result = await departTrip(trip.tripid);
 
-          
+
           try {
             await markNoShowForTrip(trip.tripid);
             console.log(`[DepartureService] ✅ Checked No-Show for trip ${trip.tripid}`);
           } catch (error) {
             console.error(`[DepartureService] ⚠️ Error checking No-Show for trip ${trip.tripid}:`, error);
-            
+
           }
 
           results.push({

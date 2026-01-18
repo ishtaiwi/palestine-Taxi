@@ -773,36 +773,13 @@ export const cancelDelayedTripsWithNoBookings = async () => {
 
     for (const trip of delayedTrips) {
       try {
-        // Check if trip has any bookings
-        const reservations = await Reservation.findByTripId(trip.tripid);
-        const activeReservations = reservations.filter(
-          r => r.status === 'confirmed' || r.status === 'checked_in'
-        );
+        // Check totalbookings field directly from trip table
+        const totalBookings = trip.totalbookings || 0;
 
-        // Also check for future bookings that might be assigned to this trip
-        let futureBookingsCount = 0;
-        if (trip.deptime && trip.lineid) {
-          try {
-            const futureBookings = await Reservation.findFutureBookingsForTrip(
-              trip.deptime,
-              { lineid: trip.lineid }
-            );
-            // Count future bookings assigned to this specific trip
-            futureBookingsCount = futureBookings.filter(b =>
-              b.tripid === trip.tripid &&
-              (b.status === 'confirmed' || b.status === 'checked_in')
-            ).length;
-          } catch (error) {
-            logger.warn(`[TripOpeningService] ⚠️ Error checking future bookings for trip ${trip.tripid}:`, error);
-          }
-        }
-
-        const totalBookings = activeReservations.length + futureBookingsCount;
-
-        // If no bookings at all, mark for cancellation
+        // If total bookings is 0, mark for cancellation
         if (totalBookings === 0) {
           tripsToCancel.push(trip);
-          logger.info(`[TripOpeningService] ❌ Trip ${trip.tripid} has no bookings and is delayed - marking for cancellation`);
+          logger.info(`[TripOpeningService] ❌ Trip ${trip.tripid} has no bookings (totalbookings: ${totalBookings}) and is delayed - marking for cancellation`);
         } else {
           logger.debug(`[TripOpeningService] ✅ Trip ${trip.tripid} has ${totalBookings} booking(s) - keeping as delayed`);
         }

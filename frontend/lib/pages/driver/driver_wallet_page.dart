@@ -1284,7 +1284,7 @@ class _DriverWalletPageState extends State<DriverWalletPage> {
           ),
         ),
         bottomNavigationBar: DriverBottomNavBar(
-          currentIndex: 3,
+          currentIndex: 2,
           isDarkMode: _isDarkMode,
           isArabic: _isArabic,
           onTap: (index) {

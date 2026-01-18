@@ -1056,6 +1056,51 @@ export const createReservation = async (req, res, next) => {
           language,
           { line, trip } // Pass raw data for separate Arabic/English formatting
         );
+
+        // Send notification to driver when passenger books on existing trip
+        if (reservation.tripid) {
+          try {
+            // Get current trip to check if it has a driver
+            const currentTrip = await Trip.findById(reservation.tripid);
+            if (currentTrip && currentTrip.assigned_driverid) {
+              // Get driver's userid
+              const Driver = (await import('../models/Driver.js')).default;
+              const driver = await Driver.findById(currentTrip.assigned_driverid);
+              
+              if (driver && driver.userid) {
+                // Get passenger information
+                const Passenger = (await import('../models/Passenger.js')).default;
+                const passenger = await Passenger.findById(reservation.passengerid);
+                const passengerName = passenger?.user?.fullname || 'Passenger';
+
+                // Get driver's language preference
+                const { getUserLanguage } = await import('../utils/lineHelpers.js');
+                const driverLanguage = await getUserLanguage(driver.userid);
+
+                // Get payment amount from reservation
+                const paymentAmount = (reservation.bookingprice || 0).toFixed(2);
+
+                // Send NEW_BOOKING_ASSIGNED notification to driver (includes payment info)
+                await sendNotification(
+                  driver.userid,
+                  NOTIFICATION_TYPES.NEW_BOOKING_ASSIGNED,
+                  {
+                    passengerName,
+                    amount: paymentAmount,
+                    bookingid: reservation.bookingid,
+                    tripid: reservation.tripid,
+                  },
+                  driverLanguage
+                );
+                
+                logger.info(`[ReservationController] ✅ Sent NEW_BOOKING_ASSIGNED notification to driver ${driver.userid} for booking ${reservation.bookingid}`);
+              }
+            }
+          } catch (driverNotifError) {
+            logger.warn('[ReservationController] Failed to send new booking notification to driver:', driverNotifError);
+            // Don't fail the request if driver notification fails
+          }
+        }
       } catch (notifError) {
         logger.warn('[ReservationController] Failed to send reservation confirmation notification:', notifError);
         // Don't fail the request if notification fails

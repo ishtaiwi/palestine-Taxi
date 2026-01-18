@@ -115,7 +115,7 @@ export const createReservation = async (req, res, next) => {
     } else {
       existingReservations = await Reservation.findByPassengerId(passengerid);
     }
-
+    
     const activeStatuses = [RESERVATION_STATUS.CONFIRMED, RESERVATION_STATUS.CHECKED_IN];
 
     if (bookingType === BOOKING_TYPE.INSTANT && tripid) {
@@ -919,7 +919,7 @@ export const createReservation = async (req, res, next) => {
       try {
         if (tripid && bookingType === BOOKING_TYPE.INSTANT) {
           const currentTripAfterSync = await Trip.findById(tripid);
-
+          
           if (currentTripAfterSync && currentTripAfterSync.lineid) {
             // If trip already has a driver, transfer payment
             if (currentTripAfterSync.assigned_driverid && currentTripAfterSync.vehicleid) {
@@ -966,7 +966,7 @@ export const createReservation = async (req, res, next) => {
                       if (availableSeats <= 0) {
                         const additionalResult = await checkAndAssignAdditionalDrivers(tripid);
                         if (additionalResult.assigned > 0) {
-                          await distributeAllBookings(tripid).catch(() => { });
+                          await distributeAllBookings(tripid).catch(() => {});
                         }
                       }
                     }
@@ -1010,7 +1010,7 @@ export const createReservation = async (req, res, next) => {
 
         // Get trip direction if available
         const tripDirection = trip?.direction || 'going';
-
+        
         // Get line names using user's language preference (pass req for Accept-Language fallback)
         const { fromName, toName, language } = await getLineNamesForNotification(line, req.user.userid, req, null, tripDirection);
 
@@ -1142,7 +1142,7 @@ export const cancelReservation = async (req, res, next) => {
       if (payment && payment.status === PAYMENT_STATUS.COMPLETED) {
         // Check if payment was transferred to driver's wallet (towalletid exists)
         const driverWalletId = payment.towalletid;
-
+        
         // If payment was transferred to driver, deduct refund amount from driver's wallet
         if (driverWalletId) {
           try {
@@ -1207,7 +1207,7 @@ export const cancelReservation = async (req, res, next) => {
 
       // Get trip direction if available
       const tripDirection = trip?.direction || 'going';
-
+      
       // Get line names for passenger (pass req for Accept-Language fallback)
       const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, req.user.userid, req, null, tripDirection);
 
@@ -1257,7 +1257,7 @@ export const cancelReservation = async (req, res, next) => {
           driverLanguage,
           { line, trip, reservation } // Pass raw data for separate Arabic/English formatting
         );
-
+        
         logger.info(`[ReservationController] ✅ Sent cancellation notification to driver ${driverUserid} for reservation ${reservation.bookingid}`);
       }
     } catch (notifError) {

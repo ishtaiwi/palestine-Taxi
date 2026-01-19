@@ -7,6 +7,7 @@ import '../../services/api_service.dart';
 import '../../pages/passenger/passenger_home.dart';
 import '../../pages/driver/driver_home.dart';
 import '../../pages/admin/admin_dashboard.dart';
+import '../../pages/terminal/walkin_terminal_page.dart';
 
 class TaxiPalestineApp extends StatelessWidget {
   const TaxiPalestineApp({super.key});
@@ -74,12 +75,33 @@ class TaxiPalestineApp extends StatelessWidget {
       ],
       // Start with a small router that decides whether to go to login
       // or directly into the appropriate dashboard based on saved session.
-      home: const _StartupRouter(),
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/passenger': (context) => const PassengerHomePage(),
-        '/driver': (context) => const DriverHomePage(),
-        '/admin': (context) => const AdminDashboardPage(),
+      // Use onGenerateRoute to handle initial route for terminal mode
+      initialRoute: '/',
+      onGenerateRoute: (settings) {
+        // Allow direct access to terminal without authentication
+        if (settings.name == '/terminal') {
+          return MaterialPageRoute(
+            builder: (_) => const WalkinTerminalPage(),
+            settings: settings,
+          );
+        }
+
+        // Handle other routes
+        switch (settings.name) {
+          case '/':
+            return MaterialPageRoute(builder: (_) => const _StartupRouter());
+          case '/login':
+            return MaterialPageRoute(builder: (_) => const LoginScreen());
+          case '/passenger':
+            return MaterialPageRoute(builder: (_) => const PassengerHomePage());
+          case '/driver':
+            return MaterialPageRoute(builder: (_) => const DriverHomePage());
+          case '/admin':
+            return MaterialPageRoute(
+                builder: (_) => const AdminDashboardPage());
+          default:
+            return MaterialPageRoute(builder: (_) => const _StartupRouter());
+        }
       },
     );
   }
@@ -181,6 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
       'ctaLogin': 'دخول',
       'ctaRegister': 'إنشاء حساب مسافر',
       'trust': 'موثوق من النقابات الفلسطينية',
+      'terminal': 'محطة الحجز للمسافرين',
     },
     'en': {
       'appTitle': 'Pal Taxi',
@@ -194,6 +217,7 @@ class _LoginScreenState extends State<LoginScreen> {
       'ctaLogin': 'Sign in',
       'ctaRegister': 'Create passenger account',
       'trust': 'Trusted by Palestinian unions',
+      'terminal': 'Walk-in Booking Terminal',
     },
   };
 
@@ -382,6 +406,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           onSubmit: _handleLogin,
                           onForgotPassword: _handleForgotPassword,
                           onRegister: _openRegisterScreen,
+                          onTerminal: _openTerminal,
                           isDesktop: isDesktop,
                           isTablet: isTablet,
                           isLargeScreen: isLargeScreen,
@@ -421,6 +446,15 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     }
+  }
+
+  void _openTerminal() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const WalkinTerminalPage(),
+      ),
+    );
   }
 
   Future<void> _handleForgotPassword() async {
@@ -634,6 +668,7 @@ class _FormCard extends StatelessWidget {
   final Future<void> Function() onSubmit;
   final VoidCallback onForgotPassword;
   final VoidCallback onRegister;
+  final VoidCallback onTerminal;
   final String Function(String key) t;
   final bool isDesktop;
   final bool isTablet;
@@ -651,6 +686,7 @@ class _FormCard extends StatelessWidget {
     required this.onSubmit,
     required this.onForgotPassword,
     required this.onRegister,
+    required this.onTerminal,
     required this.t,
     this.isDesktop = false,
     this.isTablet = false,
@@ -971,6 +1007,52 @@ class _FormCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+              ),
+              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+              // Terminal access button
+              OutlinedButton.icon(
+                onPressed: onTerminal,
+                icon: Icon(
+                  Icons.touch_app,
+                  size: isDesktop
+                      ? 22
+                      : (isTablet
+                          ? 20
+                          : (isLargeScreen ? 19 : (isMediumScreen ? 18 : 17))),
+                  color: Colors.teal,
+                ),
+                label: Text(
+                  t('terminal'),
+                  style: TextStyle(
+                    fontSize: isDesktop
+                        ? 15
+                        : (isTablet
+                            ? 14
+                            : (isLargeScreen
+                                ? 14
+                                : (isMediumScreen ? 13 : 12))),
+                    color: Colors.teal,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(
+                    vertical: isDesktop
+                        ? 14
+                        : (isTablet
+                            ? 14
+                            : (isLargeScreen
+                                ? 13
+                                : (isMediumScreen ? 12 : 11))),
+                  ),
+                  side: const BorderSide(color: Colors.teal),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      isDesktop
+                          ? 14
+                          : (isTablet ? 12 : (isLargeScreen ? 12 : 10)),
+                    ),
+                  ),
                 ),
               ),
             ],

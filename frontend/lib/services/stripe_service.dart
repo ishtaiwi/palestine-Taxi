@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:http/http.dart' as http;
 
@@ -11,9 +12,21 @@ class StripeService {
 
   static Future<void> initialize() async {
     if (_initialized) return;
-    Stripe.publishableKey = AppConfig.stripePublishableKey;
-    await Stripe.instance.applySettings();
-    _initialized = true;
+    
+    // Skip Stripe initialization on web (not supported)
+    if (kIsWeb) {
+      print('⚠️ Stripe initialization skipped on web platform');
+      return;
+    }
+    
+    try {
+      Stripe.publishableKey = AppConfig.stripePublishableKey;
+      await Stripe.instance.applySettings();
+      _initialized = true;
+    } catch (e) {
+      print('Warning: Stripe initialization failed: $e');
+      // Continue even if Stripe fails
+    }
   }
 
   

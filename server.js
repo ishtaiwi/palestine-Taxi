@@ -27,6 +27,7 @@ import ratingRoutes from './routes/ratingRoutes.js';
 import locationRoutes from './routes/locationRoutes.js';
 import routingRoutes from './routes/routingRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import walkinRoutes from './routes/walkinRoutes.js';
 
 
 
@@ -157,6 +158,7 @@ app.use('/api/time', timeRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/routing', routingRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/walkin', walkinRoutes);
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

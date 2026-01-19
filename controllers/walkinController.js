@@ -6,6 +6,7 @@ import Line from '../models/Line.js';
 import Trip from '../models/Trip.js';
 import DriverQueue from '../models/DriverQueue.js';
 import Vehicle from '../models/Vehicle.js';
+// Note: Wallet and Driver imports removed - cash transfer happens at check-in, not at booking
 import { v4 as uuidv4 } from 'uuid';
 import { generateQRCode } from '../utils/qrcode.js';
 import { BOOKING_TYPE, PAYMENT_STATUS, PAYMENT_METHOD, RESERVATION_STATUS, PASSENGER_TYPE, TRIP_STATUS } from '../utils/constants.js';
@@ -18,7 +19,6 @@ import logger from '../utils/logger.js';
  * Register walk-in passenger and create reservation with instant booking
  * Public endpoint - no authentication required
  * Supports trip selection and cash payment
- * Payment is transferred to driver's wallet when driver scans QR code at check-in
  */
 export const registerWalkIn = async (req, res, next) => {
   let paymentRecord = null;
@@ -162,16 +162,15 @@ export const registerWalkIn = async (req, res, next) => {
 
     // Create payment record with CASH method and COMPLETED status
     // Walk-in passengers pay cash at the station
-    // Payment will be transferred to driver's wallet when driver scans QR code at check-in
     paymentRecord = await Payment.create({
       paymentid: uuidv4(),
       amount: bookingPrice,
       method: PAYMENT_METHOD.CASH,
-      status: PAYMENT_STATUS.COMPLETED, // Cash payment is completed immediately
+      status: PAYMENT_STATUS.COMPLETED, // Cash payment marked as completed (will be transferred to driver on check-in)
       type: 'reservation',
       tripid: tripid || null,
       time: new Date().toISOString(),
-      // towalletid remains null until driver scans QR code at check-in
+      // Note: towalletid is NOT set here - cash will be transferred to driver's wallet when passenger checks in (QR scan)
     });
 
     // Create reservation with walk-in passenger type
@@ -197,6 +196,7 @@ export const registerWalkIn = async (req, res, next) => {
     logger.info(`[WalkInController] Created walk-in reservation ${reservation.bookingid} for phone ${normalizedPhone}${tripid ? ` on trip ${tripid}` : ''}`);
 
     // Sync trip stats if trip was provided
+    let driverAssigned = false;
     if (tripid) {
       try {
         await syncTripStats(tripid);
@@ -205,18 +205,23 @@ export const registerWalkIn = async (req, res, next) => {
         logger.warn('[WalkInController] Error syncing trip stats:', syncError);
       }
 
+      // Check if trip already has driver (through vehicle relationship or assigned_driverid)
+      const tripHasDriverAlready = (trip.vehicle && trip.vehicle.driver) || trip.assigned_driverid;
+
       // If trip doesn't have driver yet, try to assign one from queue
-      // Payment will be transferred to driver's wallet when driver scans QR code at check-in
-      if (trip && !trip.assigned_driverid) {
+      if (trip && !tripHasDriverAlready) {
         try {
           const assignmentResult = await assignVehicleFromQueue(tripid, trip.lineid);
           if (assignmentResult && assignmentResult.success) {
+            driverAssigned = true;
             logger.info(`[WalkInController] Driver ${assignmentResult.driverid} assigned to trip ${tripid}`);
-            // Payment transfer happens at check-in when driver scans QR code
+            // Note: Cash payment will be transferred to driver's wallet when passenger checks in (QR scan)
           }
         } catch (assignError) {
           logger.warn('[WalkInController] Error assigning driver from queue:', assignError);
         }
+      } else if (tripHasDriverAlready) {
+        logger.info(`[WalkInController] Trip ${tripid} already has driver assigned`);
       }
     }
 
@@ -232,16 +237,100 @@ export const registerWalkIn = async (req, res, next) => {
     // Get payment details for response
     const paymentDetails = await Payment.findById(paymentRecord.paymentid);
 
+    // Refresh trip data to get latest driver info (in case driver was just assigned)
+    // Always refresh to get the most up-to-date driver/vehicle information
+    let finalTrip = trip;
+    if (tripid) {
+      try {
+        finalTrip = await Trip.findById(tripid);
+        logger.info(`[WalkInController] Refreshed trip ${tripid}, assigned_driverid: ${finalTrip?.assigned_driverid}, vehicleid: ${finalTrip?.vehicleid}`);
+      } catch (refreshError) {
+        logger.warn('[WalkInController] Error refreshing trip, using original trip data:', refreshError);
+        // Fall back to original trip if refresh fails
+        finalTrip = trip;
+      }
+    }
+
     // Build trip info for response
     let tripInfo = null;
-    if (trip) {
+    let driverInfo = null;
+
+    if (finalTrip) {
       tripInfo = {
-        tripid: trip.tripid,
-        deptime: trip.deptime,
-        direction: trip.direction,
-        status: trip.status,
-        availableseats: trip.availableseats,
+        tripid: finalTrip.tripid,
+        deptime: finalTrip.deptime,
+        direction: finalTrip.direction,
+        status: finalTrip.status,
+        availableseats: finalTrip.availableseats,
       };
+
+      // Get driver info - check both assigned_driverid and vehicle.driver
+      let driverToUse = null;
+      let vehicleToUse = null;
+
+      // First, check if trip has vehicle with driver nested (from join)
+      if (finalTrip.vehicle && finalTrip.vehicle.driver) {
+        driverToUse = finalTrip.vehicle.driver;
+        vehicleToUse = finalTrip.vehicle;
+        logger.info(`[WalkInController] Found driver through vehicle relationship: ${driverToUse.driverid}`);
+      }
+      // Otherwise, check assigned_driverid and fetch driver separately
+      else if (finalTrip.assigned_driverid) {
+        try {
+          const Driver = (await import('../models/Driver.js')).default;
+          driverToUse = await Driver.findById(finalTrip.assigned_driverid);
+          if (driverToUse) {
+            logger.info(`[WalkInController] Fetched driver ${finalTrip.assigned_driverid} separately: ${driverToUse.driverid}`);
+          } else {
+            logger.warn(`[WalkInController] Driver ${finalTrip.assigned_driverid} not found`);
+          }
+        } catch (driverError) {
+          logger.warn('[WalkInController] Error fetching driver by ID:', driverError);
+        }
+      } else {
+        logger.info(`[WalkInController] Trip ${tripid} has no assigned_driverid and no vehicle.driver`);
+      }
+
+      // If we have driver, build driver info
+      if (driverToUse) {
+        driverInfo = {
+          driverid: driverToUse.driverid,
+          fullname: driverToUse.user?.fullname || null,
+          phone: driverToUse.user?.phone || null,
+        };
+
+        // Get vehicle info if available
+        if (vehicleToUse) {
+          driverInfo.vehicle = {
+            vehicleid: vehicleToUse.vehicleid,
+            platenumber: vehicleToUse.platenumber,
+            make: vehicleToUse.make,
+            model: vehicleToUse.model,
+            color: vehicleToUse.color,
+          };
+          logger.info(`[WalkInController] Using vehicle from relationship: ${vehicleToUse.platenumber}`);
+        } else if (finalTrip.vehicleid) {
+          try {
+            const vehicle = await Vehicle.findById(finalTrip.vehicleid);
+            if (vehicle) {
+              driverInfo.vehicle = {
+                vehicleid: vehicle.vehicleid,
+                platenumber: vehicle.platenumber,
+                make: vehicle.make,
+                model: vehicle.model,
+                color: vehicle.color,
+              };
+              logger.info(`[WalkInController] Fetched vehicle separately: ${vehicle.platenumber}`);
+            }
+          } catch (vehicleError) {
+            logger.warn('[WalkInController] Error fetching vehicle info:', vehicleError);
+          }
+        }
+
+        logger.info(`[WalkInController] Driver info prepared: ${driverInfo.fullname || 'No name'}, Phone: ${driverInfo.phone || 'None'}, Vehicle: ${driverInfo.vehicle?.platenumber || 'None'}`);
+      } else {
+        logger.info(`[WalkInController] No driver found for trip ${tripid} - assigned_driverid: ${finalTrip.assigned_driverid}, hasVehicle: ${!!finalTrip.vehicle}, hasVehicleDriver: ${!!(finalTrip.vehicle?.driver)}`);
+      }
     }
 
     res.status(201).json({
@@ -265,6 +354,7 @@ export const registerWalkIn = async (req, res, next) => {
         linename: line.linename,
       },
       trip: tripInfo,
+      driver: driverInfo,
     });
   } catch (error) {
     logger.error('[WalkInController] Error creating walk-in reservation:', error);
@@ -315,28 +405,35 @@ export const getWalkInTrips = async (req, res, next) => {
     // Get upcoming trips for the line
     const allTrips = await Trip.findUpcoming(filters);
 
+    logger.info(`[WalkInController] Found ${allTrips.length} upcoming trips for line ${lineid}, direction: ${direction || 'all'}`);
+
     // Filter trips that are available for instant booking
     const availableTrips = [];
 
     for (const trip of allTrips) {
-      // Check if trip is open for instant booking
-      if (!canBookInstant(trip)) {
-        continue;
-      }
-
-      // Check trip status
+      // Check trip status - must be in a bookable status
       const validStatuses = [TRIP_STATUS.SCHEDULED, TRIP_STATUS.OPEN, TRIP_STATUS.DELAYED];
       if (!validStatuses.includes(trip.status)) {
+        logger.debug(`[WalkInController] Trip ${trip.tripid} skipped - status: ${trip.status}`);
         continue;
       }
 
-      // Check if trip has driver OR drivers available in queue
+      // For OPEN trips, always show them (they're ready for booking)
+      // For SCHEDULED/DELAYED trips, check if instant booking time has passed
+      if (trip.status !== TRIP_STATUS.OPEN && !canBookInstant(trip)) {
+        logger.debug(`[WalkInController] Trip ${trip.tripid} skipped - not open for instant booking yet`);
+        continue;
+      }
+
+      // Check if trip has driver OR drivers available in queue for this direction
       const tripHasDriver = trip.vehicleid && trip.assigned_driverid;
       let driversAvailable = 0;
 
       if (!tripHasDriver) {
-        const queueCheck = await DriverQueue.canAcceptInstantBooking(trip.lineid);
+        // Pass the trip's direction to check for drivers in queue for that direction
+        const queueCheck = await DriverQueue.canAcceptInstantBooking(trip.lineid, trip.direction);
         if (!queueCheck.allowed) {
+          logger.debug(`[WalkInController] Trip ${trip.tripid} skipped - no driver and no drivers in queue for direction ${trip.direction}`);
           continue; // Skip trips without driver and no drivers in queue
         }
         driversAvailable = queueCheck.driversAvailable || 0;

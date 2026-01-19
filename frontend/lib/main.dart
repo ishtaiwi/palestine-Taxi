@@ -23,12 +23,17 @@ Future<void> main() async {
     print('⚠️ Firebase initialization skipped on web platform');
   }
 
-  try {
-    Stripe.publishableKey = AppConfig.stripePublishableKey;
-    await Stripe.instance.applySettings();
-    print('Stripe initialized successfully');
-  } catch (e) {
-    print('Warning: Stripe initialization failed: $e');
+  // Initialize Stripe (skip on web - not supported)
+  if (!kIsWeb) {
+    try {
+      Stripe.publishableKey = AppConfig.stripePublishableKey;
+      await Stripe.instance.applySettings();
+      print('Stripe initialized successfully');
+    } catch (e) {
+      print('Warning: Stripe initialization failed: $e');
+    }
+  } else {
+    print('⚠️ Stripe initialization skipped on web platform');
   }
 
   runApp(const TaxiPalestineApp());

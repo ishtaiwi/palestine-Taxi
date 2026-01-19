@@ -4372,4 +4372,148 @@ class ApiService {
       };
     }
   }
+
+  // ==================== Walk-in Terminal API Methods ====================
+
+  /// Get all active lines for walk-in terminal (no auth required)
+  static Future<Map<String, dynamic>> getWalkInLines() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/walkin/lines'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'lines': decoded['lines'] ?? [],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to fetch lines',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Get available trips for walk-in booking (no auth required)
+  static Future<Map<String, dynamic>> getWalkInTrips({
+    required String lineid,
+    String? direction,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'lineid': lineid,
+      };
+      if (direction != null && direction.isNotEmpty) {
+        queryParams['direction'] = direction;
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/walkin/trips')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'trips': decoded['trips'] ?? [],
+          'line': decoded['line'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to fetch trips',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Register walk-in booking with instant trip selection (no auth required)
+  static Future<Map<String, dynamic>> registerWalkInBooking({
+    required String lineid,
+    required String phone,
+    required String tripid,
+    String? dropoffpoint,
+    String? aging,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'lineid': lineid,
+        'phone': phone,
+        'tripid': tripid,
+      };
+      if (dropoffpoint != null && dropoffpoint.isNotEmpty) {
+        body['dropoffpoint'] = dropoffpoint;
+      }
+      if (aging != null && aging.isNotEmpty) {
+        body['aging'] = aging;
+      }
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/walkin/register'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 201 && decoded is Map) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Booking created successfully',
+          'reservation': decoded['reservation'],
+          'payment': decoded['payment'],
+          'qrCode': decoded['qrCode'],
+          'qrData': decoded['qrData'],
+          'line': decoded['line'],
+          'trip': decoded['trip'],
+          'driver': decoded['driver'], // Driver info for walk-in bookings
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to create booking',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
 }

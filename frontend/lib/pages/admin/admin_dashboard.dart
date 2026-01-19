@@ -81,7 +81,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'role': 'الدور',
       'admin': 'المدير',
       'logout': 'تسجيل الخروج',
-      'aiPredictions': 'توقعات الذكاء الاصطناعي',
+      'aiPredictions': 'التوقعات الإحصائية',
       'vehicleMap': 'خريطة المركبات',
       'baseStations': 'محطات القاعدة',
       'settings': 'الإعدادات',
@@ -109,7 +109,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'role': 'Role',
       'admin': 'Admin',
       'logout': 'Logout',
-      'aiPredictions': 'AI Predictions',
+      'aiPredictions': 'Statistical Predictions',
       'vehicleMap': 'Vehicle Map',
       'baseStations': 'Base Stations',
       'settings': 'Settings',
@@ -1971,7 +1971,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
               const SizedBox(width: 6),
               Text(
-                _isArabic ? 'توقعات الذكاء' : 'AI Insights',
+                _isArabic ? 'الرؤى الإحصائية' : 'Statistical Insights',
                 style: TextStyle(
                     color: textPrimary,
                     fontWeight: FontWeight.w600,
@@ -2709,7 +2709,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final topLines = (_predictionInsights?['topLines'] as List<dynamic>?) ?? [];
 
     return _buildSectionCard(
-      title: _isArabic ? 'تحليلات الطلب' : 'AI Demand Insights',
+      title: _isArabic ? 'تحليلات الطلب' : 'Statistical Demand Insights',
       icon: Icons.trending_up_rounded,
       color: Colors.deepOrange,
       cardColor: cardColor,

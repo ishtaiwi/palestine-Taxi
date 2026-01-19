@@ -22,6 +22,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
   String? _statusFilter;
   String? _lineFilter;
   List<Map<String, dynamic>> _lines = [];
+  List<Map<String, dynamic>> _vehicles = [];
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -51,6 +52,19 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
       'driver': 'السائق',
       'going': 'ذهاب',
       'return': 'إياب',
+      'addTrip': 'إضافة رحلة',
+      'editTrip': 'تعديل رحلة',
+      'save': 'حفظ',
+      'cancel': 'إلغاء',
+      'tripCreated': 'تم إنشاء الرحلة بنجاح',
+      'tripUpdated': 'تم تحديث الرحلة بنجاح',
+      'selectLine': 'اختر الخط',
+      'selectVehicle': 'اختر المركبة (اختياري)',
+      'selectDirection': 'اختر الاتجاه',
+      'departureTime': 'وقت المغادرة',
+      'availableSeats': 'المقاعد المتاحة',
+      'tripStatus': 'حالة الرحلة',
+      'required': 'مطلوب',
     },
     'en': {
       'title': 'Trips Management',
@@ -79,6 +93,19 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
       'driver': 'Driver',
       'going': 'Going',
       'return': 'Return',
+      'addTrip': 'Add Trip',
+      'editTrip': 'Edit Trip',
+      'save': 'Save',
+      'cancel': 'Cancel',
+      'tripCreated': 'Trip created successfully',
+      'tripUpdated': 'Trip updated successfully',
+      'selectLine': 'Select Line',
+      'selectVehicle': 'Select Vehicle (Optional)',
+      'selectDirection': 'Select Direction',
+      'departureTime': 'Departure Time',
+      'availableSeats': 'Available Seats',
+      'tripStatus': 'Trip Status',
+      'required': 'Required',
     },
   };
 
@@ -144,6 +171,7 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
     AppTheme.init();
     _loadData();
     _loadLines();
+    _loadVehicles();
     _loadLanguagePreference();
     _searchController.addListener(_onSearchChanged);
   }
@@ -206,6 +234,19 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
       }
     } catch (e) {
       // Silently fail - lines filter is optional
+    }
+  }
+
+  Future<void> _loadVehicles() async {
+    try {
+      final vehicles = await ApiService.getAllVehicles();
+      if (mounted) {
+        setState(() {
+          _vehicles = vehicles;
+        });
+      }
+    } catch (e) {
+      // Silently fail - vehicles are optional
     }
   }
 
@@ -390,6 +431,15 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                   ),
                 ],
               ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => _showTripFormDialog(),
+          backgroundColor: AppTheme.appBarColor,
+          icon: Icon(Icons.add_rounded, color: Colors.white),
+          label: Text(
+            t('addTrip'),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
       ),
     );
   }
@@ -772,17 +822,29 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
                 ],
               ),
               SizedBox(height: isSmallScreen ? 10.0 : 12.0),
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  icon: Icon(
-                    Icons.delete_outline_rounded,
-                    color: Colors.redAccent,
-                    size: isSmallScreen ? 20.0 : 24.0,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.edit_outlined,
+                      color: Colors.blueAccent,
+                      size: isSmallScreen ? 20.0 : 24.0,
+                    ),
+                    onPressed: () => _showTripFormDialog(trip: trip),
+                    tooltip: t('editTrip'),
                   ),
-                  onPressed: () => _handleDelete(trip['tripid']),
-                  tooltip: t('delete'),
-                ),
+                  SizedBox(width: isSmallScreen ? 4.0 : 8.0),
+                  IconButton(
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.redAccent,
+                      size: isSmallScreen ? 20.0 : 24.0,
+                    ),
+                    onPressed: () => _handleDelete(trip['tripid']),
+                    tooltip: t('delete'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -855,6 +917,278 @@ class _AdminTripsPageState extends State<AdminTripsPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showTripFormDialog({Map<String, dynamic>? trip}) async {
+    final isEdit = trip != null;
+    String? selectedLineId = trip?['line']?['lineid']?.toString() ?? trip?['lineid']?.toString();
+    String? selectedVehicleId = trip?['vehicle']?['vehicleid']?.toString() ?? trip?['vehicleid']?.toString();
+    String selectedDirection = trip?['direction']?.toString() ?? 'going';
+    DateTime? selectedDateTime;
+    int? availableSeats = trip?['availableseats'];
+    String? selectedStatus = trip?['status']?.toString();
+
+    // Parse departure time if editing
+    if (isEdit && trip['deptime'] != null) {
+      try {
+        String normalized = trip['deptime'].toString();
+        normalized = normalized.replaceFirst(' ', 'T');
+        normalized = normalized.replaceFirst(RegExp(r'\+00:?00?$'), 'Z');
+        if (!normalized.contains('Z') && !normalized.contains('+') && !normalized.contains('-')) {
+          normalized += 'Z';
+        }
+        selectedDateTime = DateTime.parse(normalized).toLocal();
+      } catch (e) {
+        // If parsing fails, use current time
+        selectedDateTime = DateTime.now();
+      }
+    } else {
+      selectedDateTime = DateTime.now().add(Duration(hours: 1));
+    }
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
+          title: Text(
+            isEdit ? t('editTrip') : t('addTrip'),
+            style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary),
+          ),
+          content: SingleChildScrollView(
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.9,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Line selection
+                  DropdownButtonFormField<String>(
+                    value: selectedLineId,
+                    decoration: InputDecoration(
+                      labelText: '${t('selectLine')} *',
+                      prefixIcon: Icon(Icons.directions_bus_rounded, color: AppTheme.appBarColor),
+                      filled: true,
+                      fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    items: _lines.map((line) {
+                      final lineId = line['lineid']?.toString();
+                      final lineName = _getLineName(line);
+                      return DropdownMenuItem(
+                        value: lineId,
+                        child: Text(lineName),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedLineId = value;
+                      });
+                    },
+                  ),
+                  SizedBox(height: 16),
+                  // Direction selection
+                  DropdownButtonFormField<String>(
+                    value: selectedDirection,
+                    decoration: InputDecoration(
+                      labelText: t('selectDirection'),
+                      prefixIcon: Icon(Icons.swap_horiz_rounded, color: AppTheme.appBarColor),
+                      filled: true,
+                      fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    items: [
+                      DropdownMenuItem(value: 'going', child: Text(t('going'))),
+                      DropdownMenuItem(value: 'return', child: Text(t('return'))),
+                    ],
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedDirection = value ?? 'going';
+                      });
+                    },
+                  ),
+                  SizedBox(height: 16),
+                  // Vehicle selection (optional)
+                  DropdownButtonFormField<String?>(
+                    value: selectedVehicleId,
+                    decoration: InputDecoration(
+                      labelText: t('selectVehicle'),
+                      prefixIcon: Icon(Icons.directions_car_rounded, color: AppTheme.appBarColor),
+                      filled: true,
+                      fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    items: [
+                      DropdownMenuItem<String?>(value: null, child: Text('${t('filterAll')} (${t('required').toLowerCase()})')),
+                      ..._vehicles.map((vehicle) {
+                        final vehicleId = vehicle['vehicleid']?.toString();
+                        final plateNo = vehicle['plateno']?.toString() ?? vehicle['platenumber']?.toString() ?? 'N/A';
+                        return DropdownMenuItem(
+                          value: vehicleId,
+                          child: Text(plateNo),
+                        );
+                      }),
+                    ],
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedVehicleId = value;
+                      });
+                    },
+                  ),
+                  SizedBox(height: 16),
+                  // Departure date and time
+                  InkWell(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDateTime ?? DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime.now().add(Duration(days: 365)),
+                      );
+                      if (date != null) {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(selectedDateTime ?? DateTime.now()),
+                        );
+                        if (time != null) {
+                          setDialogState(() {
+                            selectedDateTime = DateTime(
+                              date.year,
+                              date.month,
+                              date.day,
+                              time.hour,
+                              time.minute,
+                            );
+                          });
+                        }
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: '${t('departureTime')} *',
+                        prefixIcon: Icon(Icons.calendar_today_rounded, color: AppTheme.appBarColor),
+                        filled: true,
+                        fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        selectedDateTime != null
+                            ? DateFormat('dd/MM/yyyy HH:mm').format(selectedDateTime!)
+                            : t('selectDirection'),
+                        style: TextStyle(
+                          color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  // Available seats
+                  TextFormField(
+                    initialValue: availableSeats?.toString(),
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: t('availableSeats'),
+                      prefixIcon: Icon(Icons.event_seat_rounded, color: AppTheme.appBarColor),
+                      filled: true,
+                      fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (value) {
+                      availableSeats = int.tryParse(value);
+                    },
+                  ),
+                  if (isEdit) ...[
+                    SizedBox(height: 16),
+                    // Status (only for editing)
+                    DropdownButtonFormField<String>(
+                      value: selectedStatus,
+                      decoration: InputDecoration(
+                        labelText: t('tripStatus'),
+                        prefixIcon: Icon(Icons.info_outline_rounded, color: AppTheme.appBarColor),
+                        filled: true,
+                        fillColor: AppTheme.isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.withOpacity(0.1),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      items: [
+                        DropdownMenuItem(value: 'scheduled', child: Text(t('scheduled'))),
+                        DropdownMenuItem(value: 'open', child: Text('Open')),
+                        DropdownMenuItem(value: 'in_progress', child: Text(t('in_progress'))),
+                        DropdownMenuItem(value: 'completed', child: Text(t('completed'))),
+                        DropdownMenuItem(value: 'cancelled', child: Text(t('cancelled'))),
+                      ],
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedStatus = value;
+                        });
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(t('cancel'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (selectedLineId == null || selectedDateTime == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${t('selectLine')} ${t('required').toLowerCase()}'),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                  return;
+                }
+
+                // Convert local time to UTC ISO string
+                final deptimeUtc = selectedDateTime!.toUtc().toIso8601String();
+
+                final result = isEdit
+                    ? await ApiService.updateTrip(
+                        trip['tripid']?.toString() ?? '',
+                        lineid: selectedLineId,
+                        vehicleid: selectedVehicleId,
+                        deptime: deptimeUtc,
+                        availableseats: availableSeats,
+                        direction: selectedDirection,
+                        status: selectedStatus,
+                      )
+                    : await ApiService.createTrip(
+                        lineid: selectedLineId!,
+                        vehicleid: selectedVehicleId,
+                        deptime: deptimeUtc,
+                        availableseats: availableSeats,
+                        direction: selectedDirection,
+                      );
+
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(result['message'] ?? (isEdit ? t('tripUpdated') : t('tripCreated'))),
+                      backgroundColor: result['success'] == true ? Colors.green : Colors.redAccent,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  if (result['success'] == true) {
+                    _loadData();
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.appBarColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(t('save'), style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
       ),
     );
   }

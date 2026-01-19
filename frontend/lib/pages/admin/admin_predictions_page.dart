@@ -420,7 +420,7 @@ class _AdminPredictionsPageState extends State<AdminPredictionsPage> {
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: Text(
-          'AI Predictions',
+          'Statistical Predictions',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,

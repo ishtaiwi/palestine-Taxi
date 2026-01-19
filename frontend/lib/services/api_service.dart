@@ -2978,6 +2978,108 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> createTrip({
+    required String lineid,
+    String? vehicleid,
+    required String deptime,
+    int? availableseats,
+    String? direction,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final body = <String, dynamic>{
+        'lineid': lineid,
+        'deptime': deptime,
+      };
+      if (vehicleid != null && vehicleid.isNotEmpty) {
+        body['vehicleid'] = vehicleid;
+      }
+      if (availableseats != null) {
+        body['availableseats'] = availableseats;
+      }
+      if (direction != null && direction.isNotEmpty) {
+        body['direction'] = direction;
+      }
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/trips'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 201,
+        'message': decoded['message'] ??
+            (response.statusCode == 201
+                ? 'Trip created successfully'
+                : 'Failed to create trip'),
+        'trip': decoded['trip'],
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateTrip(
+    String tripid, {
+    String? lineid,
+    String? vehicleid,
+    String? deptime,
+    int? availableseats,
+    String? direction,
+    String? status,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final body = <String, dynamic>{};
+      if (lineid != null) body['lineid'] = lineid;
+      if (vehicleid != null) body['vehicleid'] = vehicleid;
+      if (deptime != null) body['deptime'] = deptime;
+      if (availableseats != null) body['availableseats'] = availableseats;
+      if (direction != null) body['direction'] = direction;
+      if (status != null) body['status'] = status;
+
+      final response = await http
+          .put(
+            Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripid'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'message': decoded['message'] ??
+            (response.statusCode == 200
+                ? 'Trip updated successfully'
+                : 'Failed to update trip'),
+        'trip': decoded['trip'],
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
   static Future<Map<String, dynamic>> deleteTrip(String tripid) async {
     try {
       final token = await getToken();

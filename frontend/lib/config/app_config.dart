@@ -6,11 +6,11 @@ class AppConfig {
 
   static String get _baseUrl {
     if (kIsWeb) {
-      return 'http://localhost:3000';
+      return 'http://192.168.1.110:3000';
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://192.168.1.2:3000';
+      return 'http://192.168.1.110:3000';
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       return 'http://localhost:3000';
     }

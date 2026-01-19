@@ -6,6 +6,7 @@ import { distributeAllBookings, syncTripStats } from './matchingService.js';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
 import logger from '../utils/logger.js';
 import { getUtcNow, parseUtcDate } from '../utils/timeUtils.js';
+import { TRIP_STATUS } from '../utils/constants.js';
 
 /**
  * Assign a vehicle to a trip from the driver queue
@@ -741,6 +742,112 @@ export const markTripsAsDelayed = async () => {
     };
   } catch (error) {
     logger.error('[TripOpeningService] ❌ Error marking trips as delayed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Cancel delayed trips that have no bookings
+ * This should run periodically to clean up trips that were marked as delayed but never got any bookings
+ * @returns {Promise<object>} - Cancellation results
+ */
+export const cancelDelayedTripsWithNoBookings = async () => {
+  try {
+    logger.info('[TripOpeningService] 🔍 Checking delayed trips for cancellation (no bookings)');
+
+    // Get all delayed trips
+    const delayedTrips = await Trip.findAll({ status: TRIP_STATUS.DELAYED });
+
+    if (delayedTrips.length === 0) {
+      return {
+        success: true,
+        cancelled: 0,
+        trips: [],
+      };
+    }
+
+    logger.info(`[TripOpeningService] Found ${delayedTrips.length} delayed trips to check`);
+
+    const tripsToCancel = [];
+    const results = [];
+
+    for (const trip of delayedTrips) {
+      try {
+        // Check if trip has any bookings
+        const reservations = await Reservation.findByTripId(trip.tripid);
+        const activeReservations = reservations.filter(
+          r => r.status === 'confirmed' || r.status === 'checked_in'
+        );
+
+        // Also check for future bookings that might be assigned to this trip
+        let futureBookingsCount = 0;
+        if (trip.deptime && trip.lineid) {
+          try {
+            const futureBookings = await Reservation.findFutureBookingsForTrip(
+              trip.deptime,
+              { lineid: trip.lineid }
+            );
+            // Count future bookings assigned to this specific trip
+            futureBookingsCount = futureBookings.filter(b =>
+              b.tripid === trip.tripid &&
+              (b.status === 'confirmed' || b.status === 'checked_in')
+            ).length;
+          } catch (error) {
+            logger.warn(`[TripOpeningService] ⚠️ Error checking future bookings for trip ${trip.tripid}:`, error);
+          }
+        }
+
+        const totalBookings = activeReservations.length + futureBookingsCount;
+
+        // If no bookings at all, mark for cancellation
+        if (totalBookings === 0) {
+          tripsToCancel.push(trip);
+          logger.info(`[TripOpeningService] ❌ Trip ${trip.tripid} has no bookings and is delayed - marking for cancellation`);
+        } else {
+          logger.debug(`[TripOpeningService] ✅ Trip ${trip.tripid} has ${totalBookings} booking(s) - keeping as delayed`);
+        }
+      } catch (error) {
+        logger.error(`[TripOpeningService] ❌ Error checking bookings for trip ${trip.tripid}:`, error);
+        // Continue with other trips if one fails
+      }
+    }
+
+    if (tripsToCancel.length === 0) {
+      return {
+        success: true,
+        cancelled: 0,
+        trips: [],
+      };
+    }
+
+    logger.info(`[TripOpeningService] 🚫 Cancelling ${tripsToCancel.length} delayed trips with no bookings`);
+
+    for (const trip of tripsToCancel) {
+      try {
+        await Trip.update(trip.tripid, { status: TRIP_STATUS.CANCELLED });
+        results.push({
+          tripid: trip.tripid,
+          success: true,
+        });
+        logger.info(`[TripOpeningService] ✅ Trip ${trip.tripid} cancelled (no bookings)`);
+      } catch (error) {
+        logger.error(`[TripOpeningService] ❌ Error cancelling trip ${trip.tripid}:`, error);
+        results.push({
+          tripid: trip.tripid,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      cancelled: results.filter(r => r.success).length,
+      total: tripsToCancel.length,
+      trips: results,
+    };
+  } catch (error) {
+    logger.error('[TripOpeningService] ❌ Error cancelling delayed trips with no bookings:', error);
     throw error;
   }
 };

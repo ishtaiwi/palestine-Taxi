@@ -34,6 +34,7 @@ import walkinRoutes from './routes/walkinRoutes.js';
 import { startTripOpeningJob } from './jobs/tripOpeningJob.js';
 import { startDepartureCheckJob } from './jobs/departureCheckJob.js';
 import { startDelayedTripCheckJob } from './jobs/delayedTripCheckJob.js';
+import { startCancelDelayedTripsJob } from './jobs/cancelDelayedTripsJob.js';
 import { startNoShowCheckJob } from './jobs/noShowCheckJob.js';
 import { startDailyTripCreationJob } from './jobs/dailyTripCreationJob.js';
 import { startPredictionUpdateJob } from './jobs/predictionUpdateJob.js';
@@ -194,6 +195,7 @@ app.listen(PORT, async () => {
     logger.info('Starting background jobs...');
     startTripOpeningJob();
     startDelayedTripCheckJob();
+    startCancelDelayedTripsJob();
     startDepartureCheckJob();
     startNoShowCheckJob();
     startDailyTripCreationJob();

@@ -20,10 +20,14 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
   bool _isLoading = false;
   String? _error;
   bool _isArabic = true;
+  bool _showOnScreenKeyboard = false;
 
   // Step 1: Line selection
   List<Map<String, dynamic>> _lines = [];
+  List<Map<String, dynamic>> _filteredLines = [];
   Map<String, dynamic>? _selectedLine;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   // Step 2: Phone number
   final TextEditingController _phoneController = TextEditingController();
@@ -76,11 +80,15 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
       'welcomeDesc': 'احجز رحلتك بسهولة من هنا',
       'switchLanguage': 'English',
       'driverInfo': 'معلومات السائق',
+      'searchLines': 'ابحث عن خط',
+      'searchHint': 'اكتب للبحث...',
       'driverName': 'اسم السائق',
       'driverPhone': 'هاتف السائق',
       'vehicleInfo': 'معلومات المركبة',
       'plateNumber': 'رقم اللوحة',
       'noDriverAssigned': 'سيتم تعيين سائق قريباً',
+      'driverAssigned': 'سائق معين',
+      'driversInQueue': 'سائقين في قائمة الانتظار',
     },
     'en': {
       'title': 'Book a Ticket',
@@ -119,11 +127,15 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
       'welcomeDesc': 'Book your trip easily from here',
       'switchLanguage': 'العربية',
       'driverInfo': 'Driver Information',
+      'searchLines': 'Search for line',
+      'searchHint': 'Type to search...',
       'driverName': 'Driver Name',
       'driverPhone': 'Driver Phone',
       'vehicleInfo': 'Vehicle Information',
       'plateNumber': 'Plate Number',
       'noDriverAssigned': 'Driver will be assigned soon',
+      'driverAssigned': 'Driver assigned',
+      'driversInQueue': 'drivers in queue',
     },
   };
 
@@ -141,6 +153,8 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
   @override
   void dispose() {
     _phoneController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -159,6 +173,7 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
                     ?.map((e) => Map<String, dynamic>.from(e as Map))
                     .toList() ??
                 [];
+            _filteredLines = _lines;
             _isLoading = false;
           });
         } else {
@@ -176,6 +191,24 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
         });
       }
     }
+  }
+
+  void _filterLines(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredLines = _lines;
+      } else {
+        final lowerQuery = query.toLowerCase();
+        _filteredLines = _lines.where((line) {
+          final nameAr = (line['name_ar'] ?? '').toString().toLowerCase();
+          final nameEn = (line['name_en'] ?? '').toString().toLowerCase();
+          final lineName = (line['linename'] ?? '').toString().toLowerCase();
+          return nameAr.contains(lowerQuery) ||
+              nameEn.contains(lowerQuery) ||
+              lineName.contains(lowerQuery);
+        }).toList();
+      }
+    });
   }
 
   Future<void> _loadTrips() async {
@@ -338,6 +371,9 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
       _bookingResult = null;
       _trips = [];
       _error = null;
+      _searchController.clear();
+      _filteredLines = _lines;
+      _searchFocusNode.unfocus();
     });
   }
 
@@ -368,7 +404,7 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Reduced padding
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF1E3A5F), Color(0xFF0A1929)],
@@ -378,20 +414,20 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
       ),
       child: Row(
         children: [
-          // Logo or icon
+          // Logo or icon - smaller
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8), // Reduced padding
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8), // Smaller border radius
             ),
             child: const Icon(
               Icons.directions_car,
               color: Colors.white,
-              size: 32,
+              size: 24, // Smaller icon
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12), // Reduced spacing
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -400,11 +436,11 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
                   t('title'),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 28,
+                    fontSize: 20, // Smaller font
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2), // Reduced spacing
                 _buildStepIndicator(),
               ],
             ),
@@ -420,7 +456,7 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
               t('switchLanguage'),
               style: const TextStyle(
                 color: Colors.white70,
-                fontSize: 16,
+                fontSize: 14, // Smaller font
               ),
             ),
           ),
@@ -563,7 +599,7 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Reduced padding
           child: Column(
             children: [
               Text(
@@ -582,6 +618,103 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
                   fontSize: 16,
                 ),
               ),
+              const SizedBox(height: 16),
+              // Search bar
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  // Show on-screen keyboard when search area is tapped
+                  setState(() {
+                    _showOnScreenKeyboard = true;
+                  });
+                  _searchFocusNode.requestFocus();
+                },
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _searchController,
+                  builder: (context, value, child) {
+                    return TextField(
+                      controller: _searchController,
+                      focusNode: _searchFocusNode,
+                      onChanged: _filterLines,
+                      keyboardType: TextInputType.none, // Disable system keyboard
+                      textInputAction: TextInputAction.search,
+                      enableInteractiveSelection: false, // Disable text selection
+                      showCursor: true,
+                      readOnly: true, // Make it read-only to prevent system keyboard
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                      ),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.1),
+                        hintText: t('searchHint'),
+                        hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.4),
+                          fontSize: 20,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: Colors.white.withOpacity(0.7),
+                          size: 28,
+                        ),
+                        suffixIcon: value.text.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Colors.white.withOpacity(0.7),
+                                  size: 24,
+                                ),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _filterLines('');
+                                  setState(() {
+                                    _showOnScreenKeyboard = false;
+                                  });
+                                  _searchFocusNode.unfocus();
+                                },
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.white.withOpacity(0.3),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.white.withOpacity(0.3),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.white.withOpacity(0.6),
+                            width: 2,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 16,
+                        ),
+                      ),
+                      onTap: () {
+                        // Show on-screen keyboard on tap
+                        setState(() {
+                          _showOnScreenKeyboard = true;
+                        });
+                        _searchFocusNode.requestFocus();
+                      },
+                    );
+                  },
+                ),
+              ),
+              // On-screen keyboard
+              if (_showOnScreenKeyboard) ...[
+                const SizedBox(height: 16),
+                _buildOnScreenKeyboard(),
+              ],
             ],
           ),
         ),
@@ -596,17 +729,38 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
                     ),
                   ),
                 )
-              : GridView.builder(
-                  padding: const EdgeInsets.all(20),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 1.5,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: _lines.length,
-                  itemBuilder: (context, index) {
-                    final line = _lines[index];
+              : _filteredLines.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            color: Colors.white54,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            '${t('noLines')} (${t('searchHint')})',
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.all(12), // Reduced padding
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3, // Increased from 2 to 3 columns
+                        childAspectRatio: 6.0, // 1/5 of original height (1.2 * 5 = 6.0)
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                      ),
+                      itemCount: _filteredLines.length,
+                      itemBuilder: (context, index) {
+                        final line = _filteredLines[index];
                     final isSelected =
                         _selectedLine?['lineid'] == line['lineid'];
                     final lineName = _isArabic
@@ -642,38 +796,46 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
                           ),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Icon(
                                 Icons.route,
                                 color: isSelected ? Colors.white : Colors.blue,
-                                size: 36,
+                                size: 20,
                               ),
-                              const SizedBox(height: 12),
-                              Text(
-                                lineName,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : Colors.white.withOpacity(0.9),
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '₪$price',
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? Colors.white70
-                                      : Colors.green,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      lineName,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.white.withOpacity(0.9),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '₪$price',
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? Colors.white70
+                                            : Colors.green,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -835,6 +997,178 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
         if (_phoneController.text.length < 10) {
           _phoneController.text = _phoneController.text + key;
         }
+      }
+    });
+  }
+
+  Widget _buildOnScreenKeyboard() {
+    // English keyboard layout
+    final englishKeyboardRows = [
+      // Numbers row
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+      // First letter row
+      ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+      // Second letter row
+      ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
+      // Third letter row
+      ['z', 'x', 'c', 'v', 'b', 'n', 'm'],
+      // Space and controls
+      [' ', '⌫'],
+    ];
+
+    // Arabic keyboard layout
+    final arabicKeyboardRows = [
+      // Numbers row
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+      // First letter row
+      ['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح', 'ج'],
+      // Second letter row
+      ['ش', 'س', 'ي', 'ب', 'ل', 'ا', 'ت', 'ن', 'م', 'ك'],
+      // Third letter row
+      ['ط', 'ئ', 'ء', 'ؤ', 'ر', 'لا', 'ى', 'ة', 'و', 'ز', 'ظ', 'ذ', 'د'],
+      // Space and controls
+      [' ', '⌫'],
+    ];
+
+    final keyboardRows = _isArabic ? arabicKeyboardRows : englishKeyboardRows;
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 300), // Limit height to prevent overflow
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: SingleChildScrollView( // Make keyboard scrollable
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header with close button and language toggle
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Language toggle
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isArabic = !_isArabic;
+                    });
+                  },
+                  child: Text(
+                    _isArabic ? 'English' : 'العربية',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                // Close button
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _showOnScreenKeyboard = false;
+                    });
+                    _searchFocusNode.unfocus();
+                  },
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ],
+            ),
+            // Keyboard rows
+            ...keyboardRows.map((row) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: row.map((key) {
+                    final isSpace = key == ' ';
+                    final isBackspace = key == '⌫';
+                    final flex = isSpace ? 4 : (isBackspace ? 2 : 1);
+
+                    return Expanded(
+                      flex: flex,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1),
+                        child: SizedBox(
+                          height: 45, // Slightly smaller buttons
+                          child: ElevatedButton(
+                            onPressed: () => _onKeyboardKeyPress(key),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: key == '⌫'
+                                  ? Colors.red.withOpacity(0.3)
+                                  : Colors.white.withOpacity(0.15),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: Text(
+                              key,
+                              style: TextStyle(
+                                fontSize: _isArabic ? 16 : 18, // Smaller font for Arabic
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              );
+            }).toList(),
+            // Done button
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: SizedBox(
+                width: double.infinity,
+                height: 45,
+                child: ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _showOnScreenKeyboard = false;
+                    });
+                    _searchFocusNode.unfocus();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    _isArabic ? 'تم' : 'Done',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onKeyboardKeyPress(String key) {
+    setState(() {
+      if (key == '⌫') {
+        if (_searchController.text.isNotEmpty) {
+          _searchController.text = _searchController.text
+              .substring(0, _searchController.text.length - 1);
+          _filterLines(_searchController.text);
+        }
+      } else {
+        _searchController.text = _searchController.text + key;
+        _filterLines(_searchController.text);
       }
     });
   }
@@ -1040,6 +1374,37 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
                                         ),
                                       ],
                                     ),
+                                    const SizedBox(height: 6),
+                                    // Driver information
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          trip['hasDriver'] == true
+                                              ? Icons.person
+                                              : Icons.access_time,
+                                          color: trip['hasDriver'] == true
+                                              ? Colors.blue
+                                              : Colors.orange,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            trip['hasDriver'] == true
+                                                ? t('driverAssigned')
+                                                : (trip['driversInQueue'] != null && trip['driversInQueue'] > 0)
+                                                    ? '${t('noDriverAssigned')} (${trip['driversInQueue']} ${t('driversInQueue')})'
+                                                    : t('noDriverAssigned'),
+                                            style: TextStyle(
+                                              color: trip['hasDriver'] == true
+                                                  ? Colors.blue[200]
+                                                  : Colors.orange[200],
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ),
@@ -1082,6 +1447,12 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
     final bookingId = reservation?['bookingid']?.toString() ?? '';
     final shortBookingId =
         bookingId.length > 8 ? bookingId.substring(0, 8) : bookingId;
+
+    // Debug logging
+    print('Driver data: $driver');
+    if (driver != null && driver['vehicle'] != null) {
+      print('Vehicle data: ${driver['vehicle']}');
+    }
 
     return Center(
       child: SingleChildScrollView(
@@ -1202,31 +1573,32 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
                             ],
                           ),
                         ),
-                      // Vehicle info
-                      if (driver['vehicle'] != null) ...[
-                        const Divider(color: Colors.white24, height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.directions_car,
+                      // Vehicle info - Always show this section
+                      const Divider(color: Colors.white24, height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.directions_car,
+                            color: Colors.amber,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            t('vehicleInfo'),
+                            style: const TextStyle(
                               color: Colors.amber,
-                              size: 24,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              t('vehicleInfo'),
-                              style: const TextStyle(
-                                color: Colors.amber,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      // Show vehicle details if available
+                      if (driver['vehicle'] != null && driver['vehicle'] is Map) ...[
                         // Plate number
-                        if (driver['vehicle']['platenumber'] != null)
+                        if (driver['vehicle']['platenumber'] != null && driver['vehicle']['platenumber'].toString().isNotEmpty)
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),
@@ -1244,18 +1616,49 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
                               ),
                             ),
                           ),
-                        const SizedBox(height: 8),
+                        if (driver['vehicle']['platenumber'] != null && driver['vehicle']['platenumber'].toString().isNotEmpty)
+                          const SizedBox(height: 8),
                         // Make, model, color
+                        Builder(
+                          builder: (context) {
+                            final vehicleDetails = [
+                              if (driver['vehicle']['make'] != null && driver['vehicle']['make'].toString().isNotEmpty)
+                                driver['vehicle']['make'],
+                              if (driver['vehicle']['model'] != null && driver['vehicle']['model'].toString().isNotEmpty)
+                                driver['vehicle']['model'],
+                              if (driver['vehicle']['color'] != null && driver['vehicle']['color'].toString().isNotEmpty)
+                                driver['vehicle']['color'],
+                            ].where((e) => e != null).toList();
+
+                            if (vehicleDetails.isNotEmpty) {
+                              return Text(
+                                vehicleDetails.join(' • '),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              );
+                            }
+                            return Text(
+                              'Vehicle details will be available soon',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            );
+                          },
+                        ),
+                      ] else ...[
+                        // No vehicle information available
                         Text(
-                          [
-                            driver['vehicle']['make'],
-                            driver['vehicle']['model'],
-                            driver['vehicle']['color'],
-                          ].where((e) => e != null).join(' • '),
+                          'Vehicle will be assigned soon',
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 14,
+                            fontStyle: FontStyle.italic,
                           ),
+                          textAlign: TextAlign.center,
                         ),
                       ],
                     ],
@@ -1385,7 +1788,7 @@ class _WalkinTerminalPageState extends State<WalkinTerminalPage> {
 
   Widget _buildNavigationButtons() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Reduced padding
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.3),
       ),

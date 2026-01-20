@@ -20,6 +20,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
   bool _isLoading = true;
   String? _error;
   List<Map<String, dynamic>> _trips = [];
+  List<Map<String, dynamic>> _completedTrips = [];
   final Map<String, List<Map<String, dynamic>>> _reservations = {};
   final Set<String> _loadingReservations = {};
   final Set<String> _mutatingReservations = {};
@@ -28,6 +29,9 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     'ar': {
       'title': 'رحلاتي',
       'subtitle': 'تابع رحلاتك القادمة وطلبات الركاب',
+      'completedTrips': 'الرحلات المكتملة',
+      'completedSubtitle': 'الرحلات السابقة مع تفاصيل الركاب',
+      'noCompletedTrips': 'لا توجد رحلات مكتملة بعد',
       'noTrips': 'لا توجد رحلات قادمة حالياً',
       'departure': 'موعد الانطلاق',
       'line': 'الخط',
@@ -35,6 +39,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       'seats': 'المقاعد المتاحة',
       'bookings': 'الحجوزات',
       'reservations': 'طلبات الحجز',
+      'passengers': 'الركاب',
       'passenger': 'الراكب',
       'seat': 'المقعد',
       'accept': 'قبول',
@@ -57,6 +62,9 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     'en': {
       'title': 'My Trips',
       'subtitle': 'Track upcoming trips and passenger requests',
+      'completedTrips': 'Completed Trips',
+      'completedSubtitle': 'Past trips with passenger details',
+      'noCompletedTrips': 'No completed trips yet',
       'noTrips': 'No upcoming trips yet',
       'departure': 'Departure',
       'line': 'Line',
@@ -64,6 +72,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       'seats': 'Seats left',
       'bookings': 'Bookings',
       'reservations': 'Seat requests',
+      'passengers': 'Passengers',
       'passenger': 'Passenger',
       'seat': 'Seat',
       'accept': 'Approve',
@@ -176,10 +185,24 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     });
 
     try {
-      final trips = await ApiService.fetchDriverTrips(upcomingOnly: true);
+      final upcomingTrips =
+          await ApiService.fetchDriverTrips(upcomingOnly: true);
+      final completedTrips = await ApiService.fetchDriverTrips(
+        upcomingOnly: false,
+        status: 'completed',
+      );
+
+      // Show most recent completed trips first
+      completedTrips.sort((a, b) {
+        final aDate = a['deptime']?.toString() ?? '';
+        final bDate = b['deptime']?.toString() ?? '';
+        return bDate.compareTo(aDate);
+      });
+
       if (!mounted) return;
       setState(() {
-        _trips = trips;
+        _trips = upcomingTrips;
+        _completedTrips = completedTrips;
       });
     } catch (error) {
       if (!mounted) return;
@@ -776,7 +799,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       );
     }
 
-    if (_trips.isEmpty) {
+    if (_trips.isEmpty && _completedTrips.isEmpty) {
       return Center(
         child: Text(
           t('noTrips'),
@@ -788,13 +811,29 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       );
     }
 
+    Widget buildEmptyLabel(String text) {
+      return Padding(
+        padding: EdgeInsets.symmetric(
+            vertical: isSmallScreen ? 6.0 : (isMediumScreen ? 8.0 : 10.0)),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: textSecondaryColor,
+            fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0),
+          ),
+        ),
+      );
+    }
+
+    final showWebGrid = isWeb && (isDesktop || isTablet);
+
     return RefreshIndicator(
       color: Colors.orange,
       onRefresh: _loadTrips,
       child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxContentWidth),
-          child: isWeb && (isDesktop || isTablet) && _trips.isNotEmpty
+          child: showWebGrid
               ? SingleChildScrollView(
                   padding: EdgeInsets.all(basePadding),
                   child: Column(
@@ -804,19 +843,19 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                         t('subtitle'),
                         style: TextStyle(
                           color: textSecondaryColor,
-                          fontSize: isWeb
-                              ? (isDesktop ? 16.0 : 15.0)
-                              : (isSmallScreen
-                                  ? 12.0
-                                  : (isMediumScreen ? 13.0 : 14.0)),
+                          fontSize: isDesktop ? 16.0 : 15.0,
                         ),
                       ),
                       SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                      Wrap(
-                        spacing: 16.0,
-                        runSpacing: 16.0,
-                        children: _trips
-                            .map((trip) => SizedBox(
+                      if (_trips.isEmpty)
+                        buildEmptyLabel(t('noTrips'))
+                      else
+                        Wrap(
+                          spacing: 16.0,
+                          runSpacing: 16.0,
+                          children: _trips
+                              .map(
+                                (trip) => SizedBox(
                                   width: isDesktop
                                       ? (maxContentWidth - 64) / 2
                                       : double.infinity,
@@ -824,9 +863,52 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                                       isSmallScreen: isSmallScreen,
                                       isMediumScreen: isMediumScreen,
                                       isWeb: isWeb),
-                                ))
-                            .toList(),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      SizedBox(height: isSmallScreen ? 18.0 : 22.0),
+                      Text(
+                        t('completedTrips'),
+                        style: TextStyle(
+                          color: textPrimaryColor,
+                          fontSize: isSmallScreen
+                              ? 15.0
+                              : (isMediumScreen ? 16.0 : 17.0),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
+                      SizedBox(height: isSmallScreen ? 6.0 : 8.0),
+                      Text(
+                        t('completedSubtitle'),
+                        style: TextStyle(
+                          color: textSecondaryColor,
+                          fontSize: isDesktop ? 15.0 : 14.0,
+                        ),
+                      ),
+                      SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                      if (_completedTrips.isEmpty)
+                        buildEmptyLabel(t('noCompletedTrips'))
+                      else
+                        Wrap(
+                          spacing: 16.0,
+                          runSpacing: 16.0,
+                          children: _completedTrips
+                              .map(
+                                (trip) => SizedBox(
+                                  width: isDesktop
+                                      ? (maxContentWidth - 64) / 2
+                                      : double.infinity,
+                                  child: _buildTripTile(trip,
+                                      isSmallScreen: isSmallScreen,
+                                      isMediumScreen: isMediumScreen,
+                                      isWeb: isWeb,
+                                      showActions: false,
+                                      reservationsTitle: t('passengers')),
+                                ),
+                              )
+                              .toList(),
+                        ),
                     ],
                   ),
                 )
@@ -843,10 +925,44 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                       ),
                     ),
                     SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                    ..._trips.map((trip) => _buildTripTile(trip,
-                        isSmallScreen: isSmallScreen,
-                        isMediumScreen: isMediumScreen,
-                        isWeb: isWeb)),
+                    if (_trips.isEmpty)
+                      buildEmptyLabel(t('noTrips'))
+                    else
+                      ..._trips.map((trip) => _buildTripTile(trip,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                          isWeb: isWeb)),
+                    SizedBox(height: isSmallScreen ? 18.0 : 22.0),
+                    Text(
+                      t('completedTrips'),
+                      style: TextStyle(
+                        color: textPrimaryColor,
+                        fontSize: isSmallScreen
+                            ? 15.0
+                            : (isMediumScreen ? 16.0 : 17.0),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: isSmallScreen ? 6.0 : 8.0),
+                    Text(
+                      t('completedSubtitle'),
+                      style: TextStyle(
+                        color: textSecondaryColor,
+                        fontSize: isSmallScreen
+                            ? 12.0
+                            : (isMediumScreen ? 13.0 : 14.0),
+                      ),
+                    ),
+                    SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                    if (_completedTrips.isEmpty)
+                      buildEmptyLabel(t('noCompletedTrips'))
+                    else
+                      ..._completedTrips.map((trip) => _buildTripTile(trip,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                          isWeb: isWeb,
+                          showActions: false,
+                          reservationsTitle: t('passengers'))),
                   ],
                 ),
         ),
@@ -854,14 +970,22 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     );
   }
 
-  Widget _buildTripTile(Map<String, dynamic> trip,
-      {bool isSmallScreen = false,
-      bool isMediumScreen = false,
-      bool isWeb = false}) {
+  Widget _buildTripTile(
+    Map<String, dynamic> trip, {
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+    bool isWeb = false,
+    bool showActions = true,
+    String? reservationsTitle,
+  }) {
     final tripId = trip['tripid']?.toString() ?? '';
     final line = trip['line'] as Map<String, dynamic>? ?? {};
     final departureTime = _formatDateTime(trip['deptime']);
     final status = trip['status']?.toString() ?? 'scheduled';
+    final isCompleted = status == 'completed' || status == 'cancelled';
+    final shouldShowActions = showActions && !isCompleted;
+    final reservationsLabel =
+        reservationsTitle ?? (isCompleted ? t('passengers') : t('reservations'));
 
     final cardColor =
         _isDarkMode ? const Color(0xFF1C2541) : const Color(0xFFFAFBFC);
@@ -948,103 +1072,32 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
             ),
           ],
           SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-          // Trip Actions
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => QRScannerPage(tripId: tripId),
-                      ),
-                    ).then((_) => _loadReservations(tripId));
-                  },
-                  icon: Icon(
-                    Icons.qr_code_scanner,
-                    size: isSmallScreen ? 18.0 : 20.0,
-                  ),
-                  label: Text(
-                    t('checkinQR'),
-                    style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _isDarkMode ? Colors.white : Colors.green,
-                    side: const BorderSide(color: Colors.green),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isSmallScreen ? 8.0 : 12.0,
-                      vertical: isSmallScreen ? 10.0 : 12.0,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-              if (status == 'open' ||
-                  status == 'scheduled' ||
-                  status == 'delayed')
+          if (shouldShowActions) ...[
+            // Trip Actions
+            Row(
+              children: [
                 Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => _startTrip(tripId, trip),
-                    icon: Icon(
-                      Icons.play_arrow,
-                      size: isSmallScreen ? 18.0 : 20.0,
-                    ),
-                    label: Text(
-                      t('startTrip'),
-                      style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isSmallScreen ? 8.0 : 12.0,
-                        vertical: isSmallScreen ? 10.0 : 12.0,
-                      ),
-                    ),
-                  ),
-                ),
-              if (status == 'in_progress') ...[
-                Expanded(
-                  child: FilledButton.icon(
+                  child: OutlinedButton.icon(
                     onPressed: () {
-                      final lineData =
-                          trip['line'] as Map<String, dynamic>? ?? {};
-                      final lineId = lineData['lineid']?.toString() ?? '';
-                      final lineName = _isArabic
-                          ? (lineData['name_ar']?.toString() ??
-                              lineData['linename']?.toString() ??
-                              lineData['name_en']?.toString() ??
-                              '')
-                          : (lineData['name_en']?.toString() ??
-                              lineData['linename']?.toString() ??
-                              lineData['name_ar']?.toString() ??
-                              '');
-
-                      if (lineId.isNotEmpty) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DriverNavigationPage(
-                              tripId: tripId,
-                              lineId: lineId,
-                              lineName: lineName,
-                            ),
-                          ),
-                        ).then((_) => _loadTrips());
-                      }
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => QRScannerPage(tripId: tripId),
+                        ),
+                      ).then((_) => _loadReservations(tripId));
                     },
                     icon: Icon(
-                      Icons.navigation,
+                      Icons.qr_code_scanner,
                       size: isSmallScreen ? 18.0 : 20.0,
                     ),
                     label: Text(
-                      t('navigate'),
+                      t('checkinQR'),
                       style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
                     ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor:
+                          _isDarkMode ? Colors.white : Colors.green,
+                      side: const BorderSide(color: Colors.green),
                       padding: EdgeInsets.symmetric(
                         horizontal: isSmallScreen ? 8.0 : 12.0,
                         vertical: isSmallScreen ? 10.0 : 12.0,
@@ -1053,33 +1106,112 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
                   ),
                 ),
                 SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => _endTrip(tripId),
-                    icon: Icon(
-                      Icons.stop,
-                      size: isSmallScreen ? 18.0 : 20.0,
-                    ),
-                    label: Text(
-                      t('endTrip'),
-                      style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isSmallScreen ? 8.0 : 12.0,
-                        vertical: isSmallScreen ? 10.0 : 12.0,
+                if (status == 'open' ||
+                    status == 'scheduled' ||
+                    status == 'delayed')
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _startTrip(tripId, trip),
+                      icon: Icon(
+                        Icons.play_arrow,
+                        size: isSmallScreen ? 18.0 : 20.0,
+                      ),
+                      label: Text(
+                        t('startTrip'),
+                        style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 8.0 : 12.0,
+                          vertical: isSmallScreen ? 10.0 : 12.0,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                if (status == 'in_progress') ...[
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        final lineData =
+                            trip['line'] as Map<String, dynamic>? ?? {};
+                        final lineId = lineData['lineid']?.toString() ?? '';
+                        final lineName = _isArabic
+                            ? (lineData['name_ar']?.toString() ??
+                                lineData['linename']?.toString() ??
+                                lineData['name_en']?.toString() ??
+                                '')
+                            : (lineData['name_en']?.toString() ??
+                                lineData['linename']?.toString() ??
+                                lineData['name_ar']?.toString() ??
+                                '');
+
+                        if (lineId.isNotEmpty) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => DriverNavigationPage(
+                                tripId: tripId,
+                                lineId: lineId,
+                                lineName: lineName,
+                              ),
+                            ),
+                          ).then((_) => _loadTrips());
+                        }
+                      },
+                      icon: Icon(
+                        Icons.navigation,
+                        size: isSmallScreen ? 18.0 : 20.0,
+                      ),
+                      label: Text(
+                        t('navigate'),
+                        style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 8.0 : 12.0,
+                          vertical: isSmallScreen ? 10.0 : 12.0,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _endTrip(tripId),
+                      icon: Icon(
+                        Icons.stop,
+                        size: isSmallScreen ? 18.0 : 20.0,
+                      ),
+                      label: Text(
+                        t('endTrip'),
+                        style: TextStyle(fontSize: isSmallScreen ? 12.0 : 14.0),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 8.0 : 12.0,
+                          vertical: isSmallScreen ? 10.0 : 12.0,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
+            SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+          ] else
+            SizedBox(height: isSmallScreen ? 6.0 : 8.0),
+          _buildReservationsSection(
+            tripId,
+            isSmallScreen: isSmallScreen,
+            isMediumScreen: isMediumScreen,
+            title: reservationsLabel,
           ),
-          SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-          _buildReservationsSection(tripId,
-              isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
         ],
       ),
     );
@@ -1140,10 +1272,15 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
     );
   }
 
-  Widget _buildReservationsSection(String tripId,
-      {bool isSmallScreen = false, bool isMediumScreen = false}) {
+  Widget _buildReservationsSection(
+    String tripId, {
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+    String? title,
+  }) {
     final loading = _loadingReservations.contains(tripId);
     final reservations = _reservations[tripId];
+    final sectionTitle = title ?? t('reservations');
 
     if (loading) {
       return Center(
@@ -1158,7 +1295,7 @@ class _DriverTripsPageState extends State<DriverTripsPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          t('reservations'),
+          sectionTitle,
           style: TextStyle(
             color: _isDarkMode ? Colors.white : const Color(0xFF1E3A5F),
             fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),

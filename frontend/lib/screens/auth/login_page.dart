@@ -7,7 +7,6 @@ import '../../services/api_service.dart';
 import '../../pages/passenger/passenger_home.dart';
 import '../../pages/driver/driver_home.dart';
 import '../../pages/admin/admin_dashboard.dart';
-import '../../pages/terminal/walkin_terminal_page.dart';
 
 class TaxiPalestineApp extends StatelessWidget {
   const TaxiPalestineApp({super.key});
@@ -78,15 +77,7 @@ class TaxiPalestineApp extends StatelessWidget {
       // Use onGenerateRoute to handle initial route for terminal mode
       initialRoute: '/',
       onGenerateRoute: (settings) {
-        // Allow direct access to terminal without authentication
-        if (settings.name == '/terminal') {
-          return MaterialPageRoute(
-            builder: (_) => const WalkinTerminalPage(),
-            settings: settings,
-          );
-        }
-
-        // Handle other routes
+        // Handle routes
         switch (settings.name) {
           case '/':
             return MaterialPageRoute(builder: (_) => const _StartupRouter());
@@ -202,8 +193,6 @@ class _LoginScreenState extends State<LoginScreen> {
       'enterPassword': 'أدخل كلمة المرور',
       'ctaLogin': 'دخول',
       'ctaRegister': 'إنشاء حساب مسافر',
-      'trust': 'موثوق من النقابات الفلسطينية',
-      'terminal': 'محطة الحجز للمسافرين',
     },
     'en': {
       'appTitle': 'Pal Taxi',
@@ -216,8 +205,6 @@ class _LoginScreenState extends State<LoginScreen> {
       'enterPassword': 'Enter your password',
       'ctaLogin': 'Sign in',
       'ctaRegister': 'Create passenger account',
-      'trust': 'Trusted by Palestinian unions',
-      'terminal': 'Walk-in Booking Terminal',
     },
   };
 
@@ -406,7 +393,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           onSubmit: _handleLogin,
                           onForgotPassword: _handleForgotPassword,
                           onRegister: _openRegisterScreen,
-                          onTerminal: _openTerminal,
                           isDesktop: isDesktop,
                           isTablet: isTablet,
                           isLargeScreen: isLargeScreen,
@@ -446,15 +432,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     }
-  }
-
-  void _openTerminal() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const WalkinTerminalPage(),
-      ),
-    );
   }
 
   Future<void> _handleForgotPassword() async {
@@ -668,7 +645,6 @@ class _FormCard extends StatelessWidget {
   final Future<void> Function() onSubmit;
   final VoidCallback onForgotPassword;
   final VoidCallback onRegister;
-  final VoidCallback onTerminal;
   final String Function(String key) t;
   final bool isDesktop;
   final bool isTablet;
@@ -686,7 +662,6 @@ class _FormCard extends StatelessWidget {
     required this.onSubmit,
     required this.onForgotPassword,
     required this.onRegister,
-    required this.onTerminal,
     required this.t,
     this.isDesktop = false,
     this.isTablet = false,
@@ -770,6 +745,7 @@ class _FormCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       fontSize: titleFontSize,
+                      color: Colors.black87,
                     ),
               ),
               SizedBox(
@@ -782,7 +758,10 @@ class _FormCard extends StatelessWidget {
               TextFormField(
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
-                style: TextStyle(fontSize: bodyFontSize),
+                style: TextStyle(
+                  fontSize: bodyFontSize,
+                  color: Colors.black87,
+                ),
                 decoration: InputDecoration(
                   labelText: t('email'),
                   hintText: t('enterEmail'),
@@ -794,10 +773,14 @@ class _FormCard extends StatelessWidget {
                     horizontal: inputPadding,
                     vertical: verticalInputPadding,
                   ),
-                  labelStyle:
-                      TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
-                  hintStyle:
-                      TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
+                  labelStyle: TextStyle(
+                    fontSize: isSmallScreen ? 13.0 : bodyFontSize,
+                    color: Colors.black54,
+                  ),
+                  hintStyle: TextStyle(
+                    fontSize: isSmallScreen ? 13.0 : bodyFontSize,
+                    color: Colors.black45,
+                  ),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -819,7 +802,10 @@ class _FormCard extends StatelessWidget {
               TextFormField(
                 controller: passwordController,
                 obscureText: obscurePassword,
-                style: TextStyle(fontSize: bodyFontSize),
+                style: TextStyle(
+                  fontSize: bodyFontSize,
+                  color: Colors.black87,
+                ),
                 decoration: InputDecoration(
                   labelText: t('password'),
                   hintText: t('enterPassword'),
@@ -839,10 +825,14 @@ class _FormCard extends StatelessWidget {
                     horizontal: inputPadding,
                     vertical: verticalInputPadding,
                   ),
-                  labelStyle:
-                      TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
-                  hintStyle:
-                      TextStyle(fontSize: isSmallScreen ? 13.0 : bodyFontSize),
+                  labelStyle: TextStyle(
+                    fontSize: isSmallScreen ? 13.0 : bodyFontSize,
+                    color: Colors.black54,
+                  ),
+                  hintStyle: TextStyle(
+                    fontSize: isSmallScreen ? 13.0 : bodyFontSize,
+                    color: Colors.black45,
+                  ),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -951,107 +941,6 @@ class _FormCard extends StatelessWidget {
                             : (isLargeScreen
                                 ? 15
                                 : (isMediumScreen ? 14 : 13))),
-                  ),
-                ),
-              ),
-              SizedBox(height: isSmallScreen ? 8.0 : 10.0),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isDesktop
-                      ? 18
-                      : (isTablet
-                          ? 16
-                          : (isLargeScreen ? 16 : (isMediumScreen ? 14 : 12))),
-                  vertical: isDesktop
-                      ? 12
-                      : (isTablet
-                          ? 12
-                          : (isLargeScreen ? 11 : (isMediumScreen ? 10 : 9))),
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(
-                    isDesktop
-                        ? 20
-                        : (isTablet ? 18 : (isLargeScreen ? 16 : 14)),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.verified,
-                      color: Colors.orange.shade800,
-                      size: isDesktop
-                          ? 20
-                          : (isTablet
-                              ? 19
-                              : (isLargeScreen
-                                  ? 18
-                                  : (isMediumScreen ? 17 : 16))),
-                    ),
-                    SizedBox(width: isSmallScreen ? 6.0 : 8.0),
-                    Expanded(
-                      child: Text(
-                        t('trust'),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.orange.shade900,
-                              fontSize: isDesktop
-                                  ? 14
-                                  : (isTablet
-                                      ? 13
-                                      : (isLargeScreen
-                                          ? 13
-                                          : (isMediumScreen ? 12 : 11))),
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-              // Terminal access button
-              OutlinedButton.icon(
-                onPressed: onTerminal,
-                icon: Icon(
-                  Icons.touch_app,
-                  size: isDesktop
-                      ? 22
-                      : (isTablet
-                          ? 20
-                          : (isLargeScreen ? 19 : (isMediumScreen ? 18 : 17))),
-                  color: Colors.teal,
-                ),
-                label: Text(
-                  t('terminal'),
-                  style: TextStyle(
-                    fontSize: isDesktop
-                        ? 15
-                        : (isTablet
-                            ? 14
-                            : (isLargeScreen
-                                ? 14
-                                : (isMediumScreen ? 13 : 12))),
-                    color: Colors.teal,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(
-                    vertical: isDesktop
-                        ? 14
-                        : (isTablet
-                            ? 14
-                            : (isLargeScreen
-                                ? 13
-                                : (isMediumScreen ? 12 : 11))),
-                  ),
-                  side: const BorderSide(color: Colors.teal),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      isDesktop
-                          ? 14
-                          : (isTablet ? 12 : (isLargeScreen ? 12 : 10)),
-                    ),
                   ),
                 ),
               ),

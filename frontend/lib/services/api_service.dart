@@ -163,6 +163,10 @@ class ApiService {
     required String password,
   }) async {
     try {
+      // Get language preference to send to backend
+      final isArabic = await getLanguagePreference();
+      final language = isArabic ? 'ar' : 'en';
+      
       final requestBody = jsonEncode({
         'email': email.trim(),
         'password': password,
@@ -174,6 +178,7 @@ class ApiService {
             headers: {
               'Content-Type': 'application/json; charset=utf-8',
               'Accept': 'application/json; charset=utf-8',
+              'Accept-Language': language,
             },
             body: utf8.encode(requestBody),
           )

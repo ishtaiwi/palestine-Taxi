@@ -226,7 +226,7 @@ export const createReservation = async (req, res, next) => {
 
         if (!queueCheck.allowed) {
           return res.status(503).json({
-            message: req.t('reservation.no_drivers_available') || 'Instant booking is currently unavailable. No drivers are available in the queue. Please try again later or book a future trip.',
+            message: req.t('reservation.no_drivers_available') || 'Instant booking is currently unavailable. No drivers are available in the queue. Please try again later.',
             code: 'NO_DRIVERS_AVAILABLE',
             driversAvailable: 0,
           });

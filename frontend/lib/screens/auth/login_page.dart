@@ -485,9 +485,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              _isArabic
-                  ? (result['message'] ?? 'تم تسجيل الدخول بنجاح')
-                  : (result['message'] ?? 'Login successful'),
+              result['message'] ?? (_isArabic ? 'تم تسجيل الدخول بنجاح' : 'Login successful'),
             ),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 2),

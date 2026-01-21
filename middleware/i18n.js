@@ -38,6 +38,7 @@ const translations = {
       checked_in: 'Passenger checked in successfully',
       no_seats: 'No available seats',
       seat_taken: 'Seat already taken',
+      no_drivers_available: 'Sorry, there are no drivers available at the moment. Please try again later.',
     },
     vehicle: {
       not_found: 'Vehicle not found',
@@ -129,6 +130,7 @@ const translations = {
       checked_in: 'تم تسجيل وصول الراكب بنجاح',
       no_seats: 'لا توجد مقاعد متاحة',
       seat_taken: 'المقعد محجوز بالفعل',
+      no_drivers_available: 'عذراً، لا يوجد سائقون متاحون في الوقت الحالي. يرجى المحاولة مرة أخرى لاحقاً.',
     },
     vehicle: {
       not_found: 'المركبة غير موجودة',

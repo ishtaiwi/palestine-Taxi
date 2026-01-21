@@ -276,10 +276,44 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
           );
           Navigator.pop(context, true);
         } else {
+          final errorMessage = result['message']?.toString() ?? t('error');
+          final isNoDriversError = errorMessage.toLowerCase().contains('no drivers') || 
+                                   errorMessage.toLowerCase().contains('لا يوجد سائق') ||
+                                   result['code'] == 'NO_DRIVERS_AVAILABLE';
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message']?.toString() ?? t('error')),
-              backgroundColor: Colors.red,
+              content: Row(
+                children: [
+                  Icon(
+                    isNoDriversError ? Icons.info_outline : Icons.error_outline,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      errorMessage,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: isNoDriversError ? Colors.orange : Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.all(16),
+              duration: Duration(seconds: isNoDriversError ? 5 : 4),
+              action: isNoDriversError ? SnackBarAction(
+                label: _isArabic ? 'حسناً' : 'OK',
+                textColor: Colors.white,
+                onPressed: () {},
+              ) : null,
             ),
           );
         }

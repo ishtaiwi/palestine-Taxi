@@ -778,7 +778,11 @@ class _DriverAdditionalInfoScreenState
     final isDesktop = kIsWeb && screenWidth > 800;
     
     return DropdownButtonFormField<String>(
-      value: _selectedLineId,
+      value: _selectedLineId != null &&
+              _lines.any((line) =>
+                  line['lineid']?.toString() == _selectedLineId)
+          ? _selectedLineId
+          : null,
       decoration: _inputDecoration(t('lineLabel'), t('lineHint'), required: true),
       dropdownColor: const Color(0xFF142238),
       iconEnabledColor: Colors.white,

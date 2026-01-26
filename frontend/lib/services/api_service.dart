@@ -2951,6 +2951,37 @@ class ApiService {
     }
   }
 
+  static Future<List<Map<String, dynamic>>> getAllDrivers() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/drivers'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is Map && decoded['drivers'] is List) {
+          return (decoded['drivers'] as List)
+              .map((d) => Map<String, dynamic>.from(d))
+              .toList();
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        throw Exception('Failed to load drivers');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getAllTrips(
       {String? lineid, String? status}) async {
     try {

@@ -226,7 +226,11 @@ class _AdminMapPageState extends State<AdminMapPage> {
                           SizedBox(width: isSmallScreen ? 6.0 : 8.0),
                           Expanded(
                             child: DropdownButton<String>(
-                              value: _selectedLineId,
+                              value: _selectedLineId != null &&
+                                      _lines.any((line) =>
+                                          line['lineid'].toString() == _selectedLineId)
+                                  ? _selectedLineId
+                                  : null,
                               isExpanded: true,
                               hint: Text(
                                 'All Lines',

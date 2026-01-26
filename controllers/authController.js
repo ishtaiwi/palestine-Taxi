@@ -62,6 +62,7 @@ export const register = async (req, res, next) => {
       phone: phone.trim(),
       role: normalizedRole,
       password: hashedPassword,
+      active: true,
     };
 
     logger.info('Creating user', {
@@ -578,6 +579,15 @@ export const login = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: req.t('auth.invalid_credentials') || 'Invalid credentials'
+      });
+    }
+
+    // Check if user is active
+    if (user.active === false) {
+      logger.warn('Login attempt with inactive user', { email, userid: user.userid });
+      return res.status(403).json({
+        success: false,
+        message: req.t('auth.account_inactive') || 'Your account has been deactivated. Please contact support.'
       });
     }
 

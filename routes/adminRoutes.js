@@ -5,6 +5,7 @@ import {
   getUserById,
   updateUser,
   deleteUser,
+  reactivateUser,
   getRevenueAnalytics,
   updateAdminPermissions,
   getRushHourPredictionsReport,
@@ -68,6 +69,7 @@ router.get('/users', getAllUsers);
 router.get('/users/:userid', getUserById);
 router.put('/users/:userid', updateUser);
 router.delete('/users/:userid', deleteUser);
+router.post('/users/:userid/reactivate', reactivateUser);
 router.put('/admins/:adminid/permissions', updateAdminPermissions);
 
 router.get('/base-station', getAllBaseStations);

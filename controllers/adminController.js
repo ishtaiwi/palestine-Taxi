@@ -148,128 +148,56 @@ export const deleteUser = async (req, res, next) => {
       });
     }
 
-
-    const driver = await Driver.findByUserId(userid);
-    if (driver) {
-
-      await DriverQueue.deleteByDriverId(driver.driverid);
-
-
-
-
-      const vehicles = await Vehicle.findByDriverId(driver.driverid);
-      if (vehicles && vehicles.length > 0) {
-        for (const vehicle of vehicles) {
-          await Vehicle.delete(vehicle.vehicleid);
-        }
-      }
-
-
-      await Driver.delete(driver.driverid);
-    }
-
-    const passenger = await Passenger.findByUserId(userid);
-    if (passenger) {
-      try {
-        await Reservation.deleteByPassengerId(passenger.passengerid);
-        logger.info('Deleted reservations for passenger before user deletion', {
-          userid,
-          passengerid: passenger.passengerid,
-        });
-      } catch (reservationError) {
-        logger.warn('Could not delete reservations for passenger', {
-          userid,
-          passengerid: passenger.passengerid,
-          error: reservationError.message,
-        });
-      }
-
-      await Passenger.delete(passenger.passengerid);
-    }
-
-    const admin = await Admin.findByUserId(userid);
-    if (admin) {
-      await Admin.delete(admin.id);
-      logger.info('Deleted admin record before user deletion', {
-        userid,
-        adminid: admin.id,
+    // Check if user is already inactive
+    if (user.active === false) {
+      return res.status(400).json({
+        message: req.t('user.already_inactive') || 'User is already inactive'
       });
     }
 
-    try {
-      const wallets = await Wallet.findByUserId(userid);
-      if (wallets && wallets.length > 0) {
-        const walletIds = wallets.map(w => w.walletid);
+    // Deactivate the user instead of deleting
+    await User.update(userid, { active: false });
+    logger.info('User deactivated', { userid });
 
-        try {
-          await Payment.deleteByWalletIds(walletIds);
-          logger.info('Deleted payments for user wallets before wallet deletion', {
-            userid,
-            wallets_count: wallets.length,
-          });
-        } catch (paymentError) {
-          logger.warn('Could not delete payments for user wallets', {
-            userid,
-            error: paymentError.message,
-          });
-        }
-      }
-
-      await Wallet.deleteByUserId(userid);
-      logger.info('Deleted wallets for user before user deletion', { userid });
-    } catch (walletError) {
-      logger.warn('Could not delete wallets for user', {
-        userid,
-        error: walletError.message,
-      });
-    }
-
-    try {
-      const PasswordResetToken = (await import('../models/PasswordResetToken.js')).default;
-      await PasswordResetToken.deleteByUserId(userid);
-      logger.info('Deleted password reset tokens for user before user deletion', { userid });
-    } catch (tokenError) {
-      logger.warn('Could not delete password reset tokens for user', {
-        userid,
-        error: tokenError.message,
-      });
-    }
-
-    try {
-      const Rating = (await import('../models/Rating.js')).default;
-      await Rating.deleteByPassengerId(userid);
-      logger.info('Deleted trip ratings for user before user deletion', { userid });
-    } catch (ratingError) {
-      logger.warn('Could not delete trip ratings for user', {
-        userid,
-        error: ratingError.message,
-      });
-    }
-
-    try {
-      const driversApprovedByUser = await Driver.updateByFilter(
-        { approved_by: userid },
-        { approved_by: null }
-      );
-      if (driversApprovedByUser && driversApprovedByUser.length > 0) {
-        logger.info('Cleared approved_by references before user deletion', {
-          userid,
-          drivers_affected: driversApprovedByUser.length,
-        });
-      }
-    } catch (updateError) {
-      logger.warn('Could not clear approved_by references', {
-        userid,
-        error: updateError.message,
-      });
-    }
-
-    await User.delete(userid);
-
-    const translatedMessage = req.t('user.deleted');
-    const message = (translatedMessage && translatedMessage !== 'user.deleted') 
+    const translatedMessage = req.t('user.deactivated') || req.t('user.deleted');
+    const message = (translatedMessage && translatedMessage !== 'user.deactivated' && translatedMessage !== 'user.deleted') 
       ? translatedMessage 
-      : 'User has been deleted successfully';
+      : 'User has been deactivated successfully';
+    
+    res.json({
+      message: message,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reactivateUser = async (req, res, next) => {
+  try {
+    const { userid } = req.params;
+
+    const user = await User.findById(userid);
+    if (!user) {
+      return res.status(404).json({
+        message: req.t('user.not_found') || 'User not found'
+      });
+    }
+
+    // Check if user is already active
+    if (user.active !== false) {
+      return res.status(400).json({
+        message: req.t('user.already_active') || 'User is already active'
+      });
+    }
+
+    // Reactivate the user
+    await User.update(userid, { active: true });
+    logger.info('User reactivated', { userid });
+
+    const translatedMessage = req.t('user.reactivated') || 'User has been reactivated successfully';
+    const message = (translatedMessage && translatedMessage !== 'user.reactivated') 
+      ? translatedMessage 
+      : 'User has been reactivated successfully';
     
     res.json({
       message: message,

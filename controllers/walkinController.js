@@ -305,6 +305,7 @@ export const registerWalkIn = async (req, res, next) => {
         phone: normalizedPhone,
         role: 'PASSENGER',
         password: null, // No password for walk-in passengers
+        active: true,
       };
 
       user = await User.create(userData);

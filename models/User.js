@@ -83,6 +83,10 @@ class User {
       query = query.eq('role', filters.role);
     }
     
+    if (filters.active !== undefined) {
+      query = query.eq('active', filters.active);
+    }
+    
     const { data, error } = await query;
     if (error) throw error;
     

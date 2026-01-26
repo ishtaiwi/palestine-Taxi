@@ -49,6 +49,12 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       'filterPassenger': 'ركاب',
       'filterByRole': 'تصفية حسب الدور',
       'search': 'بحث...',
+      'inactive': 'غير نشط',
+      'active': 'نشط',
+      'reactivate': 'إعادة تفعيل',
+      'confirmReactivate': 'هل أنت متأكد من إعادة تفعيل هذا المستخدم؟',
+      'userReactivated': 'تم إعادة تفعيل المستخدم بنجاح',
+      'reactivateFailed': 'فشل إعادة تفعيل المستخدم',
     },
     'en': {
       'title': 'Users Management',
@@ -80,6 +86,12 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
       'filterPassenger': 'Passengers',
       'filterByRole': 'Filter by Role',
       'search': 'Search...',
+      'inactive': 'Inactive',
+      'active': 'Active',
+      'reactivate': 'Reactivate',
+      'confirmReactivate': 'Are you sure you want to reactivate this user?',
+      'userReactivated': 'User reactivated successfully',
+      'reactivateFailed': 'Failed to reactivate user',
     },
   };
 
@@ -468,6 +480,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
     final role = user['role']?.toString();
     final roleColor = _getRoleColor(role);
     final roleIcon = _getRoleIcon(role);
+    final isInactive = user['active'] == false;
 
     return Container(
       decoration: BoxDecoration(
@@ -484,7 +497,7 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         ],
         border: AppTheme.isDarkMode
             ? Border.all(color: Colors.white.withOpacity(0.1))
-            : null,
+            : (isInactive ? Border.all(color: Colors.redAccent.withOpacity(0.3), width: 1.5) : null),
       ),
       child: Material(
         color: Colors.transparent,
@@ -500,12 +513,14 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                   width: isSmallScreen ? 42.0 : (isMediumScreen ? 46.0 : 50.0),
                   height: isSmallScreen ? 42.0 : (isMediumScreen ? 46.0 : 50.0),
                   decoration: BoxDecoration(
-                    color: roleColor.withOpacity(0.1),
+                    color: isInactive 
+                        ? Colors.grey.withOpacity(0.2)
+                        : roleColor.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     roleIcon,
-                    color: roleColor,
+                    color: isInactive ? Colors.grey : roleColor,
                     size: isSmallScreen ? 20.0 : (isMediumScreen ? 22.0 : 24.0),
                   ),
                 ),
@@ -514,21 +529,53 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        user['fullname'] ?? t('name'),
-                        style: TextStyle(
-                          color: AppTheme.textPrimary,
-                          fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              user['fullname'] ?? t('name'),
+                              style: TextStyle(
+                                color: isInactive 
+                                    ? AppTheme.textSecondary
+                                    : AppTheme.textPrimary,
+                                fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
+                                fontWeight: FontWeight.bold,
+                                decoration: isInactive ? TextDecoration.lineThrough : null,
+                              ),
+                            ),
+                          ),
+                          if (isInactive) ...[
+                            SizedBox(width: isSmallScreen ? 4.0 : 6.0),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isSmallScreen ? 6.0 : 8.0,
+                                vertical: isSmallScreen ? 2.0 : 4.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
+                              ),
+                              child: Text(
+                                t('inactive'),
+                                style: TextStyle(
+                                  color: Colors.redAccent,
+                                  fontSize: isSmallScreen ? 9.0 : (isMediumScreen ? 10.0 : 11.0),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                       Text(
                         user['email'] ?? '',
                         style: TextStyle(
-                          color: AppTheme.isDarkMode
-                              ? Colors.white.withOpacity(0.9)
-                              : AppTheme.textSecondary,
+                          color: isInactive
+                              ? AppTheme.textSecondary.withOpacity(0.7)
+                              : (AppTheme.isDarkMode
+                                  ? Colors.white.withOpacity(0.9)
+                                  : AppTheme.textSecondary),
                           fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
                         ),
                         maxLines: 1,
@@ -541,17 +588,21 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                             Icon(
                               Icons.phone_iphone_rounded,
                               size: isSmallScreen ? 10.0 : 12.0,
-                              color: AppTheme.isDarkMode
-                                  ? Colors.blueAccent.shade100
-                                  : AppTheme.textSecondary,
+                              color: isInactive
+                                  ? AppTheme.textSecondary.withOpacity(0.5)
+                                  : (AppTheme.isDarkMode
+                                      ? Colors.blueAccent.shade100
+                                      : AppTheme.textSecondary),
                             ),
                             SizedBox(width: isSmallScreen ? 3.0 : 4.0),
                             Text(
                               user['phone'].toString(),
                               style: TextStyle(
-                                color: AppTheme.isDarkMode
-                                    ? Colors.blueAccent.shade100
-                                    : AppTheme.textSecondary,
+                                color: isInactive
+                                    ? AppTheme.textSecondary.withOpacity(0.7)
+                                    : (AppTheme.isDarkMode
+                                        ? Colors.blueAccent.shade100
+                                        : AppTheme.textSecondary),
                                 fontSize: isSmallScreen ? 10.0 : (isMediumScreen ? 11.0 : 12.0),
                               ),
                             ),
@@ -563,13 +614,22 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
                 ),
                 Column(
                   children: [
-                    _buildActionButton(
-                      icon: Icons.edit_rounded,
-                      color: Colors.blueAccent,
-                      isSmallScreen: isSmallScreen,
-                      isMediumScreen: isMediumScreen,
-                      onTap: () => _handleEdit(user),
-                    ),
+                    if (isInactive)
+                      _buildActionButton(
+                        icon: Icons.refresh_rounded,
+                        color: Colors.green,
+                        isSmallScreen: isSmallScreen,
+                        isMediumScreen: isMediumScreen,
+                        onTap: () => _handleReactivate(user['userid']),
+                      )
+                    else
+                      _buildActionButton(
+                        icon: Icons.edit_rounded,
+                        color: Colors.blueAccent,
+                        isSmallScreen: isSmallScreen,
+                        isMediumScreen: isMediumScreen,
+                        onTap: () => _handleEdit(user),
+                      ),
                     SizedBox(height: isSmallScreen ? 6.0 : 8.0),
                     _buildActionButton(
                       icon: Icons.delete_outline_rounded,
@@ -906,6 +966,54 @@ class _AdminUsersPageState extends State<AdminUsersPage> {
         message = result['success'] == true 
           ? 'User has been deleted successfully' 
           : t('error');
+      }
+      // Remove any periods and clean up the message
+      message = message.replaceAll(RegExp(r'\.\s*$'), '');
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: result['success'] == true ? Colors.green : Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      if (result['success'] == true) _loadData();
+    }
+  }
+
+  Future<void> _handleReactivate(String userid) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: AppTheme.isDarkMode ? const Color(0xFF1C2541) : AppTheme.cardBackground,
+        title: Text(t('confirmReactivate'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(t('no'), style: TextStyle(color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(t('yes'), style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final result = await ApiService.reactivateUser(userid);
+    if (mounted) {
+      String message = result['message'] ?? '';
+      if (message.isEmpty) {
+        message = result['success'] == true 
+          ? t('userReactivated')
+          : t('reactivateFailed');
       }
       // Remove any periods and clean up the message
       message = message.replaceAll(RegExp(r'\.\s*$'), '');

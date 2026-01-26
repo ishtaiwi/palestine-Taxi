@@ -21,6 +21,13 @@ export const authenticate = async (req, res, next) => {
       });
     }
     
+    // Check if user is active
+    if (user.active === false) {
+      return res.status(403).json({ 
+        message: req.t?.('auth.account_inactive') || 'Your account has been deactivated. Please contact support.' 
+      });
+    }
+    
     req.user = {
       userid: user.userid,
       role: user.role,

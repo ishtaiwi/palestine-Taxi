@@ -2922,6 +2922,32 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> reactivateUser(String userid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/users/$userid/reactivate'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'message': decoded['message'] ??
+            (response.statusCode == 200 ? 'User reactivated' : 'Failed'),
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getAllVehicles() async {
     try {
       final token = await getToken();

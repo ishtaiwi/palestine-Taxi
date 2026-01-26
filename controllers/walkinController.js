@@ -25,6 +25,7 @@ export const registerWalkIn = async (req, res, next) => {
   let user = null;
   let passenger = null;
   let trip = null;
+  let reservation = null;
 
   try {
     const { lineid, phone, dropoffpoint, aging } = req.body;
@@ -321,51 +322,18 @@ export const registerWalkIn = async (req, res, next) => {
       bookingPrice += line.additionalprice;
     }
 
-    // Create payment record with CASH method and COMPLETED status
-    // Walk-in passengers pay cash at the station
-    paymentRecord = await Payment.create({
-      paymentid: uuidv4(),
-      amount: bookingPrice,
-      method: PAYMENT_METHOD.CASH,
-      status: PAYMENT_STATUS.COMPLETED, // Cash payment marked as completed (will be transferred to driver on check-in)
-      type: 'reservation',
-      tripid: tripid || null,
-      time: new Date().toISOString(),
-      // Note: towalletid is NOT set here - cash will be transferred to driver's wallet when passenger checks in (QR scan)
-    });
-
-    // Create reservation with walk-in passenger type
-    const reservationData = {
-      bookingid: uuidv4(),
-      passengerid: passenger.passengerid,
-      paymentid: paymentRecord.paymentid,
-      tripid: tripid || null,
-      lineid: line.lineid,
-      seatlocation: null,
-      bookingprice: bookingPrice,
-      dropoffpoint: dropoffpoint || null,
-      aging: aging || null,
-      status: RESERVATION_STATUS.CONFIRMED,
-      driver_status: 'approved',
-      booking_type: BOOKING_TYPE.INSTANT,
-      scheduled_trip_time: null,
-      passenger_type: PASSENGER_TYPE.WALK_IN,
-      phone_number: normalizedPhone,
-    };
-
-    const reservation = await Reservation.create(reservationData);
-    logger.info(`[WalkInController] Created walk-in reservation ${reservation.bookingid} for phone ${normalizedPhone}${tripid ? ` on trip ${tripid}` : ''}`);
-
-    // For walk-in bookings with tripid, check if trip is full AFTER creating reservation (same logic as instant booking)
+    // CRITICAL FIX: Check trip capacity BEFORE creating reservation
+    // This prevents creating orphaned bookings when trip is full
+    let finalTripid = tripid;
     if (tripid) {
       let currentTrip = await Trip.findById(tripid);
       if (!currentTrip) {
-        throw new Error('Trip not found when updating seats');
+        throw new Error('Trip not found when checking capacity');
       }
 
-      // Count actual reservations for this trip (including the one we just created)
+      // Count current reservations for this trip (BEFORE creating new reservation)
       const tripReservations = await Reservation.findByTripId(tripid);
-      const activeReservationCount = tripReservations.filter(
+      const currentReservationCount = tripReservations.filter(
         r => r.status === 'confirmed' || r.status === 'checked_in'
       ).length;
 
@@ -380,9 +348,9 @@ export const registerWalkIn = async (req, res, next) => {
         }
       }
 
-      // Check if trip is full (same logic as instant booking)
-      if (activeReservationCount > maxPassengerSeats) {
-        logger.info(`[WalkInController] 🚨 Trip ${tripid} is FULL (${activeReservationCount} bookings > ${maxPassengerSeats} capacity) - new booking ${reservation.bookingid} made it full, checking for other trips or creating new trip`);
+      // Check if trip would be full after adding this booking
+      if (currentReservationCount >= maxPassengerSeats) {
+        logger.info(`[WalkInController] 🚨 Trip ${tripid} is FULL (${currentReservationCount} bookings >= ${maxPassengerSeats} capacity) - checking for alternative trips or new trip creation`);
 
         // Check for other trips at the same time with capacity
         const { findTripsAtSameTime, getAvailableSeats } = await import('../services/matchingService.js');
@@ -410,35 +378,11 @@ export const registerWalkIn = async (req, res, next) => {
           }
         }
 
-        // If found alternative trip, reassign booking to it
+        // If found alternative trip, use it for the booking
         if (targetTripForBooking) {
-          const originalTripId = tripid;
-          const originalTrip = currentTrip;
-          await Reservation.update(reservation.bookingid, {
-            tripid: targetTripForBooking.tripid,
-          });
-          logger.info(`[WalkInController] ✅ Reassigned booking ${reservation.bookingid} from full trip ${originalTripId} to alternative trip ${targetTripForBooking.tripid}`);
-
-          // Update payment.tripid to match the new trip
-          try {
-            await Payment.update(paymentRecord.paymentid, {
-              tripid: targetTripForBooking.tripid,
-            });
-            logger.info(`[WalkInController] ✅ Updated payment ${paymentRecord.paymentid} tripid to ${targetTripForBooking.tripid}`);
-          } catch (error) {
-            logger.warn(`[WalkInController] ⚠️ Failed to update payment.tripid after reassignment:`, error);
-          }
-
-          // Update reservation object with new tripid for the rest of the function
-          reservation.tripid = targetTripForBooking.tripid;
-          // Update tripid variable to use the alternative trip for rest of processing
-          tripid = targetTripForBooking.tripid;
-
-          // Refresh currentTrip to the alternative trip
-          currentTrip = await Trip.findById(tripid);
-          trip = currentTrip;
-
-          logger.info(`[WalkInController] 📝 Using alternative trip ${tripid} for rest of booking processing`);
+          finalTripid = targetTripForBooking.tripid;
+          trip = await Trip.findById(finalTripid);
+          logger.info(`[WalkInController] 📝 Will assign booking to alternative trip ${finalTripid}`);
         } else {
           // No alternative trip found - check if additional drivers can be assigned
           logger.info(`[WalkInController] No alternative trips found, checking queue for drivers...`);
@@ -452,99 +396,173 @@ export const registerWalkIn = async (req, res, next) => {
           const queueCheck = await DriverQueue.canAcceptInstantBooking(currentTrip.lineid, queueDirection);
           logger.info(`[WalkInController] Queue check result: allowed=${queueCheck.allowed}, driversAvailable=${queueCheck.driversAvailable}`);
 
-          if (queueCheck.allowed && queueCheck.driversAvailable > 0) {
-            // Allow booking - immediately create new trip with next driver and assign booking to it
-            logger.info(`[WalkInController] 🚨 Trip ${tripid} is full (${activeReservationCount} bookings > ${maxPassengerSeats} capacity), but ${queueCheck.driversAvailable} driver(s) available in queue - creating new trip and assigning booking ${reservation.bookingid}`);
-
-            // Use the same function that instant reservations use
-            const { createNewTripForFullTripBooking } = await import('../services/matchingService.js');
-            logger.info(`[WalkInController] Calling createNewTripForFullTripBooking with fullTripId=${tripid}, bookingId=${reservation.bookingid}`);
-            const newTrip = await createNewTripForFullTripBooking(tripid, reservation.bookingid);
-
-            if (newTrip) {
-              logger.info(`[WalkInController] ✅ SUCCESS: Created new trip ${newTrip.tripid} and assigned booking ${reservation.bookingid} to it`);
-
-              // IMPORTANT: Sync stats for the ORIGINAL full trip to remove this booking from its count
-              const originalFullTripId = tripid;
-              const originalDriverId = currentTrip?.assigned_driverid;
-              const { syncTripStats } = await import('../services/matchingService.js');
-              await syncTripStats(originalFullTripId);
-              logger.info(`[WalkInController] ✅ Synced stats for original full trip ${originalFullTripId} (removed booking ${reservation.bookingid} from count)`);
-
-              // Update payment.tripid to match the new trip
-              try {
-                await Payment.update(paymentRecord.paymentid, {
-                  tripid: newTrip.tripid,
-                });
-                logger.info(`[WalkInController] ✅ Updated payment ${paymentRecord.paymentid} tripid to ${newTrip.tripid}`);
-              } catch (error) {
-                logger.warn(`[WalkInController] ⚠️ Failed to update payment.tripid after new trip creation:`, error);
-              }
-
-              // CRITICAL: Transfer payment from original driver to new driver (if needed)
-              // For walk-in bookings, payments are cash and not yet transferred, so this is mainly for consistency
-              const refreshedPayment = await Payment.findById(paymentRecord.paymentid);
-              if (refreshedPayment && refreshedPayment.towalletid && newTrip.assigned_driverid) {
-                try {
-                  const { reassignPaymentToDriver } = await import('../services/paymentService.js');
-                  if (originalDriverId && originalDriverId !== newTrip.assigned_driverid) {
-                    const reassignResult = await reassignPaymentToDriver(
-                      paymentRecord.paymentid,
-                      originalDriverId,
-                      newTrip.assigned_driverid
-                    );
-                    if (reassignResult.success) {
-                      logger.info(`[WalkInController] ✅ Transferred payment from driver ${originalDriverId} to driver ${newTrip.assigned_driverid}`);
-                    } else {
-                      logger.warn(`[WalkInController] ⚠️ Failed to transfer payment to new driver: ${reassignResult.error}`);
-                    }
-                  }
-                } catch (paymentError) {
-                  logger.warn(`[WalkInController] ⚠️ Error transferring payment to new driver:`, paymentError);
-                }
-              } else if (newTrip.assigned_driverid && !refreshedPayment?.towalletid) {
-                // Payment not yet transferred to any driver, transfer to new driver
-                try {
-                  const { transferPaymentToDriver } = await import('../services/paymentService.js');
-                  const transferResult = await transferPaymentToDriver(paymentRecord.paymentid, newTrip.assigned_driverid);
-                  if (transferResult.success) {
-                    logger.info(`[WalkInController] ✅ Transferred payment to new driver ${newTrip.assigned_driverid}`);
-                  }
-                } catch (paymentError) {
-                  logger.warn(`[WalkInController] ⚠️ Error transferring payment to driver:`, paymentError);
-                }
-              }
-
-              // Update reservation and tripid for rest of processing
-              reservation.tripid = newTrip.tripid;
-              tripid = newTrip.tripid;
-              currentTrip = await Trip.findById(tripid);
-              trip = currentTrip;
-
-              // Sync stats for the new trip (booking is already assigned, this just updates the count)
-              await syncTripStats(tripid);
-              logger.info(`[WalkInController] ✅ Synced stats for new trip ${tripid}`);
-            } else {
-              logger.error(`[WalkInController] ❌ FAILED: createNewTripForFullTripBooking returned null for booking ${reservation.bookingid}`);
-              // Failed to create new trip - return error
-              return res.status(400).json({
-                message: 'No available seats on this trip and no additional drivers available',
-              });
-            }
-          } else {
-            // No drivers in queue - return error
-            logger.warn(`[WalkInController] ⚠️ Trip ${tripid} is full and no drivers available in queue`);
+          if (!queueCheck.allowed || queueCheck.driversAvailable === 0) {
+            // No drivers in queue - return error BEFORE creating reservation
+            logger.warn(`[WalkInController] ⚠️ Trip ${tripid} is full and no drivers available in queue - rejecting booking`);
             return res.status(400).json({
               message: 'No available seats on this trip and no additional drivers available',
             });
           }
+          
+          // CRITICAL FIX: Create new trip BEFORE creating reservation to avoid double-counting
+          // This ensures the reservation is created with the correct tripid from the start
+          logger.info(`[WalkInController] 🚨 Trip ${tripid} is full, but ${queueCheck.driversAvailable} driver(s) available - creating new trip BEFORE reservation`);
+          
+          // Create new trip with next driver
+          // We create the trip manually here instead of using createNewTripForFullTripBooking
+          // since that function expects a booking to already exist, but we want to create the trip first
+          const queue = await DriverQueue.getActiveByLine(currentTrip.lineid, queueDirection);
+          if (!queue || queue.length === 0) {
+            logger.warn(`[WalkInController] ⚠️ No drivers available in queue (should not happen)`);
+            return res.status(400).json({
+              message: 'No available seats on this trip and no additional drivers available',
+            });
+          }
+
+          const { parseUtcDate } = await import('../utils/timeUtils.js');
+          const tripDeptime = parseUtcDate(currentTrip.deptime);
+          if (!tripDeptime) {
+            throw new Error('Invalid trip deptime');
+          }
+
+          let selectedDriver = null;
+          let selectedVehicle = null;
+
+          for (const driverQueueEntry of queue) {
+            const driverid = driverQueueEntry.driverid;
+            const driverTrips = await Trip.findAssignedTrips(driverid, { fromNow: false });
+            const hasTripAtSameTime = driverTrips.some(t => {
+              if (t.status === 'completed' || t.status === 'cancelled') return false;
+              if (t.deptime) {
+                const tDeptime = parseUtcDate(t.deptime);
+                if (tDeptime) {
+                  const timeDiff = Math.abs(tDeptime.getTime() - tripDeptime.getTime());
+                  return timeDiff <= 60000;
+                }
+              }
+              return false;
+            });
+
+            if (hasTripAtSameTime) {
+              logger.info(`[WalkInController] Driver ${driverid} already has trip at this time, skipping`);
+              continue;
+            }
+
+            const vehicles = await Vehicle.findByDriverId(driverid);
+            if (!vehicles || vehicles.length === 0) {
+              logger.warn(`[WalkInController] ⚠️ Driver ${driverid} has no vehicle, removing from queue`);
+              await DriverQueue.removeDriverFromQueue(driverid);
+              continue;
+            }
+
+            selectedDriver = driverQueueEntry;
+            selectedVehicle = vehicles[0];
+            logger.info(`[WalkInController] ✅ Selected driver ${driverid} from queue for new trip`);
+            break;
+          }
+
+          if (!selectedDriver || !selectedVehicle) {
+            logger.warn(`[WalkInController] ⚠️ No available driver found in queue`);
+            return res.status(400).json({
+              message: 'No available seats on this trip and no additional drivers available',
+            });
+          }
+
+          const driverid = selectedDriver.driverid;
+          const vehicle = selectedVehicle;
+
+          // Create new trip
+          const { calculateAvailablePassengerSeats } = await import('../utils/seatCalculation.js');
+          const openingTime = new Date(tripDeptime.getTime() - 45 * 60 * 1000);
+          const maxPassengerSeats = calculateAvailablePassengerSeats(vehicle.seatnum, 0, 0);
+
+          const newTripData = {
+            tripid: uuidv4(),
+            lineid: currentTrip.lineid,
+            vehicleid: vehicle.vehicleid,
+            deptime: currentTrip.deptime,
+            status: 'scheduled',
+            availableseats: maxPassengerSeats,
+            totalbookings: 0,
+            trip_opening_time: openingTime.toISOString(),
+            auto_departure_enabled: true,
+            early_departure_allowed: true,
+            scheduled_departure_enforced: true,
+            direction: currentTrip.direction || 'going',
+            origin_stationid: currentTrip.origin_stationid || null,
+          };
+
+          const newTrip = await Trip.create(newTripData);
+          await Trip.assignDriver(newTrip.tripid, driverid);
+          await DriverQueue.removeDriverFromQueue(driverid);
+          
+          // Update finalTripid to use the new trip
+          finalTripid = newTrip.tripid;
+          trip = await Trip.findById(finalTripid);
+          
+          logger.info(`[WalkInController] ✅ Created new trip ${newTrip.tripid} with driver ${driverid} BEFORE reservation creation`);
         }
       }
+    }
 
-      // Sync trip stats based on actual reservation count (ensures accuracy)
-      // This will sync the correct trip (original or alternative if reassigned)
+    // Create payment record with CASH method and COMPLETED status
+    // Walk-in passengers pay cash at the station
+    paymentRecord = await Payment.create({
+      paymentid: uuidv4(),
+      amount: bookingPrice,
+      method: PAYMENT_METHOD.CASH,
+      status: PAYMENT_STATUS.COMPLETED, // Cash payment marked as completed (will be transferred to driver on check-in)
+      type: 'reservation',
+      tripid: finalTripid || null,
+      time: new Date().toISOString(),
+      // Note: towalletid is NOT set here - cash will be transferred to driver's wallet when passenger checks in (QR scan)
+    });
+
+    // Create reservation with walk-in passenger type
+    // CRITICAL: finalTripid is now the correct trip (either original, alternative, or newly created)
+    const reservationData = {
+      bookingid: uuidv4(),
+      passengerid: passenger.passengerid,
+      paymentid: paymentRecord.paymentid,
+      tripid: finalTripid || null,
+      lineid: line.lineid,
+      seatlocation: null,
+      bookingprice: bookingPrice,
+      dropoffpoint: dropoffpoint || null,
+      aging: aging || null,
+      status: RESERVATION_STATUS.CONFIRMED,
+      driver_status: 'approved',
+      booking_type: BOOKING_TYPE.INSTANT,
+      scheduled_trip_time: null,
+      passenger_type: PASSENGER_TYPE.WALK_IN,
+      phone_number: normalizedPhone,
+    };
+
+    const reservation = await Reservation.create(reservationData);
+    logger.info(`[WalkInController] Created walk-in reservation ${reservation.bookingid} for phone ${normalizedPhone}${finalTripid ? ` on trip ${finalTripid}` : ''}`);
+
+    // Update tripid variable to use finalTripid for rest of processing
+    tripid = finalTripid;
+
+    // Sync trip stats for the trip (whether original, alternative, or newly created)
+    if (tripid) {
       const { syncTripStats } = await import('../services/matchingService.js');
       await syncTripStats(tripid);
+      logger.info(`[WalkInController] ✅ Synced trip stats for trip ${tripid}`);
+      
+      // Transfer payments for the trip to the driver (if driver is assigned)
+      const currentTrip = await Trip.findById(tripid);
+      if (currentTrip && currentTrip.assigned_driverid) {
+        try {
+          const { transferPaymentsForTrip } = await import('../services/paymentService.js');
+          const transferResult = await transferPaymentsForTrip(tripid, currentTrip.assigned_driverid);
+          if (transferResult.success) {
+            logger.info(`[WalkInController] ✅ Transferred ${transferResult.transferred} payment(s) to driver ${currentTrip.assigned_driverid} for trip ${tripid}`);
+          }
+        } catch (paymentError) {
+          logger.warn(`[WalkInController] ⚠️ Error transferring payments for trip ${tripid}:`, paymentError);
+        }
+      }
 
       // Check if trip already has driver (through vehicle relationship or assigned_driverid)
       const tripHasDriverAlready = (trip.vehicle && trip.vehicle.driver) || trip.assigned_driverid;
@@ -700,9 +718,19 @@ export const registerWalkIn = async (req, res, next) => {
     logger.error('[WalkInController] Error creating walk-in reservation:', error);
 
     // Clean up created records on error
+    if (reservation) {
+      try {
+        await Reservation.delete(reservation.bookingid);
+        logger.info(`[WalkInController] ✅ Cleaned up reservation ${reservation.bookingid} after error`);
+      } catch (cleanupError) {
+        logger.warn('[WalkInController] Failed to delete reservation on error:', cleanupError);
+      }
+    }
+
     if (paymentRecord) {
       try {
         await Payment.update(paymentRecord.paymentid, { status: PAYMENT_STATUS.FAILED });
+        logger.info(`[WalkInController] ✅ Updated payment ${paymentRecord.paymentid} status to FAILED after error`);
       } catch (cleanupError) {
         logger.warn('[WalkInController] Failed to update payment status on error:', cleanupError);
       }

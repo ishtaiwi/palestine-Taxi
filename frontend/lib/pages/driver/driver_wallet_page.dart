@@ -993,10 +993,12 @@ class _DriverWalletPageState extends State<DriverWalletPage> {
                                   final time =
                                       transaction['time']?.toString() ?? '';
 
+                                  // For drivers, money is incoming if it goes TO their wallet
+                                  // This includes walk-in payments where fromwalletid is null (cash payments)
                                   final isIncoming =
                                       transaction['towalletid'] ==
                                               _wallet!['walletid'] &&
-                                          transaction['fromwalletid'] != null;
+                                          transaction['fromwalletid'] != _wallet!['walletid'];
                                   final isOutgoing =
                                       transaction['fromwalletid'] ==
                                           _wallet!['walletid'];

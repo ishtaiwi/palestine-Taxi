@@ -10,6 +10,7 @@ import { validateReservationData } from '../utils/validation.js';
 import { syncTripStats } from '../services/matchingService.js';
 import { updateModelIncremental } from '../services/rushHourPredictionService.js';
 import { assignVehicleFromQueue } from '../services/tripOpeningService.js';
+import { mapTripDirectionToQueueDirection } from '../utils/tripDirectionUtils.js';
 import logger from '../utils/logger.js';
 import { canBookInstant } from '../utils/timeUtils.js';
 
@@ -216,13 +217,18 @@ export const createReservation = async (req, res, next) => {
 
     // CRITICAL RULE: Check driver queue availability for instant bookings
     // Passengers are not allowed to make an instant booking unless there are drivers available in the queue
+    // IMPORTANT: Must check the queue for the specific trip direction (going/returning)
     if (bookingType === BOOKING_TYPE.INSTANT && trip) {
       // Check if trip already has a driver/vehicle assigned
       const tripHasDriver = trip.vehicleid && trip.assigned_driverid;
 
       if (!tripHasDriver) {
-        // Trip has no driver assigned - check if there are drivers in the queue
-        const queueCheck = await DriverQueue.canAcceptInstantBooking(trip.lineid);
+        // Trip has no driver assigned - check if there are drivers in the queue for this specific direction
+        // This ensures returning trips only check returning queue, and going trips only check going queue
+        // IMPORTANT: Convert trip direction ('return') to queue direction ('returning')
+        const tripDirection = trip.direction || 'going';
+        const queueDirection = mapTripDirectionToQueueDirection(tripDirection);
+        const queueCheck = await DriverQueue.canAcceptInstantBooking(trip.lineid, queueDirection);
 
         if (!queueCheck.allowed) {
           return res.status(503).json({

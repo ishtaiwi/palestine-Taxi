@@ -36,30 +36,42 @@ class ScheduleTemplate {
       query = query.eq('active', filters.active);
     }
     
+    if (filters.direction) {
+      query = query.eq('direction', filters.direction);
+    }
+    
     const { data, error } = await query.order('start_hour', { ascending: true });
     if (error) throw error;
     return data;
   }
 
-  static async findByLineId(lineid) {
-    const { data, error } = await supabase
+  static async findByLineId(lineid, direction = null) {
+    let query = supabase
       .from('schedule_template')
       .select('*, line(*)')
       .eq('lineid', lineid)
-      .eq('active', true)
-      .order('start_hour', { ascending: true });
+      .eq('active', true);
     
+    if (direction) {
+      query = query.eq('direction', direction);
+    }
+    
+    const { data, error } = await query.order('start_hour', { ascending: true });
     if (error) throw error;
     return data;
   }
 
-  static async existsForLine(lineid) {
-    const { data, error } = await supabase
+  static async existsForLine(lineid, direction = null) {
+    let query = supabase
       .from('schedule_template')
       .select('templateid')
-      .eq('lineid', lineid)
-      .limit(1)
-      .single();
+      .eq('lineid', lineid);
+    
+    if (direction) {
+      query = query.eq('direction', direction);
+    }
+    
+    const { data, error } = await query.limit(1).single();
     
     if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "not found" which is fine
     return data !== null;

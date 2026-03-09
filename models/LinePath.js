@@ -151,6 +151,51 @@ class LinePath {
     static toRadians(degrees) {
         return degrees * (Math.PI / 180);
     }
+
+    /**
+     * Get reversed waypoints for returning trips
+     * @param {string} lineid - Line ID
+     * @returns {Promise<Array>} - Reversed waypoint array
+     */
+    static async getReversedWaypoints(lineid) {
+        const path = await this.findByLineId(lineid);
+        if (!path || !path.waypoints) {
+            return [];
+        }
+
+        const waypoints = Array.isArray(path.waypoints) ? path.waypoints : JSON.parse(path.waypoints);
+        return [...waypoints].reverse();
+    }
+
+    /**
+     * Get origin waypoint (first waypoint)
+     * @param {string} lineid - Line ID
+     * @returns {Promise<Object|null>} - First waypoint or null
+     */
+    static async getOriginStation(lineid) {
+        const path = await this.findByLineId(lineid);
+        if (!path || !path.waypoints) {
+            return null;
+        }
+
+        const waypoints = Array.isArray(path.waypoints) ? path.waypoints : JSON.parse(path.waypoints);
+        return waypoints.length > 0 ? waypoints[0] : null;
+    }
+
+    /**
+     * Get destination waypoint (last waypoint)
+     * @param {string} lineid - Line ID
+     * @returns {Promise<Object|null>} - Last waypoint or null
+     */
+    static async getDestinationStation(lineid) {
+        const path = await this.findByLineId(lineid);
+        if (!path || !path.waypoints) {
+            return null;
+        }
+
+        const waypoints = Array.isArray(path.waypoints) ? path.waypoints : JSON.parse(path.waypoints);
+        return waypoints.length > 0 ? waypoints[waypoints.length - 1] : null;
+    }
 }
 
 export default LinePath;

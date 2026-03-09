@@ -6,6 +6,7 @@ import Trip from '../models/Trip.js';
 import Reservation from '../models/Reservation.js';
 import Payment from '../models/Payment.js';
 import Wallet from '../models/Wallet.js';
+import Rating from '../models/Rating.js';
 import { v4 as uuidv4 } from 'uuid';
 import { RESERVATION_STATUS, PAYMENT_STATUS, PAYMENT_METHOD, WALLET_TYPE } from '../utils/constants.js';
 import { checkAndAssignWaitingTrips } from '../services/tripOpeningService.js';
@@ -21,6 +22,8 @@ const buildQueueResponse = (queue = [], driverid) => {
     lineid: entry.lineid,
     status: entry.status,
     joinedAt: entry.joined_at,
+    direction: entry.direction,
+    stationid: entry.stationid,
     driver: entry.driver,
   }));
 
@@ -75,11 +78,49 @@ export const getDriverQueue = async (req, res, next) => {
       });
     }
 
-    const queue = await DriverQueue.getActiveByLine(driverRecord.lineid);
+    // Get station information for the line
+    const BaseStation = (await import('../models/BaseStation.js')).default;
+    const mainStation = line.main_stationid ? await BaseStation.findById(line.main_stationid) : null;
+    const returnStation = line.return_stationid ? await BaseStation.findById(line.return_stationid) : null;
+
+    // Get current queue entry to determine direction
+    const currentEntry = await DriverQueue.findActiveByDriver(driverRecord.driverid);
+    const driverDirection = currentEntry?.direction || null;
+
+    // Get direction from query parameter if driver is not in queue
+    // If driver is in queue, always use their current direction (ignore requested direction)
+    const requestedDirection = req.query.direction;
+    const direction = driverDirection || requestedDirection || null;
+
+    // Validate direction if provided
+    if (direction && direction !== 'going' && direction !== 'returning') {
+      return res.status(400).json({
+        message: req.t('driver.invalid_direction') || 'Invalid direction. Must be "going" or "returning"',
+      });
+    }
+
+    // Get queue for the specified direction
+    // When driver is in queue, only show drivers in their direction
+    // When driver is not in queue, show drivers in the requested direction (or both if none requested)
+    let queue = [];
+    if (direction) {
+      // Filter by direction: either driver's current direction or requested direction
+      queue = await DriverQueue.getActiveByLine(driverRecord.lineid, direction);
+    } else {
+      // If no direction specified and driver not in queue, return both directions for display
+      const goingQueue = await DriverQueue.getActiveByLine(driverRecord.lineid, 'going');
+      const returningQueue = await DriverQueue.getActiveByLine(driverRecord.lineid, 'returning');
+      queue = [...goingQueue, ...returningQueue];
+    }
+
     const response = buildQueueResponse(queue, driverRecord.driverid);
 
     res.json({
       line: line,
+      direction: direction, // Send back the direction used for filtering
+      currentDirection: driverDirection,
+      mainStation: mainStation,
+      returnStation: returnStation,
       ...response,
     });
   } catch (error) {
@@ -97,19 +138,84 @@ export const joinDriverQueue = async (req, res, next) => {
       });
     }
 
+    // Get direction from request body (default to 'going')
+    const direction = req.body.direction || 'going';
+    
+    // Validate direction
+    if (direction !== 'going' && direction !== 'returning') {
+      return res.status(400).json({
+        message: req.t('driver.invalid_direction') || 'Invalid direction. Must be "going" or "returning"',
+      });
+    }
+
+    // Check if location validation is enabled
+    const AppConfig = (await import('../models/AppConfig.js')).default;
+    const locationValidationEnabled = await AppConfig.getQueueLocationValidationEnabled();
+
+    // Validate location if enabled
+    if (locationValidationEnabled) {
+      const { validateQueueJoinLocation } = await import('../services/locationValidationService.js');
+      const locationValidation = await validateQueueJoinLocation(
+        driverRecord.driverid,
+        driverRecord.lineid,
+        direction
+      );
+
+      if (!locationValidation.valid) {
+        return res.status(400).json({
+          message: locationValidation.error || 'Location validation failed',
+          locationValidation: {
+            valid: false,
+            station: locationValidation.station,
+            distance: locationValidation.distance,
+            driverLocation: locationValidation.driverLocation,
+          },
+        });
+      }
+    }
+
+    // Get line to determine station
+    const Line = (await import('../models/Line.js')).default;
+    const line = await Line.findById(driverRecord.lineid);
+    
+    // Determine stationid based on direction
+    let stationid = null;
+    if (direction === 'going') {
+      stationid = line?.main_stationid || null;
+    } else if (direction === 'returning') {
+      stationid = line?.return_stationid || null;
+    }
+
+    // Check if driver is already in a queue (will be automatically removed by join method)
     const existing = await DriverQueue.findActiveByDriver(driverRecord.driverid);
-    if (existing) {
-      const queue = await DriverQueue.getActiveByLine(existing.lineid);
+    if (existing && existing.direction === direction && existing.lineid === driverRecord.lineid) {
+      const queue = await DriverQueue.getActiveByLine(driverRecord.lineid, direction);
       const response = buildQueueResponse(queue, driverRecord.driverid);
+      
+      // Get station information for the line
+      const BaseStation = (await import('../models/BaseStation.js')).default;
+      const mainStation = line?.main_stationid ? await BaseStation.findById(line.main_stationid) : null;
+      const returnStation = line?.return_stationid ? await BaseStation.findById(line.return_stationid) : null;
+      
       return res.status(200).json({
         message: req.t('driver.queue_exists') || 'Driver already in queue',
+        line: line, // Include line data in response
+        direction: direction, // Include direction used
+        mainStation: mainStation,
+        returnStation: returnStation,
         ...response,
       });
     }
 
-    const entry = await DriverQueue.join(driverRecord.driverid, driverRecord.lineid);
-    const queue = await DriverQueue.getActiveByLine(driverRecord.lineid);
+    // Join queue with direction and station
+    const entry = await DriverQueue.join(driverRecord.driverid, driverRecord.lineid, direction, stationid);
+    const queue = await DriverQueue.getActiveByLine(driverRecord.lineid, direction);
     const response = buildQueueResponse(queue, driverRecord.driverid);
+
+    // Get station information for the line
+    const BaseStation = (await import('../models/BaseStation.js')).default;
+    const mainStation = line?.main_stationid ? await BaseStation.findById(line.main_stationid) : null;
+    const returnStation = line?.return_stationid ? await BaseStation.findById(line.return_stationid) : null;
 
     // Check for waiting trips and assign vehicle (event-driven assignment)
     try {
@@ -122,6 +228,10 @@ export const joinDriverQueue = async (req, res, next) => {
     res.status(201).json({
       message: req.t('driver.queue_joined') || 'Driver added to queue',
       entry,
+      line: line, // Include line data in response
+      direction: direction, // Include direction used
+      mainStation: mainStation,
+      returnStation: returnStation,
       ...response,
     });
   } catch (error) {
@@ -398,6 +508,8 @@ export const updateDriverReservationStatus = async (req, res, next) => {
                 fromwalletid: driverWalletId || null, // Driver wallet if payment was transferred, null if not
                 towalletid: wallets[0].walletid, // Passenger wallet (refund destination)
                 tripid: reservation.tripid || null,
+                time: new Date().toISOString(), // Explicitly set refund time
+                external_reference: 'cancelled_by_driver', // Track that driver cancelled/rejected the reservation
               });
             }
           }
@@ -422,6 +534,81 @@ export const updateDriverReservationStatus = async (req, res, next) => {
       }
     }
 
+    // Send notification to passenger when driver rejects/cancels reservation
+    if (action === 'reject') {
+      try {
+        const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notificationService.js');
+        const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+        const Passenger = (await import('../models/Passenger.js')).default;
+        
+        // Get passenger information
+        const passenger = await Passenger.findById(reservation.passengerid);
+        if (passenger?.userid) {
+          // Get trip and line information
+          let line = null;
+          let trip = null;
+          
+          if (reservation.tripid) {
+            trip = await Trip.findById(reservation.tripid);
+            if (trip?.lineid) {
+              line = await Line.findById(trip.lineid);
+            }
+          } else if (reservation.lineid) {
+            line = await Line.findById(reservation.lineid);
+          }
+          
+          // Get trip direction if available
+          const tripDirection = trip?.direction || 'going';
+          
+          // Get line names for passenger's language
+          const { fromName, toName, language } = await getLineNamesForNotification(line, passenger.userid, req, null, tripDirection);
+          
+          // Format time if trip exists
+          let deptime = '';
+          if (trip?.deptime) {
+            const { DateTime } = await import('luxon');
+            const date = DateTime.fromISO(new Date(trip.deptime).toISOString());
+            
+            if (language === 'en') {
+              deptime = date.setLocale('en').toLocaleString({ 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true
+              });
+            } else {
+              deptime = date.setLocale('ar').toLocaleString({ 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit'
+              });
+            }
+          }
+          
+          // Send notification to passenger
+          await sendNotification(
+            passenger.userid,
+            NOTIFICATION_TYPES.RESERVATION_CANCELLED,
+            {
+              from: fromName,
+              to: toName,
+              bookingid: reservation.bookingid,
+              ...(deptime && { time: deptime }),
+            },
+            language,
+            { line, trip } // Pass raw data for separate Arabic/English formatting
+          );
+        }
+      } catch (notifError) {
+        logger.warn('[DriverController] Failed to send cancellation notification to passenger:', notifError);
+        // Don't fail the rejection if notification fails
+      }
+    }
+
     // Prepare response message
     let message;
     if (action === 'approve') {
@@ -443,6 +630,93 @@ export const updateDriverReservationStatus = async (req, res, next) => {
         message: req.t('driver.trip_forbidden') || 'Driver not authorized for this trip',
       });
     }
+    next(error);
+  }
+};
+
+export const getDriverStatistics = async (req, res, next) => {
+  try {
+    const driverRecord = await Driver.findById(req.user.driverid);
+    if (!driverRecord) {
+      return res.status(404).json({
+        message: req.t('driver.not_found') || 'Driver not found',
+      });
+    }
+
+    // Get today's date range (UTC)
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    const todayStartISO = todayStart.toISOString();
+    const todayEndISO = todayEnd.toISOString();
+
+    // Get vehicles for this driver
+    const vehicles = await Vehicle.findByDriverId(driverRecord.driverid);
+    const vehicleIds = vehicles.map((vehicle) => vehicle.vehicleid).filter(Boolean);
+
+    // Get all trips for this driver (similar to getDriverTrips)
+    const tripsByVehicle = vehicleIds.length > 0
+      ? await Trip.findByVehicleIds(vehicleIds)
+      : [];
+    const tripsByDriver = await Trip.findAssignedTrips(driverRecord.driverid);
+
+    // Combine and deduplicate trips
+    const allTrips = [...tripsByVehicle, ...tripsByDriver];
+    const uniqueTrips = Array.from(
+      new Map(allTrips.map(trip => [trip.tripid, trip])).values()
+    );
+
+    // Filter for today's trips
+    const todayTrips = uniqueTrips.filter(trip => {
+      if (!trip.deptime) return false;
+      const tripDate = new Date(trip.deptime);
+      return tripDate >= todayStart && tripDate <= todayEnd;
+    });
+
+    const todayTripsCount = todayTrips.length;
+
+    // Get passenger count (confirmed/checked_in reservations for today's trips)
+    const todayTripIds = todayTrips.map(trip => trip.tripid);
+    let totalPassengers = 0;
+
+    if (todayTripIds.length > 0) {
+      // Get reservations for today's trips
+      const allReservations = await Reservation.findAll({});
+      const todayReservations = allReservations.filter(res => 
+        todayTripIds.includes(res.tripid) &&
+        (res.status === RESERVATION_STATUS.CONFIRMED || res.status === RESERVATION_STATUS.CHECKED_IN)
+      );
+      totalPassengers = todayReservations.length;
+    }
+
+    // Get driver rating (use driver.rating field, or calculate from trip_rating if null/0)
+    let driverRating = driverRecord.rating || 0;
+    
+    // If driver rating is null or 0, calculate from trip_rating
+    if (!driverRating || driverRating === 0) {
+      // Get ratings for all trips
+      let totalRating = 0;
+      let ratingCount = 0;
+      
+      for (const trip of uniqueTrips) {
+        const tripRating = await Rating.getAverageRating(trip.tripid);
+        if (tripRating.count > 0) {
+          totalRating += tripRating.average * tripRating.count;
+          ratingCount += tripRating.count;
+        }
+      }
+
+      if (ratingCount > 0) {
+        driverRating = Math.round((totalRating / ratingCount) * 10) / 10;
+      }
+    }
+
+    res.json({
+      todayTrips: todayTripsCount,
+      passengers: totalPassengers,
+      rating: driverRating || 0,
+    });
+  } catch (error) {
     next(error);
   }
 };

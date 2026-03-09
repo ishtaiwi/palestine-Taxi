@@ -89,6 +89,26 @@ class ApiService {
   static Future<void> saveLanguagePreference(bool isArabic) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('language_arabic', isArabic);
+
+    // Sync language preference to backend
+    try {
+      final token = await getToken();
+      if (token != null) {
+        await http.put(
+          Uri.parse('${AppConfig.apiBaseUrl}/auth/profile/language'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            'language': isArabic ? 'ar' : 'en',
+          }),
+        );
+      }
+    } catch (e) {
+      // Silently fail - language preference is still saved locally
+      print('Failed to sync language preference to backend: $e');
+    }
   }
 
   static Future<bool> getLanguagePreference() async {
@@ -143,6 +163,10 @@ class ApiService {
     required String password,
   }) async {
     try {
+      // Get language preference to send to backend
+      final isArabic = await getLanguagePreference();
+      final language = isArabic ? 'ar' : 'en';
+      
       final requestBody = jsonEncode({
         'email': email.trim(),
         'password': password,
@@ -154,6 +178,7 @@ class ApiService {
             headers: {
               'Content-Type': 'application/json; charset=utf-8',
               'Accept': 'application/json; charset=utf-8',
+              'Accept-Language': language,
             },
             body: utf8.encode(requestBody),
           )
@@ -171,6 +196,37 @@ class ApiService {
           }
           if (responseData['user'] != null) {
             await saveUserData(responseData['user']);
+
+            // Sync language preference: use database value if available, otherwise sync local to database
+            final user = responseData['user'] as Map<String, dynamic>?;
+            final dbLanguage = user?['language_preference'] as String?;
+            final prefs = await SharedPreferences.getInstance();
+            if (dbLanguage != null &&
+                (dbLanguage == 'ar' || dbLanguage == 'en')) {
+              // Update local preference to match database
+              await prefs.setBool('language_arabic', dbLanguage == 'ar');
+            } else {
+              // If no language preference in database, sync local preference to backend
+              final localIsArabic = await getLanguagePreference();
+              try {
+                final syncResponse = await http.put(
+                  Uri.parse('${AppConfig.apiBaseUrl}/auth/profile/language'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ${responseData['token']}',
+                  },
+                  body: jsonEncode({
+                    'language': localIsArabic ? 'ar' : 'en',
+                  }),
+                );
+                if (syncResponse.statusCode == 200) {
+                  print('✅ Language preference synced to backend on login');
+                }
+              } catch (e) {
+                // Silently fail - language sync is not critical for login
+                print('⚠️ Failed to sync language preference on login: $e');
+              }
+            }
           }
           return {
             'success': true,
@@ -301,7 +357,8 @@ class ApiService {
           print('[ApiService.register] ✅ Registration successful');
           print('  - User saved: ${responseData['user'] != null}');
           print('  - Token saved: ${responseData['token'] != null}');
-          print('  - Approval Status: ${responseData['approvalStatus'] ?? 'N/A'}');
+          print(
+              '  - Approval Status: ${responseData['approvalStatus'] ?? 'N/A'}');
 
           return {
             'success': true,
@@ -644,7 +701,8 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> fetchDriverQueue() async {
+  static Future<Map<String, dynamic>> fetchDriverQueue(
+      {String? direction}) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -654,8 +712,16 @@ class ApiService {
         };
       }
 
+      final queryParams = <String, String>{};
+      if (direction != null && direction.isNotEmpty) {
+        queryParams['direction'] = direction;
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue').replace(
+          queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
       final response = await http.get(
-        Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue'),
+        uri,
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Accept': 'application/json; charset=utf-8',
@@ -684,7 +750,10 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> joinDriverQueue() async {
+  static Future<Map<String, dynamic>> joinDriverQueue({
+    String? direction,
+    String? stationid,
+  }) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -694,14 +763,25 @@ class ApiService {
         };
       }
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue/join'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Accept': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(AppConfig.requestTimeout);
+      final body = <String, dynamic>{};
+      if (direction != null && direction.isNotEmpty) {
+        body['direction'] = direction;
+      }
+      if (stationid != null && stationid.isNotEmpty) {
+        body['stationid'] = stationid;
+      }
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/drivers/queue/join'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
 
       final responseData = jsonDecode(utf8.decode(response.bodyBytes));
 
@@ -767,6 +847,7 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> fetchDriverTrips({
     bool upcomingOnly = true,
     String? status,
+    String? direction,
   }) async {
     final token = await getToken();
     if (token == null) {
@@ -776,6 +857,7 @@ class ApiService {
     final queryParams = <String, String>{
       if (upcomingOnly) 'upcoming': 'true',
       if (status != null && status.isNotEmpty) 'status': status,
+      if (direction != null && direction.isNotEmpty) 'direction': direction,
     };
 
     final uri = Uri.parse('${AppConfig.apiBaseUrl}/drivers/trips')
@@ -1039,6 +1121,34 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getDriverStatistics() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/drivers/statistics'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return Map<String, dynamic>.from(decoded);
+      } else {
+        throw Exception('Failed to load driver statistics');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> fetchDriverVehicles() async {
     final token = await getToken();
     if (token == null) return [];
@@ -1207,11 +1317,14 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> fetchUpcomingTrips({
     String? lineid,
     String? date,
+    String? direction,
   }) async {
     try {
       final queryParams = <String, String>{};
       if (lineid != null && lineid.isNotEmpty) queryParams['lineid'] = lineid;
       if (date != null && date.isNotEmpty) queryParams['date'] = date;
+      if (direction != null && direction.isNotEmpty)
+        queryParams['direction'] = direction;
 
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/trips/upcoming').replace(
           queryParameters: queryParams.isNotEmpty ? queryParams : null);
@@ -1251,6 +1364,62 @@ class ApiService {
       throw Exception('Failed to fetch trip');
     } catch (exception) {
       throw Exception('Failed to fetch trip: ${exception.toString()}');
+    }
+  }
+
+  static Future<Map<String, dynamic>> checkLineBookingAvailability(
+      String lineId) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            '${AppConfig.apiBaseUrl}/trips/line/$lineId/booking-availability'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return decoded is Map<String, dynamic>
+            ? decoded
+            : {'driversInQueue': 0, 'instantBookingAvailable': false};
+      }
+      return {'driversInQueue': 0, 'instantBookingAvailable': false};
+    } catch (exception) {
+      return {'driversInQueue': 0, 'instantBookingAvailable': false};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getAvailableTripTimes({
+    required String lineId,
+    required String date,
+    required String direction,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'lineid': lineId,
+        'date': date,
+        'direction': direction,
+      };
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/trips/available-times')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        return decoded is Map<String, dynamic> ? decoded : {};
+      }
+      throw Exception('Failed to get available trip times');
+    } catch (exception) {
+      throw Exception(
+          'Failed to get available trip times: ${exception.toString()}');
     }
   }
 
@@ -1705,7 +1874,7 @@ class ApiService {
   }
 
   static Future<List<Map<String, dynamic>>> fetchSchedules(
-      {String? lineid, bool? active}) async {
+      {String? lineid, bool? active, String? direction}) async {
     try {
       final token = await getToken();
       if (token == null) {
@@ -1716,6 +1885,7 @@ class ApiService {
       final queryParams = <String, String>{};
       if (lineid != null) queryParams['lineid'] = lineid;
       if (active != null) queryParams['active'] = active.toString();
+      if (direction != null) queryParams['direction'] = direction;
 
       if (queryParams.isNotEmpty) {
         url += '?${Uri(queryParameters: queryParams).query}';
@@ -1800,6 +1970,7 @@ class ApiService {
     bool active = true,
     bool? autoDepartureEnabled,
     bool? scheduledDepartureEnforced,
+    String? direction,
   }) async {
     try {
       final token = await getToken();
@@ -1824,8 +1995,11 @@ class ApiService {
               'end_hour': endHour,
               'interval_minutes': intervalMinutes,
               'active': active,
-              if (autoDepartureEnabled != null) 'auto_departure_enabled': autoDepartureEnabled,
-              if (scheduledDepartureEnforced != null) 'scheduled_departure_enforced': scheduledDepartureEnforced,
+              if (autoDepartureEnabled != null)
+                'auto_departure_enabled': autoDepartureEnabled,
+              if (scheduledDepartureEnforced != null)
+                'scheduled_departure_enforced': scheduledDepartureEnforced,
+              if (direction != null) 'direction': direction,
             })),
           )
           .timeout(AppConfig.requestTimeout);
@@ -1863,6 +2037,7 @@ class ApiService {
     bool? active,
     bool? autoDepartureEnabled,
     bool? scheduledDepartureEnforced,
+    String? direction,
   }) async {
     try {
       final token = await getToken();
@@ -1879,8 +2054,11 @@ class ApiService {
       if (endHour != null) body['end_hour'] = endHour;
       if (intervalMinutes != null) body['interval_minutes'] = intervalMinutes;
       if (active != null) body['active'] = active;
-      if (autoDepartureEnabled != null) body['auto_departure_enabled'] = autoDepartureEnabled;
-      if (scheduledDepartureEnforced != null) body['scheduled_departure_enforced'] = scheduledDepartureEnforced;
+      if (autoDepartureEnabled != null)
+        body['auto_departure_enabled'] = autoDepartureEnabled;
+      if (scheduledDepartureEnforced != null)
+        body['scheduled_departure_enforced'] = scheduledDepartureEnforced;
+      if (direction != null) body['direction'] = direction;
 
       final response = await http
           .put(
@@ -2056,6 +2234,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getRushHourPredictionsAdmin({
     required String lineId,
+    String? direction,
     int? daysAhead,
   }) async {
     final token = await getToken();
@@ -2064,6 +2243,7 @@ class ApiService {
     }
 
     final queryParams = <String, String>{'lineid': lineId};
+    if (direction != null) queryParams['direction'] = direction;
     if (daysAhead != null) queryParams['daysAhead'] = daysAhead.toString();
 
     final uri =
@@ -2310,6 +2490,8 @@ class ApiService {
     int? estduration,
     double? distance,
     bool active = true,
+    String? mainStationId,
+    String? returnStationId,
   }) async {
     try {
       final token = await getToken();
@@ -2338,6 +2520,10 @@ class ApiService {
 
       if (estduration != null) body['estduration'] = estduration;
       if (distance != null) body['distance'] = distance;
+      if (mainStationId != null && mainStationId.isNotEmpty)
+        body['main_stationid'] = mainStationId;
+      if (returnStationId != null && returnStationId.isNotEmpty)
+        body['return_stationid'] = returnStationId;
 
       final response = await http
           .post(
@@ -2373,6 +2559,8 @@ class ApiService {
     int? estduration,
     double? distance,
     bool? active,
+    String? mainStationId,
+    String? returnStationId,
   }) async {
     try {
       final token = await getToken();
@@ -2396,6 +2584,20 @@ class ApiService {
       if (estduration != null) body['estduration'] = estduration;
       if (distance != null) body['distance'] = distance;
       if (active != null) body['active'] = active;
+      if (mainStationId != null) {
+        if (mainStationId.isEmpty) {
+          body['main_stationid'] = null;
+        } else {
+          body['main_stationid'] = mainStationId;
+        }
+      }
+      if (returnStationId != null) {
+        if (returnStationId.isEmpty) {
+          body['return_stationid'] = null;
+        } else {
+          body['return_stationid'] = returnStationId;
+        }
+      }
 
       final response = await http
           .put(
@@ -2516,6 +2718,7 @@ class ApiService {
     String? startDate,
     String? endDate,
     String? groupBy,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2527,6 +2730,7 @@ class ApiService {
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
       if (groupBy != null) queryParams['groupBy'] = groupBy;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri =
           Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/revenue-timeseries')
@@ -2556,6 +2760,7 @@ class ApiService {
     String? startDate,
     String? endDate,
     String? groupBy,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2567,6 +2772,7 @@ class ApiService {
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
       if (groupBy != null) queryParams['groupBy'] = groupBy;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri =
           Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/booking-timeseries')
@@ -2595,6 +2801,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getTripStatistics({
     String? startDate,
     String? endDate,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2605,6 +2812,7 @@ class ApiService {
       final queryParams = <String, String>{};
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri =
           Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/trip-statistics')
@@ -2634,6 +2842,7 @@ class ApiService {
     String? startDate,
     String? endDate,
     String? groupBy,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2645,6 +2854,7 @@ class ApiService {
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
       if (groupBy != null) queryParams['groupBy'] = groupBy;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/user-growth')
           .replace(
@@ -2672,6 +2882,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getVehicleUtilization({
     String? startDate,
     String? endDate,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2682,6 +2893,7 @@ class ApiService {
       final queryParams = <String, String>{};
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri =
           Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/vehicle-utilization')
@@ -2710,6 +2922,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getLinePerformance({
     String? startDate,
     String? endDate,
+    bool comparePrevious = false,
   }) async {
     try {
       final token = await getToken();
@@ -2720,6 +2933,7 @@ class ApiService {
       final queryParams = <String, String>{};
       if (startDate != null) queryParams['startDate'] = startDate;
       if (endDate != null) queryParams['endDate'] = endDate;
+      if (comparePrevious) queryParams['comparePrevious'] = 'true';
 
       final uri =
           Uri.parse('${AppConfig.apiBaseUrl}/admin/reports/line-performance')
@@ -2848,6 +3062,32 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> reactivateUser(String userid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/users/$userid/reactivate'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'message': decoded['message'] ??
+            (response.statusCode == 200 ? 'User reactivated' : 'Failed'),
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getAllVehicles() async {
     try {
       final token = await getToken();
@@ -2871,6 +3111,37 @@ class ApiService {
         throw Exception('Unexpected response format');
       } else {
         throw Exception('Failed to load vehicles');
+      }
+    } catch (exception) {
+      throw Exception(exception.toString());
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getAllDrivers() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('Not authenticated');
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/admin/drivers'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is Map && decoded['drivers'] is List) {
+          return (decoded['drivers'] as List)
+              .map((d) => Map<String, dynamic>.from(d))
+              .toList();
+        }
+        throw Exception('Unexpected response format');
+      } else {
+        throw Exception('Failed to load drivers');
       }
     } catch (exception) {
       throw Exception(exception.toString());
@@ -2906,6 +3177,136 @@ class ApiService {
       }
     } catch (exception) {
       throw Exception(exception.toString());
+    }
+  }
+
+  static Future<Map<String, dynamic>> createTrip({
+    required String lineid,
+    String? vehicleid,
+    required String deptime,
+    int? availableseats,
+    String? direction,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final body = <String, dynamic>{
+        'lineid': lineid,
+        'deptime': deptime,
+      };
+      if (vehicleid != null && vehicleid.isNotEmpty) {
+        body['vehicleid'] = vehicleid;
+      }
+      if (availableseats != null) {
+        body['availableseats'] = availableseats;
+      }
+      if (direction != null && direction.isNotEmpty) {
+        body['direction'] = direction;
+      }
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/trips'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 201,
+        'message': decoded['message'] ??
+            (response.statusCode == 201
+                ? 'Trip created successfully'
+                : 'Failed to create trip'),
+        'trip': decoded['trip'],
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateTrip(
+    String tripid, {
+    String? lineid,
+    String? vehicleid,
+    String? deptime,
+    int? availableseats,
+    String? direction,
+    String? status,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final body = <String, dynamic>{};
+      if (lineid != null) body['lineid'] = lineid;
+      if (vehicleid != null) body['vehicleid'] = vehicleid;
+      if (deptime != null) body['deptime'] = deptime;
+      if (availableseats != null) body['availableseats'] = availableseats;
+      if (direction != null) body['direction'] = direction;
+      if (status != null) body['status'] = status;
+
+      final response = await http
+          .put(
+            Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripid'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'message': decoded['message'] ??
+            (response.statusCode == 200
+                ? 'Trip updated successfully'
+                : 'Failed to update trip'),
+        'trip': decoded['trip'],
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteTrip(String tripid) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Not authenticated'};
+      }
+
+      final response = await http.delete(
+        Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripid'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      return {
+        'success': response.statusCode == 200,
+        'message': decoded['message'] ??
+            (response.statusCode == 200
+                ? 'Trip deleted successfully'
+                : 'Failed'),
+      };
+    } catch (exception) {
+      return {'success': false, 'message': exception.toString()};
     }
   }
 
@@ -3059,6 +3460,36 @@ class ApiService {
       throw Exception('Failed to load rating');
     } catch (exception) {
       return null;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getPendingRatings() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return [];
+      }
+
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/ratings/pending'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        if (decoded is List) {
+          return decoded
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+        }
+        return [];
+      }
+      return [];
+    } catch (exception) {
+      return [];
     }
   }
 
@@ -3849,6 +4280,543 @@ class ApiService {
       return {
         'success': false,
         'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Get queue location validation configuration (Admin only)
+  static Future<Map<String, dynamic>> getQueueLocationValidationConfig() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http.get(
+        Uri.parse(
+            '${AppConfig.apiBaseUrl}/admin/config/queue-location-validation'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'enabled': decoded['enabled'] ?? false,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to get queue location validation configuration',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Register FCM token with backend
+  static Future<Map<String, dynamic>> registerFcmToken(
+      String token, String deviceType, String? deviceId) async {
+    try {
+      final authToken = await getToken();
+      if (authToken == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri =
+          Uri.parse('${AppConfig.apiBaseUrl}/notifications/register-token');
+      final response = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $authToken',
+            },
+            body: jsonEncode({
+              'fcm_token': token,
+              'device_type': deviceType,
+              'device_id': deviceId,
+            }),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Token registered successfully',
+          'token': decoded['token'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to register token',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Get user notifications
+  static Future<Map<String, dynamic>> getNotifications({
+    int page = 1,
+    int limit = 20,
+    bool? read,
+    String? type,
+  }) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+      if (read != null) {
+        queryParams['read'] = read.toString();
+      }
+      if (type != null) {
+        queryParams['type'] = type;
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/notifications')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'notifications': decoded['notifications'] ?? [],
+          'pagination': decoded['pagination'] ?? {},
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to get notifications',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Update queue location validation configuration (Admin only)
+  static Future<Map<String, dynamic>> updateQueueLocationValidationConfig(
+      bool enabled) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final response = await http
+          .put(
+            Uri.parse(
+                '${AppConfig.apiBaseUrl}/admin/config/queue-location-validation'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+              'Authorization': 'Bearer $token',
+            },
+            body: utf8.encode(jsonEncode({
+              'enabled': enabled,
+            })),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map<String, dynamic>) {
+        return {
+          'success': true,
+          'message': decoded['message'] ??
+              'Queue location validation configuration updated successfully',
+          'enabled': decoded['enabled'] ?? enabled,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] is String
+            ? decoded['message']
+            : 'Failed to update queue location validation configuration',
+      };
+    } catch (exception) {
+      return {
+        'success': false,
+        'message': 'Connection error: ${exception.toString()}',
+      };
+    }
+  }
+
+  /// Get unread notification count
+  static Future<Map<String, dynamic>> getUnreadCount() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri =
+          Uri.parse('${AppConfig.apiBaseUrl}/notifications/unread-count');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'count': decoded['count'] ?? 0,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to get unread count',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Mark notification as read
+  static Future<Map<String, dynamic>> markNotificationAsRead(
+      String notificationId) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri = Uri.parse(
+          '${AppConfig.apiBaseUrl}/notifications/$notificationId/read');
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Notification marked as read',
+          'notification': decoded['notification'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to mark notification as read',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Mark all notifications as read
+  static Future<Map<String, dynamic>> markAllNotificationsAsRead() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/notifications/read-all');
+
+      final response = await http.put(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'All notifications marked as read',
+          'count': decoded['count'] ?? 0,
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to mark all notifications as read',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Delete notification
+  static Future<Map<String, dynamic>> deleteNotification(
+      String notificationId) async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        return {
+          'success': false,
+          'message': 'Not authenticated',
+        };
+      }
+
+      final uri =
+          Uri.parse('${AppConfig.apiBaseUrl}/notifications/$notificationId');
+
+      final response = await http.delete(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Notification deleted successfully',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to delete notification',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  // ==================== Walk-in Terminal API Methods ====================
+
+  /// Get all active lines for walk-in terminal (no auth required)
+  static Future<Map<String, dynamic>> getWalkInLines() async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/walkin/lines'),
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'lines': decoded['lines'] ?? [],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to fetch lines',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Get available trips for walk-in booking (no auth required)
+  static Future<Map<String, dynamic>> getWalkInTrips({
+    required String lineid,
+    String? direction,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'lineid': lineid,
+      };
+      if (direction != null && direction.isNotEmpty) {
+        queryParams['direction'] = direction;
+      }
+
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/walkin/trips')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+        },
+      ).timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200 && decoded is Map) {
+        return {
+          'success': true,
+          'trips': decoded['trips'] ?? [],
+          'line': decoded['line'],
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to fetch trips',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
+      };
+    }
+  }
+
+  /// Register walk-in booking with instant trip selection (no auth required)
+  static Future<Map<String, dynamic>> registerWalkInBooking({
+    required String lineid,
+    required String phone,
+    required String tripid,
+    String? dropoffpoint,
+    String? aging,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'lineid': lineid,
+        'phone': phone,
+        'tripid': tripid,
+      };
+      if (dropoffpoint != null && dropoffpoint.isNotEmpty) {
+        body['dropoffpoint'] = dropoffpoint;
+      }
+      if (aging != null && aging.isNotEmpty) {
+        body['aging'] = aging;
+      }
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/walkin/register'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
+            body: utf8.encode(jsonEncode(body)),
+          )
+          .timeout(AppConfig.requestTimeout);
+
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 201 && decoded is Map) {
+        return {
+          'success': true,
+          'message': decoded['message'] ?? 'Booking created successfully',
+          'reservation': decoded['reservation'],
+          'payment': decoded['payment'],
+          'qrCode': decoded['qrCode'],
+          'qrData': decoded['qrData'],
+          'line': decoded['line'],
+          'trip': decoded['trip'],
+          'driver': decoded['driver'], // Driver info for walk-in bookings
+        };
+      }
+
+      return {
+        'success': false,
+        'message': decoded is Map && decoded['message'] != null
+            ? decoded['message']
+            : 'Failed to create booking',
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': e.toString(),
       };
     }
   }

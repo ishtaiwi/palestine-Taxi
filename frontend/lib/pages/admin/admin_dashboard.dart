@@ -11,6 +11,7 @@ import '../../theme/app_theme.dart';
 import '../../utils/responsive_layout.dart';
 import '../../widgets/reports/revenue_chart.dart';
 import '../../widgets/reports/trip_chart.dart';
+import '../../widgets/reports/shared/shared.dart';
 import 'admin_schedules_page.dart';
 import 'admin_lines_page.dart';
 import 'admin_users_page.dart';
@@ -23,6 +24,9 @@ import 'admin_base_station_page.dart';
 import 'admin_reports_page.dart';
 import 'admin_settings_page.dart';
 import 'admin_driver_approvals_page.dart';
+import 'admin_routes_page.dart';
+import '../../widgets/weather/weather_widget.dart';
+import '../../widgets/weather/map_weather_stack.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -77,12 +81,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'role': 'الدور',
       'admin': 'المدير',
       'logout': 'تسجيل الخروج',
-      'aiPredictions': 'توقعات الذكاء الاصطناعي',
+      'aiPredictions': 'التوقعات الإحصائية',
       'vehicleMap': 'خريطة المركبات',
       'baseStations': 'محطات القاعدة',
       'settings': 'الإعدادات',
       'analytics': 'التحليلات',
       'map': 'الخريطة',
+      'routes': 'المسارات',
     },
     'en': {
       'title': 'Admin Dashboard',
@@ -104,12 +109,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       'role': 'Role',
       'admin': 'Admin',
       'logout': 'Logout',
-      'aiPredictions': 'AI Predictions',
+      'aiPredictions': 'Statistical Predictions',
       'vehicleMap': 'Vehicle Map',
       'baseStations': 'Base Stations',
       'settings': 'Settings',
       'analytics': 'Analytics',
       'map': 'Map',
+      'routes': 'Routes',
     },
   };
 
@@ -687,7 +693,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     SizedBox(width: isSmallScreen ? 8.0 : 12.0),
                     Expanded(
                       child: _buildActionCard(
-                        icon: Icons.route_rounded,
+                        icon: Icons.timeline_rounded,
                         title: t('lines'),
                         color: Colors.green,
                         isSmallScreen: isSmallScreen,
@@ -696,6 +702,20 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             context,
                             MaterialPageRoute(
                                 builder: (_) => const AdminLinesPage())),
+                      ),
+                    ),
+                    SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                    Expanded(
+                      child: _buildActionCard(
+                        icon: Icons.route_rounded,
+                        title: t('routes'),
+                        color: Colors.cyan,
+                        isSmallScreen: isSmallScreen,
+                        isMediumScreen: isMediumScreen,
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const AdminRoutesPage())),
                       ),
                     ),
                   ],
@@ -857,6 +877,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               cardColor, textPrimaryColor, textSecondaryColor,
               isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
           SizedBox(
+              height: isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0)),
+          // Weather Widget below the map
+          WeatherWidget(
+            isArabic: _isArabic,
+            isSmallScreen: isSmallScreen,
+            isMediumScreen: isMediumScreen,
+            isDesktop: false,
+          ),
+          SizedBox(
               height: isSmallScreen ? 20.0 : (isMediumScreen ? 26.0 : 32.0)),
           _buildPredictionSummaryCard(
               cardColor, textPrimaryColor, textSecondaryColor,
@@ -989,11 +1018,23 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 title: t('lines'),
                 titleStyle: TextStyle(
                     color: _isDarkMode ? Colors.white : Colors.black87),
-                icon: Icon(Icons.route_rounded,
+                icon: Icon(Icons.timeline_rounded,
                     color: _isDarkMode ? Colors.white70 : Colors.black54),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const AdminLinesPage()),
+                ),
+              ),
+              SideMenuItemDataTile(
+                isSelected: false,
+                title: t('routes'),
+                titleStyle: TextStyle(
+                    color: _isDarkMode ? Colors.white : Colors.black87),
+                icon: Icon(Icons.route_rounded,
+                    color: _isDarkMode ? Colors.white70 : Colors.black54),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AdminRoutesPage()),
                 ),
               ),
               SideMenuItemDataTile(
@@ -1204,10 +1245,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ),
           ),
         ),
-        // Main content area
+        // Main content area - fits screen height without scrolling
         Expanded(
           child: SafeArea(
-            child: SingleChildScrollView(
+            child: Padding(
               padding: const EdgeInsets.all(10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1216,98 +1257,118 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   _buildStatsGrid(
                       cardColor, textPrimaryColor, textSecondaryColor),
                   const SizedBox(height: 8),
-                  // Main content: Map on left (2 rows), right side has cards
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Left: Map spanning 2 rows
-                      Expanded(
-                        flex: 3,
-                        child: _buildLargeMapCard(
-                          cardColor,
-                          textPrimaryColor,
-                          textSecondaryColor,
+                  // Main content: Map+Weather on left, right side has cards
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Left: Map + Weather Stack (weather expands upward)
+                        Expanded(
+                          flex: 3,
+                          child: MapWeatherStack(
+                            isArabic: _isArabic,
+                            mapLoading: _mapLoading,
+                            baseStations: _baseStations,
+                            vehicleLocations: _vehicleLocations,
+                            mapController: _mapController,
+                            onMapTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AdminMapPage(),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Right side: Column with Status/Activity + Charts
-                      Expanded(
-                        flex: 4,
-                        child: Column(
-                          children: [
-                            // Row 1: System Status | Activity | AI Insights
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: _buildSystemStatusCard(
-                                    cardColor,
-                                    textPrimaryColor,
-                                    textSecondaryColor,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _buildRecentActivityCard(
-                                    cardColor,
-                                    textPrimaryColor,
-                                    textSecondaryColor,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    children: [
-                                      _buildCompactAiInsightsCard(
+                        const SizedBox(width: 8),
+                        // Right side: Column with Status/Activity + Charts
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            children: [
+                              // Row 1: System Status | Activity | AI Insights
+                              Expanded(
+                                flex: 5,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(
+                                      child: _buildSystemStatusCard(
                                         cardColor,
                                         textPrimaryColor,
                                         textSecondaryColor,
                                       ),
-                                      const SizedBox(height: 8),
-                                      _buildServerHealthCard(
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _buildRecentActivityCard(
                                         cardColor,
                                         textPrimaryColor,
                                         textSecondaryColor,
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        children: [
+                                          Expanded(
+                                            child: _buildCompactAiInsightsCard(
+                                              cardColor,
+                                              textPrimaryColor,
+                                              textSecondaryColor,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Expanded(
+                                            child: _buildServerHealthCard(
+                                              cardColor,
+                                              textPrimaryColor,
+                                              textSecondaryColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            // Row 2: Revenue + Trips charts
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: _buildMiniChartCard(
-                                    title: t('revenue'),
-                                    icon: Icons.attach_money_rounded,
-                                    color: Colors.green,
-                                    cardColor: cardColor,
-                                    textPrimaryColor: textPrimaryColor,
-                                    child: _buildCompactRevenueChart(
-                                        textPrimaryColor, textSecondaryColor),
-                                  ),
+                              ),
+                              const SizedBox(height: 8),
+                              // Row 2: Revenue + Trips charts
+                              Expanded(
+                                flex: 5,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(
+                                      child: _buildMiniChartCard(
+                                        title: t('revenue'),
+                                        icon: Icons.attach_money_rounded,
+                                        color: Colors.green,
+                                        cardColor: cardColor,
+                                        textPrimaryColor: textPrimaryColor,
+                                        child: _buildCompactRevenueChart(
+                                            textPrimaryColor, textSecondaryColor),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: _buildMiniChartCard(
+                                        title: t('trips'),
+                                        icon: Icons.directions_bus_filled_rounded,
+                                        color: Colors.purple,
+                                        cardColor: cardColor,
+                                        textPrimaryColor: textPrimaryColor,
+                                        child: _buildCompactTripChart(
+                                            textPrimaryColor, textSecondaryColor),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: _buildMiniChartCard(
-                                    title: t('trips'),
-                                    icon: Icons.directions_bus_filled_rounded,
-                                    color: Colors.purple,
-                                    cardColor: cardColor,
-                                    textPrimaryColor: textPrimaryColor,
-                                    child: _buildCompactTripChart(
-                                        textPrimaryColor, textSecondaryColor),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -1726,9 +1787,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 _vehicleLocations[0]['longitude']?.toDouble() ?? 35.2332)
             : const LatLng(31.9522, 35.2332);
 
-    // Height to match 2 rows: 250 + 8 + 270 = 528
+    // Reduced height to accommodate weather widget below (was 528)
     return Container(
-      height: 528,
+      height: 460,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: cardColor,
@@ -1910,7 +1971,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
               const SizedBox(width: 6),
               Text(
-                _isArabic ? 'توقعات الذكاء' : 'AI Insights',
+                _isArabic ? 'الرؤى الإحصائية' : 'Statistical Insights',
                 style: TextStyle(
                     color: textPrimary,
                     fontWeight: FontWeight.w600,
@@ -2358,12 +2419,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final totalTransactions = _revenueStats?['totalTransactions'] ?? 0;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(_formatRevenue(totalRevenue),
                     style: TextStyle(
@@ -2375,6 +2438,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text('$totalTransactions',
                     style: TextStyle(
@@ -2388,10 +2452,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ],
         ),
         const SizedBox(height: 4),
-        RevenueChart(
-          data: _revenueChartData ?? const {},
-          isArabic: _isArabic,
-          showSummary: false,
+        Flexible(
+          child: SizedBox(
+            height: 200,
+            child: RevenueChart(
+              data: _revenueChartData ?? const {},
+              isArabic: _isArabic,
+              showSummary: false,
+              showInsights: false,
+              showComparison: false,
+              preferredSize: ChartSize.small,
+            ),
+          ),
         ),
       ],
     );
@@ -2402,12 +2474,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final completed = _dashboardStats?['completedTrips'] ?? 0;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text('$totalTrips',
                     style: TextStyle(
@@ -2419,6 +2493,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ],
             ),
             Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text('$completed',
                     style: TextStyle(
@@ -2432,9 +2507,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           ],
         ),
         const SizedBox(height: 4),
-        TripTimeSeriesChart(
-          data: _tripChartData ?? const {},
-          isArabic: _isArabic,
+        Flexible(
+          child: SizedBox(
+            height: 200,
+            child: TripTimeSeriesChart(
+              data: _tripChartData ?? const {},
+              isArabic: _isArabic,
+              showSummary: false,
+              showInsights: false,
+              preferredSize: ChartSize.small,
+            ),
+          ),
         ),
       ],
     );
@@ -2626,7 +2709,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final topLines = (_predictionInsights?['topLines'] as List<dynamic>?) ?? [];
 
     return _buildSectionCard(
-      title: _isArabic ? 'تحليلات الطلب' : 'AI Demand Insights',
+      title: _isArabic ? 'تحليلات الطلب' : 'Statistical Demand Insights',
       icon: Icons.trending_up_rounded,
       color: Colors.deepOrange,
       cardColor: cardColor,

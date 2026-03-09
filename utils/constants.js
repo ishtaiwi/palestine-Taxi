@@ -50,6 +50,7 @@ export const PAYMENT_STATUS = {
 export const PAYMENT_METHOD = {
   WALLET: 'wallet',
   CARD: 'card',
+  CASH: 'cash',
 };
 
 export const WALLET_TYPE = {
@@ -107,4 +108,16 @@ export const QUEUE_STATUS = {
   ASSIGNED: 'assigned',
   LEFT: 'left',
 };
+
+export const TRIP_DIRECTION = {
+  GOING: 'going',
+  RETURN: 'return',
+};
+
+export const QUEUE_DIRECTION = {
+  GOING: 'going',
+  RETURNING: 'returning',
+};
+
+export const CONFIG_KEY_QUEUE_LOCATION_VALIDATION = 'queue_location_validation_enabled';
 

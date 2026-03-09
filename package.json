@@ -28,6 +28,7 @@
     "express": "^4.18.2",
     "express-rate-limit": "^8.2.1",
     "express-validator": "^7.0.1",
+    "firebase-admin": "^12.0.0",
     "jsonwebtoken": "^9.0.2",
     "luxon": "^3.7.2",
     "ml-matrix": "^6.11.0",

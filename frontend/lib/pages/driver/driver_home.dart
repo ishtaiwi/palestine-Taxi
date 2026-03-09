@@ -15,6 +15,9 @@ import 'driver_vehicle_page.dart';
 import 'driver_profile_page.dart';
 import 'driver_wallet_page.dart';
 import 'driver_location_tracking_page.dart';
+import 'driver_notifications_page.dart';
+import '../../widgets/notification_badge.dart';
+import '../../services/notification_service.dart';
 
 class DriverHomePage extends StatefulWidget {
   const DriverHomePage({super.key});
@@ -35,6 +38,13 @@ class _DriverHomePageState extends State<DriverHomePage>
   final ImagePicker _imagePicker = ImagePicker();
   bool _isTracking = false;
   final LocationService _locationService = LocationService.instance;
+  
+  // Statistics
+  int _todayTrips = 0;
+  int _passengers = 0;
+  double _rating = 0.0;
+  bool _isLoadingStats = true;
+  int _unreadNotificationCount = 0;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -109,6 +119,7 @@ class _DriverHomePageState extends State<DriverHomePage>
     WidgetsBinding.instance.addObserver(this);
     _loadUserData();
     _loadProfileImage();
+    _loadStatistics();
   }
 
   @override
@@ -139,6 +150,98 @@ class _DriverHomePageState extends State<DriverHomePage>
     // Auto-start location tracking for drivers
     if (userData != null && userData['role'] == 'DRIVER') {
       await _checkAndStartTracking();
+    }
+
+    // Initialize notifications
+    _initializeNotifications();
+    _loadUnreadCount();
+  }
+
+  Future<void> _initializeNotifications() async {
+    try {
+      await NotificationService().initialize();
+      NotificationService().setOnNotificationTap((data) {
+        // Show notification dialog when push notification is tapped
+        final isArabic = _isArabic;
+        final title = data['title'] as String? ?? (isArabic ? 'إشعار' : 'Notification');
+        final body = data['body'] as String? ?? (isArabic ? 'إشعار جديد' : 'New notification');
+        
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              content: SingleChildScrollView(
+                child: Text(
+                  body,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(isArabic ? 'إغلاق' : 'Close'),
+                ),
+              ],
+            );
+          },
+        );
+        
+        // Handle notification tap navigation based on data['action']
+        if (data['action'] == 'view_trip' && data['tripid'] != null) {
+          // Navigate to trip details
+          // Navigator.push(...);
+        } else if (data['action'] == 'view_payment' && data['paymentid'] != null) {
+          // Navigate to payment details
+          // Navigator.push(...);
+        }
+      });
+    } catch (e) {
+      print('Error initializing notifications: $e');
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final result = await ApiService.getUnreadCount();
+      if (result['success'] == true && mounted) {
+        setState(() {
+          _unreadNotificationCount = result['count'] as int? ?? 0;
+        });
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
+  Future<void> _loadStatistics() async {
+    try {
+      setState(() {
+        _isLoadingStats = true;
+      });
+      
+      final statistics = await ApiService.getDriverStatistics();
+      
+      if (mounted) {
+        setState(() {
+          _todayTrips = statistics['todayTrips'] ?? 0;
+          _passengers = statistics['passengers'] ?? 0;
+          _rating = (statistics['rating'] ?? 0.0).toDouble();
+          _isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _todayTrips = 0;
+          _passengers = 0;
+          _rating = 0.0;
+          _isLoadingStats = false;
+        });
+      }
     }
   }
 
@@ -381,6 +484,22 @@ class _DriverHomePageState extends State<DriverHomePage>
               iconTheme: const IconThemeData(color: Colors.white),
               actionsIconTheme: const IconThemeData(color: Colors.white),
               actions: [
+                // Notification badge
+                NotificationBadge(
+                  count: _unreadNotificationCount,
+                  child: IconButton(
+                    icon: const Icon(Icons.notifications, color: Colors.white),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DriverNotificationsPage(),
+                        ),
+                      ).then((_) => _loadUnreadCount());
+                    },
+                    tooltip: 'Notifications',
+                  ),
+                ),
                 // Tracking status indicator
                 GestureDetector(
                   onTap: () async {
@@ -1200,39 +1319,48 @@ class _DriverHomePageState extends State<DriverHomePage>
                                 ),
                               ],
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                _buildStatItem(
-                                  t('todayTrips'),
-                                  '0',
-                                  Colors.white,
-                                  Icons.local_taxi_rounded,
-                                ),
-                                Container(
-                                  width: 1,
-                                  height: 60,
-                                  color: Colors.white.withAlpha(77),
-                                ),
-                                _buildStatItem(
-                                  t('passengers'),
-                                  '0',
-                                  Colors.white,
-                                  Icons.people_rounded,
-                                ),
-                                Container(
-                                  width: 1,
-                                  height: 60,
-                                  color: Colors.white.withAlpha(77),
-                                ),
-                                _buildStatItem(
-                                  t('rating'),
-                                  '4.5',
-                                  Colors.white,
-                                  Icons.star_rounded,
-                                ),
-                              ],
-                            ),
+                            child: _isLoadingStats
+                                ? const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(24.0),
+                                      child: CircularProgressIndicator(
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                    children: [
+                                      _buildStatItem(
+                                        t('todayTrips'),
+                                        '$_todayTrips',
+                                        Colors.white,
+                                        Icons.local_taxi_rounded,
+                                      ),
+                                      Container(
+                                        width: 1,
+                                        height: 60,
+                                        color: Colors.white.withAlpha(77),
+                                      ),
+                                      _buildStatItem(
+                                        t('passengers'),
+                                        '$_passengers',
+                                        Colors.white,
+                                        Icons.people_rounded,
+                                      ),
+                                      Container(
+                                        width: 1,
+                                        height: 60,
+                                        color: Colors.white.withAlpha(77),
+                                      ),
+                                      _buildStatItem(
+                                        t('rating'),
+                                        _rating.toStringAsFixed(1),
+                                        Colors.white,
+                                        Icons.star_rounded,
+                                      ),
+                                    ],
+                                  ),
                           ),
                           const SizedBox(height: 28),
 

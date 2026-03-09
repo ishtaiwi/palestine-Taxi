@@ -4,6 +4,7 @@ import {
   login,
   getProfile,
   updateProfile,
+  updateLanguagePreference,
   changePassword,
   requestPasswordReset,
   verifyResetCode,
@@ -70,6 +71,7 @@ router.post('/check-user', async (req, res, next) => {
 });
 router.get('/profile', authenticate, getProfile);
 router.put('/profile', authenticate, updateProfile);
+router.put('/profile/language', authenticate, updateLanguagePreference);
 
 router.post(
   '/profile/avatar',

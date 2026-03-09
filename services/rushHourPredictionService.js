@@ -9,11 +9,32 @@ const DEFAULT_LOOKBACK_DAYS = Number(process.env.PREDICTION_LOOKBACK_DAYS || 90)
 const DEFAULT_FORWARD_DAYS = Number(process.env.PREDICTION_FORWARD_DAYS || 7);
 const RUSH_THRESHOLD_MULTIPLIER = Number(process.env.RUSH_HOUR_THRESHOLD || 0.7);
 
+// Supported directions for predictions
+export const DIRECTIONS = ['going', 'return'];
+
 const modelState = {
     lastTrainedAt: null,
     lastBulkTrainingRange: null,
-    lines: new Map(), // lineid -> { buckets: Map, stats: {...} }
+    // Key format: "lineid_direction" -> { buckets: Map, stats: {...} }
+    lines: new Map(),
 };
+
+/**
+ * Build a model key from lineid and direction
+ */
+function buildModelKey(lineid, direction) {
+    return `${lineid}_${direction}`;
+}
+
+/**
+ * Parse a model key back to lineid and direction
+ */
+function parseModelKey(modelKey) {
+    const parts = modelKey.split('_');
+    const direction = parts.pop();
+    const lineid = parts.join('_');
+    return { lineid, direction };
+}
 
 export async function trainModelBulk(options = {}) {
     const now = new Date();
@@ -33,22 +54,32 @@ export async function trainModelBulk(options = {}) {
         filters.booking_type = options.booking_type;
     }
 
+    // If direction is specified, only train for that direction
+    if (options.direction) {
+        filters.direction = options.direction;
+    }
+
     const historicalBuckets = await Reservation.getHistoricalBookingsByTimeRange(start, end, filters);
 
-    const trainedLines = new Set();
+    const trainedModels = new Set(); // Now tracks "lineid_direction" keys
     let sampleCount = 0;
 
     for (const bucket of historicalBuckets) {
         if (!bucket.lineid) continue;
-        trainedLines.add(bucket.lineid);
+
+        // Use direction from bucket (defaults to 'going' if not present)
+        const direction = bucket.direction || 'going';
+        const modelKey = buildModelKey(bucket.lineid, direction);
+
+        trainedModels.add(modelKey);
         sampleCount += bucket.totalBookings;
 
-        const lineModel = getOrCreateLineModel(bucket.lineid);
+        const lineModel = getOrCreateLineModel(bucket.lineid, direction);
         mergeBucket(lineModel, bucket);
     }
 
-    for (const lineid of trainedLines) {
-        recomputeStats(modelState.lines.get(lineid));
+    for (const modelKey of trainedModels) {
+        recomputeStats(modelState.lines.get(modelKey));
     }
 
     modelState.lastTrainedAt = new Date().toISOString();
@@ -66,8 +97,12 @@ export async function trainModelBulk(options = {}) {
         });
     }
 
+    // Parse trained models back to lineid + direction for reporting
+    const trainedLineDirections = Array.from(trainedModels).map(parseModelKey);
+
     return {
-        trainedLines: Array.from(trainedLines),
+        trainedModels: Array.from(trainedModels),
+        trainedLineDirections,
         samplesProcessed: sampleCount,
         lookbackWindow: {
             start: start.toISOString(),
@@ -77,14 +112,18 @@ export async function trainModelBulk(options = {}) {
 }
 
 export async function updateModelIncremental(events = []) {
-    let updatedLines = new Set();
+    let updatedModels = new Set();
 
     for (const event of events) {
         if (!event?.lineid || !event.eventTime) {
             continue;
         }
 
-        const lineModel = getOrCreateLineModel(event.lineid);
+        // Use direction from event (defaults to 'going' if not present)
+        const direction = event.direction || 'going';
+        const modelKey = buildModelKey(event.lineid, direction);
+
+        const lineModel = getOrCreateLineModel(event.lineid, direction);
         const date = new Date(event.eventTime);
         if (Number.isNaN(date.getTime())) continue;
 
@@ -95,6 +134,7 @@ export async function updateModelIncremental(events = []) {
         if (!lineModel.buckets.has(key)) {
             lineModel.buckets.set(key, {
                 lineid: event.lineid,
+                direction,
                 dayOfWeek,
                 hour,
                 totalBookings: 0,
@@ -108,14 +148,14 @@ export async function updateModelIncremental(events = []) {
         bucket.sampleCount += 1;
         bucket.statusBreakdown[event.status] = (bucket.statusBreakdown[event.status] || 0) + 1;
 
-        updatedLines.add(event.lineid);
+        updatedModels.add(modelKey);
     }
 
-    updatedLines = Array.from(updatedLines);
-    updatedLines.forEach((lineid) => recomputeStats(modelState.lines.get(lineid)));
+    updatedModels = Array.from(updatedModels);
+    updatedModels.forEach((modelKey) => recomputeStats(modelState.lines.get(modelKey)));
 
     // Debounced save - only save if we processed significant updates
-    if (updatedLines.length > 0 && events.length >= 5) {
+    if (updatedModels.length > 0 && events.length >= 5) {
         try {
             await saveModelToDatabase();
         } catch (saveError) {
@@ -126,28 +166,43 @@ export async function updateModelIncremental(events = []) {
     }
 
     return {
-        updatedLines,
+        updatedModels,
         eventsProcessed: events.length,
         lastIncrementalUpdate: new Date().toISOString(),
     };
 }
 
+/**
+ * Get rush hour predictions for a specific line and direction
+ * @param {Object} options - Options
+ * @param {string} options.lineid - Line ID (required)
+ * @param {string} options.direction - Direction ('going' or 'return', required)
+ * @param {number} options.daysAhead - Number of days to predict ahead (default 7)
+ */
 export async function getRushHourPredictions(options = {}) {
     const lineid = options.lineid;
+    const direction = options.direction || 'going';
     const daysAhead = options.daysAhead || DEFAULT_FORWARD_DAYS;
 
     if (!lineid) {
         throw new Error('lineid is required for getRushHourPredictions');
     }
 
-    if (!modelState.lines.has(lineid)) {
-        await trainModelBulk({ lineid });
+    if (!DIRECTIONS.includes(direction)) {
+        throw new Error(`Invalid direction: ${direction}. Must be one of: ${DIRECTIONS.join(', ')}`);
     }
 
-    const lineModel = modelState.lines.get(lineid);
+    const modelKey = buildModelKey(lineid, direction);
+
+    if (!modelState.lines.has(modelKey)) {
+        await trainModelBulk({ lineid, direction });
+    }
+
+    const lineModel = modelState.lines.get(modelKey);
     if (!lineModel || lineModel.buckets.size === 0) {
         return {
             lineid,
+            direction,
             predictions: [],
             metadata: buildLineMetadata(lineModel),
         };
@@ -170,6 +225,7 @@ export async function getRushHourPredictions(options = {}) {
             const confidence = Math.min(0.99, avgBookings / (threshold || 1));
             predictions.push({
                 lineid,
+                direction,
                 date: currentDay.toISOString().slice(0, 10),
                 hour,
                 expectedBookings: avgBookings,
@@ -184,6 +240,7 @@ export async function getRushHourPredictions(options = {}) {
 
     return {
         lineid,
+        direction,
         predictions,
         metadata: {
             ...buildLineMetadata(lineModel),
@@ -227,20 +284,42 @@ export async function getLineDemandSnapshot(lineid, options = {}) {
 
 export function getModelSummary() {
     return {
-        trainedLines: modelState.lines.size,
+        trainedModels: modelState.lines.size,
         lastTrainedAt: modelState.lastTrainedAt,
         lastBulkTrainingRange: modelState.lastBulkTrainingRange,
     };
 }
 
-export function getTrackedLines() {
+/**
+ * Get all tracked model keys (lineid_direction format)
+ */
+export function getTrackedModels() {
     return Array.from(modelState.lines.keys());
 }
 
-function getOrCreateLineModel(lineid) {
-    if (!modelState.lines.has(lineid)) {
-        modelState.lines.set(lineid, {
+/**
+ * Get unique line IDs that have trained models (for backwards compatibility)
+ */
+export function getTrackedLines() {
+    const lineIds = new Set();
+    for (const modelKey of modelState.lines.keys()) {
+        const { lineid } = parseModelKey(modelKey);
+        lineIds.add(lineid);
+    }
+    return Array.from(lineIds);
+}
+
+/**
+ * Get or create a line model for a specific direction
+ * @param {string} lineid - Line ID
+ * @param {string} direction - Direction ('going' or 'return')
+ */
+function getOrCreateLineModel(lineid, direction = 'going') {
+    const modelKey = buildModelKey(lineid, direction);
+    if (!modelState.lines.has(modelKey)) {
+        modelState.lines.set(modelKey, {
             lineid,
+            direction,
             buckets: new Map(),
             stats: {
                 mean: 0,
@@ -249,7 +328,7 @@ function getOrCreateLineModel(lineid) {
             },
         });
     }
-    return modelState.lines.get(lineid);
+    return modelState.lines.get(modelKey);
 }
 
 function mergeBucket(lineModel, bucket) {
@@ -258,6 +337,7 @@ function mergeBucket(lineModel, bucket) {
     if (!lineModel.buckets.has(key)) {
         lineModel.buckets.set(key, {
             lineid: bucket.lineid,
+            direction: bucket.direction || lineModel.direction || 'going',
             dayOfWeek: bucket.dayOfWeek,
             hour: bucket.hour,
             totalBookings: 0,
@@ -307,6 +387,7 @@ function buildLineMetadata(lineModel) {
             updatedAt: null,
             mean: 0,
             stdDev: 0,
+            direction: null,
         };
     }
 
@@ -315,6 +396,7 @@ function buildLineMetadata(lineModel) {
         updatedAt: lineModel.stats.lastUpdatedAt,
         mean: lineModel.stats.mean,
         stdDev: lineModel.stats.stdDev,
+        direction: lineModel.direction,
     };
 }
 
@@ -322,11 +404,11 @@ function serializeModelState() {
     const serialized = {
         lastTrainedAt: modelState.lastTrainedAt,
         lastBulkTrainingRange: modelState.lastBulkTrainingRange,
-        lines: {},
+        models: {},
     };
 
-    // Convert Map to serializable format
-    modelState.lines.forEach((lineModel, lineid) => {
+    // Convert Map to serializable format (keyed by lineid_direction)
+    modelState.lines.forEach((lineModel, modelKey) => {
         const bucketsArray = [];
         lineModel.buckets.forEach((bucket, key) => {
             bucketsArray.push({
@@ -335,8 +417,9 @@ function serializeModelState() {
             });
         });
 
-        serialized.lines[lineid] = {
-            lineid,
+        serialized.models[modelKey] = {
+            lineid: lineModel.lineid,
+            direction: lineModel.direction,
             buckets: bucketsArray,
             stats: lineModel.stats,
         };
@@ -346,7 +429,7 @@ function serializeModelState() {
 }
 
 function deserializeModelState(serializedData) {
-    if (!serializedData || !serializedData.lines) {
+    if (!serializedData) {
         return;
     }
 
@@ -354,19 +437,28 @@ function deserializeModelState(serializedData) {
     modelState.lastBulkTrainingRange = serializedData.lastBulkTrainingRange || null;
     modelState.lines.clear();
 
+    // Support both old format (lines) and new format (models)
+    const modelsData = serializedData.models || serializedData.lines || {};
+
     // Reconstruct Maps from serialized data
-    Object.entries(serializedData.lines || {}).forEach(([lineid, lineData]) => {
+    Object.entries(modelsData).forEach(([modelKey, modelData]) => {
         const buckets = new Map();
-        if (Array.isArray(lineData.buckets)) {
-            lineData.buckets.forEach(({ key, value }) => {
+        if (Array.isArray(modelData.buckets)) {
+            modelData.buckets.forEach(({ key, value }) => {
                 buckets.set(key, value);
             });
         }
 
-        modelState.lines.set(lineid, {
+        // For old format, modelKey is just lineid, for new format it's lineid_direction
+        const direction = modelData.direction || 'going';
+        const lineid = modelData.lineid || modelKey;
+        const actualModelKey = modelData.direction ? modelKey : buildModelKey(lineid, direction);
+
+        modelState.lines.set(actualModelKey, {
             lineid,
+            direction,
             buckets,
-            stats: lineData.stats || {
+            stats: modelData.stats || {
                 mean: 0,
                 stdDev: 0,
                 lastUpdatedAt: null,
@@ -376,43 +468,47 @@ function deserializeModelState(serializedData) {
 }
 
 export async function saveModelToDatabase() {
-    const serialized = serializeModelState();
-    const savedLines = [];
+    const savedModels = [];
 
-    for (const [lineid, lineData] of modelState.lines.entries()) {
+    for (const [modelKey, modelData] of modelState.lines.entries()) {
         try {
             const bucketsArray = [];
-            lineData.buckets.forEach((bucket, key) => {
+            modelData.buckets.forEach((bucket, key) => {
                 bucketsArray.push({ key, value: bucket });
             });
 
-            await PredictionModel.upsert(lineid, {
+            // Use modelKey (lineid_direction) as the storage key
+            await PredictionModel.upsert(modelKey, {
                 model_data: {
+                    lineid: modelData.lineid,
+                    direction: modelData.direction,
                     buckets: bucketsArray,
-                    stats: lineData.stats,
+                    stats: modelData.stats,
                 },
                 last_trained_at: modelState.lastTrainedAt,
                 training_range_start: modelState.lastBulkTrainingRange?.start || null,
                 training_range_end: modelState.lastBulkTrainingRange?.end || null,
             });
 
-            savedLines.push(lineid);
+            savedModels.push(modelKey);
         } catch (error) {
-            logger.error('Failed to save model for line', {
-                lineid,
+            logger.error('Failed to save model', {
+                modelKey,
+                lineid: modelData.lineid,
+                direction: modelData.direction,
                 error: error.message,
             });
         }
     }
 
-    logger.info('Model saved to database', {
-        linesSaved: savedLines.length,
-        totalLines: modelState.lines.size,
+    logger.info('Models saved to database', {
+        modelsSaved: savedModels.length,
+        totalModels: modelState.lines.size,
     });
 
     return {
-        savedLines,
-        totalLines: modelState.lines.size,
+        savedModels,
+        totalModels: modelState.lines.size,
     };
 }
 
@@ -449,8 +545,15 @@ export async function loadModelFromDatabase() {
                     });
                 }
 
-                modelState.lines.set(savedModel.lineid, {
-                    lineid: savedModel.lineid,
+                // Support both old format (lineid only) and new format (lineid_direction)
+                const direction = modelData.direction || 'going';
+                const lineid = modelData.lineid || savedModel.lineid;
+                // Use the stored key as-is (it's already in lineid_direction format for new models)
+                const modelKey = savedModel.lineid;
+
+                modelState.lines.set(modelKey, {
+                    lineid,
+                    direction,
                     buckets,
                     stats: modelData.stats || {
                         mean: 0,
@@ -472,14 +575,14 @@ export async function loadModelFromDatabase() {
 
                 loadedCount++;
             } catch (error) {
-                logger.error('Failed to load model for line', {
-                    lineid: savedModel.lineid,
+                logger.error('Failed to load model', {
+                    modelKey: savedModel.lineid,
                     error: error.message,
                 });
             }
         }
 
-        logger.info('Model loaded from database', {
+        logger.info('Models loaded from database', {
             loaded: loadedCount,
             total: savedModels.length,
         });
@@ -523,8 +626,10 @@ export default {
     getLineDemandSnapshot,
     getModelSummary,
     getTrackedLines,
+    getTrackedModels,
     saveModelToDatabase,
     loadModelFromDatabase,
     initializeModel,
+    DIRECTIONS,
 };
 

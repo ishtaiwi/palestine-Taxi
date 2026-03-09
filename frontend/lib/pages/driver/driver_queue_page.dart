@@ -29,6 +29,7 @@ class DriverQueuePageState extends State<DriverQueuePage> {
   bool _isMutating = false;
   String? _error;
   Map<String, dynamic>? _queueData;
+  String _selectedDirection = 'going'; // 'going' or 'returning'
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -48,6 +49,10 @@ class DriverQueuePageState extends State<DriverQueuePage> {
       'driverName': 'اسم السائق',
       'phoneNumber': 'رقم الهاتف',
       'you': 'أنت',
+      'direction': 'الاتجاه',
+      'going': 'ذهاب',
+      'returning': 'عودة',
+      'selectDirection': 'اختر الاتجاه',
     },
     'en': {
       'title': 'Driver Queue',
@@ -66,6 +71,10 @@ class DriverQueuePageState extends State<DriverQueuePage> {
       'driverName': 'Driver Name',
       'phoneNumber': 'Phone Number',
       'you': 'You',
+      'direction': 'Direction',
+      'going': 'Going',
+      'returning': 'Returning',
+      'selectDirection': 'Select Direction',
     },
   };
 
@@ -132,13 +141,27 @@ class DriverQueuePageState extends State<DriverQueuePage> {
       _error = null;
     });
 
-    final result = await ApiService.fetchDriverQueue();
+    // If driver is in queue, use their current direction from queue data
+    // Otherwise, use the selected direction
+    final isInQueue = _queueData?['currentEntry'] != null;
+    final direction = isInQueue 
+        ? (_queueData?['currentDirection']?.toString() ?? _queueData?['direction']?.toString() ?? _selectedDirection)
+        : _selectedDirection;
+    
+    final result = await ApiService.fetchDriverQueue(direction: direction);
     if (!mounted) return;
 
     setState(() {
       _isLoading = false;
       if (result['success'] == true) {
         _queueData = result;
+        // Update selected direction from response when not in queue
+        // When in queue, the direction is already fixed
+        if (!isInQueue && result['direction'] != null) {
+          _selectedDirection = result['direction'].toString();
+        } else if (isInQueue && result['currentDirection'] != null) {
+          _selectedDirection = result['currentDirection'].toString();
+        }
       } else {
         _error = result['message']?.toString() ?? 'Failed to load queue';
       }
@@ -152,7 +175,7 @@ class DriverQueuePageState extends State<DriverQueuePage> {
       _error = null;
     });
 
-    final result = await ApiService.joinDriverQueue();
+    final result = await ApiService.joinDriverQueue(direction: _selectedDirection);
     if (!mounted) return;
 
     setState(() {
@@ -162,6 +185,10 @@ class DriverQueuePageState extends State<DriverQueuePage> {
           result['line'] = currentLine;
         }
         _queueData = result;
+        // Update selected direction from response if available
+        if (result['direction'] != null) {
+          _selectedDirection = result['direction'].toString();
+        }
       } else {
         _error = result['message']?.toString();
       }
@@ -193,6 +220,58 @@ class DriverQueuePageState extends State<DriverQueuePage> {
 
   bool get _isInQueue => _queueData?['currentEntry'] != null;
 
+  // Get direction label with station names from line name
+  // Line name format: "station1-station2" (e.g., "nablus-beit iba")
+  String _getDirectionLabel(String direction) {
+    final line = _queueData?['line'] as Map<String, dynamic>?;
+    
+    if (line == null) {
+      // Fallback to default labels if line not available
+      return direction == 'going' ? t('going') : t('returning');
+    }
+
+    // Get line name (prefer name_ar for Arabic, name_en for English, fallback to linename)
+    String? lineName;
+    if (_isArabic) {
+      lineName = line['name_ar']?.toString() ?? line['linename']?.toString() ?? line['name_en']?.toString();
+    } else {
+      lineName = line['name_en']?.toString() ?? line['linename']?.toString() ?? line['name_ar']?.toString();
+    }
+
+    if (lineName == null || lineName.isEmpty) {
+      // Fallback to default labels if line name not available
+      return direction == 'going' ? t('going') : t('returning');
+    }
+
+    // Split line name by "-" to get station names
+    final parts = lineName.split('-').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    
+    if (parts.length < 2) {
+      // If line name doesn't have "-" separator, fallback to default labels
+      return direction == 'going' ? t('going') : t('returning');
+    }
+
+    // First part is the first station, second part is the second station
+    final firstStation = parts[0];
+    final secondStation = parts[1];
+
+    String fromStation, toStation;
+    if (direction == 'going') {
+      // Going: From first station to second station
+      fromStation = firstStation;
+      toStation = secondStation;
+    } else {
+      // Returning: From second station to first station
+      fromStation = secondStation;
+      toStation = firstStation;
+    }
+
+    // Format: "From [station1] to [station2]"
+    return _isArabic 
+        ? 'من $fromStation إلى $toStation'
+        : 'From $fromStation to $toStation';
+  }
+
   @override
   Widget build(BuildContext context) {
     final textDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
@@ -202,8 +281,6 @@ class DriverQueuePageState extends State<DriverQueuePage> {
     
     // Web-specific responsive breakpoints
     final isWeb = kIsWeb;
-    final isDesktop = isWeb && screenWidth >= 1200;
-    final isTablet = screenWidth >= 600 && screenWidth < 1200;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 600;
     
@@ -387,6 +464,17 @@ class DriverQueuePageState extends State<DriverQueuePage> {
   Widget _buildQueueContent({bool isSmallScreen = false, bool isMediumScreen = false}) {
     final queue = (_queueData?['queue'] as List?) ?? [];
     
+    // Filter queue by direction when not in queue
+    // This ensures only drivers in the selected direction are shown
+    List<dynamic> filteredQueue = queue;
+    if (!_isInQueue) {
+      final currentDirection = _queueData?['direction']?.toString() ?? _selectedDirection;
+      filteredQueue = queue.where((entry) {
+        final entryDirection = (entry as Map<String, dynamic>)['direction']?.toString();
+        return entryDirection == currentDirection;
+      }).toList();
+    }
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -394,8 +482,10 @@ class DriverQueuePageState extends State<DriverQueuePage> {
           _buildLineCard(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
           SizedBox(height: isSmallScreen ? 14.0 : (isMediumScreen ? 16.0 : 20.0)),
         ],
-        _buildStatsRow(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+        _buildStatsRow(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen, filteredQueue: filteredQueue),
         SizedBox(height: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 24.0)),
+        if (!_isInQueue) _buildDirectionSelector(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+        if (!_isInQueue) SizedBox(height: isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
         _buildActionButton(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
         SizedBox(height: isSmallScreen ? 18.0 : (isMediumScreen ? 20.0 : 24.0)),
         if (!_isInQueue)
@@ -415,7 +505,7 @@ class DriverQueuePageState extends State<DriverQueuePage> {
             ),
           ),
         
-        _buildQueueList(queue, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+        _buildQueueList(filteredQueue, isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
       ],
     );
   }
@@ -471,23 +561,91 @@ class DriverQueuePageState extends State<DriverQueuePage> {
             ],
           ),
           SizedBox(height: isSmallScreen ? 8.0 : 12.0),
-          Text(
-            lineName,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 21.0 : 24.0),
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(
+                  lineName,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 21.0 : 24.0),
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              if (_queueData?['direction'] != null || _isInQueue) ...[
+                SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                Flexible(
+                  flex: 3,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isSmallScreen ? 6.0 : 8.0,
+                      vertical: isSmallScreen ? 4.0 : 6.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 8.0 : 10.0),
+                    ),
+                    child: Text(
+                      _getDirectionLabel(
+                        _queueData?['direction']?.toString() ?? 
+                         _queueData?['currentDirection']?.toString() ?? 
+                         _selectedDirection
+                      ),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isSmallScreen ? 9.0 : (isMediumScreen ? 10.0 : 11.0),
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatsRow({bool isSmallScreen = false, bool isMediumScreen = false}) {
-    final ahead = (_queueData?['aheadCount'] as num?)?.toInt() ?? 0;
-    final behind = (_queueData?['behindCount'] as num?)?.toInt() ?? 0;
+  Widget _buildStatsRow({bool isSmallScreen = false, bool isMediumScreen = false, List<dynamic>? filteredQueue}) {
+    // Calculate ahead and behind counts from filtered queue
+    int ahead = 0;
+    int behind = 0;
+    
+    if (_isInQueue) {
+      // Use backend counts when in queue (they're already correct)
+      ahead = (_queueData?['aheadCount'] as num?)?.toInt() ?? 0;
+      behind = (_queueData?['behindCount'] as num?)?.toInt() ?? 0;
+    } else if (filteredQueue != null) {
+      // Calculate counts from filtered queue when not in queue
+      final currentEntry = _queueData?['currentEntry'] as Map<String, dynamic>?;
+      if (currentEntry != null) {
+        final currentIndex = filteredQueue.indexWhere((entry) {
+          final entryMap = entry as Map<String, dynamic>;
+          return entryMap['queueid'] == currentEntry['queueid'];
+        });
+        if (currentIndex >= 0) {
+          ahead = currentIndex;
+          behind = filteredQueue.length - currentIndex - 1;
+        } else {
+          ahead = filteredQueue.length;
+          behind = 0;
+        }
+      } else {
+        ahead = filteredQueue.length;
+        behind = 0;
+      }
+    } else {
+      // Fallback to backend counts
+      ahead = (_queueData?['aheadCount'] as num?)?.toInt() ?? 0;
+      behind = (_queueData?['behindCount'] as num?)?.toInt() ?? 0;
+    }
 
     return Row(
       children: [
@@ -735,6 +893,170 @@ class DriverQueuePageState extends State<DriverQueuePage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildDirectionSelector({bool isSmallScreen = false, bool isMediumScreen = false}) {
+    final cardColor = _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white;
+    final borderColor = _isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200;
+    final textColor = _isDarkMode ? Colors.white : const Color(0xFF1E3A5F);
+    final selectedColor = const Color(0xFFF57C00);
+
+    return Container(
+      padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(_isDarkMode ? 0.2 : 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            t('selectDirection'),
+            style: TextStyle(
+              color: textColor,
+              fontSize: isSmallScreen ? 13.0 : (isMediumScreen ? 14.0 : 15.0),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: isSmallScreen ? 10.0 : 12.0),
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedDirection = 'going';
+                    });
+                    _loadQueue();
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      vertical: isSmallScreen ? 10.0 : 12.0,
+                      horizontal: isSmallScreen ? 8.0 : 12.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _selectedDirection == 'going'
+                          ? selectedColor.withOpacity(0.2)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                      border: Border.all(
+                        color: _selectedDirection == 'going'
+                            ? selectedColor
+                            : borderColor,
+                        width: _selectedDirection == 'going' ? 2 : 1,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 4.0 : 6.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.arrow_forward,
+                            color: _selectedDirection == 'going'
+                                ? selectedColor
+                                : textColor.withOpacity(0.7),
+                            size: isSmallScreen ? 16.0 : 18.0,
+                          ),
+                          SizedBox(width: isSmallScreen ? 4.0 : 6.0),
+                          Expanded(
+                            child: Text(
+                              _getDirectionLabel('going'),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: _selectedDirection == 'going'
+                                    ? selectedColor
+                                    : textColor,
+                                fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                                fontWeight: _selectedDirection == 'going'
+                                    ? FontWeight.bold
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: isSmallScreen ? 10.0 : 12.0),
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedDirection = 'returning';
+                    });
+                    _loadQueue();
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      vertical: isSmallScreen ? 10.0 : 12.0,
+                      horizontal: isSmallScreen ? 8.0 : 12.0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _selectedDirection == 'returning'
+                          ? selectedColor.withOpacity(0.2)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0),
+                      border: Border.all(
+                        color: _selectedDirection == 'returning'
+                            ? selectedColor
+                            : borderColor,
+                        width: _selectedDirection == 'returning' ? 2 : 1,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 4.0 : 6.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.arrow_back,
+                            color: _selectedDirection == 'returning'
+                                ? selectedColor
+                                : textColor.withOpacity(0.7),
+                            size: isSmallScreen ? 16.0 : 18.0,
+                          ),
+                          SizedBox(width: isSmallScreen ? 4.0 : 6.0),
+                          Expanded(
+                            child: Text(
+                              _getDirectionLabel('returning'),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: _selectedDirection == 'returning'
+                                    ? selectedColor
+                                    : textColor,
+                                fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                                fontWeight: _selectedDirection == 'returning'
+                                    ? FontWeight.bold
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

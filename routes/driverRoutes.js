@@ -9,6 +9,7 @@ import {
   getDriverTrips,
   getDriverTripReservations,
   updateDriverReservationStatus,
+  getDriverStatistics,
 } from '../controllers/driverController.js';
 import {
   getDriverWallet,
@@ -30,6 +31,7 @@ router.patch('/trips/:tripid/reservations/:bookingid', updateDriverReservationSt
 router.get('/wallet', getDriverWallet);
 router.get('/wallet/transactions', getDriverTransactions);
 router.get('/wallet/summary', getDriverEarningsSummary);
+router.get('/statistics', getDriverStatistics);
 
 export default router;
 

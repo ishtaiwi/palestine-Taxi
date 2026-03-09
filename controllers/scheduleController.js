@@ -128,11 +128,12 @@ const validateScheduleData = (data, req, isCreate = false) => {
 
 export const getAllSchedules = async (req, res, next) => {
   try {
-    const { lineid, active } = req.query;
+    const { lineid, active, direction } = req.query;
     
     const filters = {};
     if (lineid) filters.lineid = lineid;
     if (active !== undefined) filters.active = active === 'true';
+    if (direction) filters.direction = direction;
     
     const schedules = await ScheduleTemplate.findAll(filters);
     
@@ -169,20 +170,32 @@ export const getScheduleById = async (req, res, next) => {
 
 export const createSchedule = async (req, res, next) => {
   try {
-    const { lineid, start_hour, end_hour, interval_minutes, active, auto_departure_enabled, scheduled_departure_enforced } = req.body;
+    const { lineid, start_hour, end_hour, interval_minutes, active, auto_departure_enabled, scheduled_departure_enforced, direction } = req.body;
     
     // Validate schedule data
     const validationError = validateScheduleData(req.body, req, true);
     if (validationError) {
       return res.status(validationError.status).json(validationError.body);
     }
+
+    // Validate direction
+    const scheduleDirection = direction || 'going'; // Default to 'going' for backward compatibility
+    if (scheduleDirection !== 'going' && scheduleDirection !== 'return') {
+      return res.status(400).json({
+        message: req.t('schedule.invalid_direction') || 'direction must be either "going" or "return"',
+      });
+    }
+    }
     
-    // Check if a schedule already exists for this line
-    const scheduleExists = await ScheduleTemplate.existsForLine(lineid);
+    // Check if a schedule already exists for this line and direction combination
+    const scheduleExists = await ScheduleTemplate.existsForLine(lineid, scheduleDirection);
     if (scheduleExists) {
+      const directionLabel = scheduleDirection === 'going' 
+        ? (req.t('schedule.going') || 'going') 
+        : (req.t('schedule.return') || 'return');
       return res.status(400).json({
         success: false,
-        message: req.t('schedule.duplicate_line') || 'A schedule already exists for this line. Only one schedule per line is allowed.',
+        message: req.t('schedule.duplicate_line_direction') || `A ${directionLabel} schedule already exists for this line. Each line can have one going and one returning schedule.`,
       });
     }
     
@@ -194,6 +207,7 @@ export const createSchedule = async (req, res, next) => {
       active: active !== undefined ? active : true,
       auto_departure_enabled: auto_departure_enabled !== undefined ? auto_departure_enabled : false,
       scheduled_departure_enforced: scheduled_departure_enforced !== undefined ? scheduled_departure_enforced : false,
+      direction: scheduleDirection,
     };
     
     const schedule = await ScheduleTemplate.create(scheduleData);
@@ -219,7 +233,27 @@ export const updateSchedule = async (req, res, next) => {
       return res.status(validationError.status).json(validationError.body);
     }
     
+    // Get the old schedule before updating
+    const oldSchedule = await ScheduleTemplate.findById(templateid);
     const schedule = await ScheduleTemplate.update(templateid, updates);
+    
+    // If interval_minutes changed, adjust future reservations
+    if (updates.interval_minutes && oldSchedule.interval_minutes !== updates.interval_minutes) {
+      try {
+        const { adjustReservationsForScheduleChange } = await import('../services/matchingService.js');
+        await adjustReservationsForScheduleChange(
+          schedule.lineid,
+          oldSchedule.interval_minutes,
+          updates.interval_minutes,
+          schedule.start_hour,
+          schedule.end_hour
+        );
+        logger.info(`[ScheduleController] ✅ Adjusted future reservations for schedule change on line ${schedule.lineid}`);
+      } catch (error) {
+        logger.error(`[ScheduleController] ⚠️ Error adjusting reservations for schedule change:`, error);
+        // Don't fail the update, just log the error
+      }
+    }
     
     res.json({
       message: req.t('schedule.updated') || 'Schedule template updated successfully',

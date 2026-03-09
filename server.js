@@ -9,7 +9,7 @@ import logger from './utils/logger.js';
 import { testConnection, getConnectionStatus } from './config/dbcon.js';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './docs/swagger.js';
-import { generalLimiter } from './middleware/rateLimit.js';
+import { generalLimiter, adminLimiter } from './middleware/rateLimit.js';
 import timeRoutes from './routes/timeRoute.js';
 import stripeRoutes from './routes/stripeRoutes.js';
 
@@ -25,16 +25,21 @@ import driverRoutes from './routes/driverRoutes.js';
 import scheduleRoutes from './routes/scheduleRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
 import locationRoutes from './routes/locationRoutes.js';
+import routingRoutes from './routes/routingRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import walkinRoutes from './routes/walkinRoutes.js';
 
 
 
 import { startTripOpeningJob } from './jobs/tripOpeningJob.js';
 import { startDepartureCheckJob } from './jobs/departureCheckJob.js';
 import { startDelayedTripCheckJob } from './jobs/delayedTripCheckJob.js';
+import { startCancelDelayedTripsJob } from './jobs/cancelDelayedTripsJob.js';
 import { startNoShowCheckJob } from './jobs/noShowCheckJob.js';
 import { startDailyTripCreationJob } from './jobs/dailyTripCreationJob.js';
 import { startPredictionUpdateJob } from './jobs/predictionUpdateJob.js';
 import { initializeModel } from './services/rushHourPredictionService.js';
+import { initializeFirebase } from './config/firebase.js';
 
 const app = express();
 
@@ -60,7 +65,17 @@ app.use((req, res, next) => {
 });
 
 
-app.use('/api/', generalLimiter);
+// Apply more lenient rate limiting for admin routes first
+app.use('/api/admin', adminLimiter);
+
+// Apply general rate limiting to all API routes (admin routes already have their own limiter)
+app.use('/api/', (req, res, next) => {
+  // Skip general limiter for admin routes (they have their own)
+  if (req.path.startsWith('/admin')) {
+    return next();
+  }
+  generalLimiter(req, res, next);
+});
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -142,6 +157,9 @@ app.use('/api/schedules', scheduleRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/time', timeRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/routing', routingRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/walkin', walkinRoutes);
 
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
@@ -164,10 +182,20 @@ app.listen(PORT, async () => {
   if (dbTest.connected) {
     logger.info('✅ Database connection verified');
 
+    // Initialize Firebase
+    logger.info('Initializing Firebase...');
+    const firebaseInitialized = initializeFirebase();
+    if (firebaseInitialized) {
+      logger.info('✅ Firebase initialized successfully');
+    } else {
+      logger.warn('⚠️ Firebase initialization failed or not configured');
+    }
+
 
     logger.info('Starting background jobs...');
     startTripOpeningJob();
     startDelayedTripCheckJob();
+    startCancelDelayedTripsJob();
     startDepartureCheckJob();
     startNoShowCheckJob();
     startDailyTripCreationJob();

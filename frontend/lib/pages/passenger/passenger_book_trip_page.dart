@@ -26,7 +26,6 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
   Map<String, dynamic>? _trip;
   Map<String, dynamic>? _line;
   String? _selectedSeat;
-  String? _dropoffPoint;
   String? _bookingType;
   DateTime? _selectedScheduledTime;
   double _walletBalance = 0.0;
@@ -258,7 +257,6 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
         tripid: _bookingType == 'instant' ? widget.tripId : null,
         lineid: finalLineId,
         seatlocation: _selectedSeat,
-        dropoffpoint: _dropoffPoint,
         paymentmethod: 'wallet', // Always use wallet
         booking_type: _bookingType,
         scheduled_trip_time: _selectedScheduledTime?.toIso8601String(),
@@ -278,10 +276,44 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
           );
           Navigator.pop(context, true);
         } else {
+          final errorMessage = result['message']?.toString() ?? t('error');
+          final isNoDriversError = errorMessage.toLowerCase().contains('no drivers') || 
+                                   errorMessage.toLowerCase().contains('لا يوجد سائق') ||
+                                   result['code'] == 'NO_DRIVERS_AVAILABLE';
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result['message']?.toString() ?? t('error')),
-              backgroundColor: Colors.red,
+              content: Row(
+                children: [
+                  Icon(
+                    isNoDriversError ? Icons.info_outline : Icons.error_outline,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      errorMessage,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: isNoDriversError ? Colors.orange : Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.all(16),
+              duration: Duration(seconds: isNoDriversError ? 5 : 4),
+              action: isNoDriversError ? SnackBarAction(
+                label: _isArabic ? 'حسناً' : 'OK',
+                textColor: Colors.white,
+                onPressed: () {},
+              ) : null,
             ),
           );
         }
@@ -499,36 +531,6 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      TextField(
-                        decoration: InputDecoration(
-                          labelText: t('dropoffPoint'),
-                          labelStyle: TextStyle(color: Colors.grey.shade700),
-                          filled: true,
-                          fillColor: Colors.grey.shade50,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                                color: Color(0xFF1E3A5F), width: 2),
-                          ),
-                        ),
-                        style: const TextStyle(
-                            color: Color(0xFF1E3A5F),
-                            fontWeight: FontWeight.w500),
-                        onChanged: (value) {
-                          setState(() {
-                            _dropoffPoint = value.isEmpty ? null : value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
                       Container(
                         padding: EdgeInsets.all(isSmallScreen ? 14.0 : (isMediumScreen ? 17.0 : 20.0)),
                         decoration: BoxDecoration(
@@ -579,20 +581,14 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
                                   color: _walletBalance < (_trip != null && _line != null
-                                          ? ((_line!['baseprice'] ?? 0.0).toDouble() +
-                                              ((_dropoffPoint != null && _line!['additionalprice'] != null)
-                                                  ? (_line!['additionalprice'] ?? 0.0).toDouble()
-                                                  : 0.0))
+                                          ? ((_line!['baseprice'] ?? 0.0).toDouble())
                                           : 0.0)
                                       ? Colors.orange.shade50
                                       : Colors.green.shade50,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                     color: _walletBalance < (_trip != null && _line != null
-                                            ? ((_line!['baseprice'] ?? 0.0).toDouble() +
-                                                ((_dropoffPoint != null && _line!['additionalprice'] != null)
-                                                    ? (_line!['additionalprice'] ?? 0.0).toDouble()
-                                                    : 0.0))
+                                            ? ((_line!['baseprice'] ?? 0.0).toDouble())
                                             : 0.0)
                                         ? Colors.orange
                                         : Colors.green,
@@ -614,10 +610,7 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
                                           ),
                                         ),
                                         if (_walletBalance < (_trip != null && _line != null
-                                                ? ((_line!['baseprice'] ?? 0.0).toDouble() +
-                                                    ((_dropoffPoint != null && _line!['additionalprice'] != null)
-                                                        ? (_line!['additionalprice'] ?? 0.0).toDouble()
-                                                        : 0.0))
+                                                ? ((_line!['baseprice'] ?? 0.0).toDouble())
                                                 : 0.0))
                                           Text(
                                             t('insufficientBalance'),
@@ -629,10 +622,7 @@ class _PassengerBookTripPageState extends State<PassengerBookTripPage> {
                                       ],
                                     ),
                                     if (_walletBalance < (_trip != null && _line != null
-                                            ? ((_line!['baseprice'] ?? 0.0).toDouble() +
-                                                ((_dropoffPoint != null && _line!['additionalprice'] != null)
-                                                    ? (_line!['additionalprice'] ?? 0.0).toDouble()
-                                                    : 0.0))
+                                            ? ((_line!['baseprice'] ?? 0.0).toDouble())
                                             : 0.0))
                                       TextButton.icon(
                                         onPressed: () {

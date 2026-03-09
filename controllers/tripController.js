@@ -4,12 +4,14 @@ import Vehicle from '../models/Vehicle.js';
 import Reservation from '../models/Reservation.js';
 import DriverQueue from '../models/DriverQueue.js';
 import Driver from '../models/Driver.js';
+import ScheduleTemplate from '../models/ScheduleTemplate.js';
 import { buildSeatRows, normalizeSeatId } from '../utils/seatLayout.js';
 import { calculateAvailablePassengerSeats, getTotalPassengerSeats } from '../utils/seatCalculation.js';
 import { v4 as uuidv4 } from 'uuid';
 import { TRIP_STATUS } from '../utils/constants.js';
-import { getUtcNow, parseUtcDate, canBookInstant } from '../utils/timeUtils.js';
+import { getUtcNow, parseUtcDate, canBookInstant, getServerTimezoneOffset } from '../utils/timeUtils.js';
 import { processTripEarnings } from '../services/driverEarningsService.js';
+import logger from '../utils/logger.js';
 
 
 export const getAllTrips = async (req, res, next) => {
@@ -22,36 +24,22 @@ export const getAllTrips = async (req, res, next) => {
     if (date) filters.date = date;
 
     const allTrips = await Trip.findAll(filters);
-    
-    // Group trips by deptime and show only the first trip for each time
-    // This ensures frontend shows one trip per time, even though backend may have multiple
-    const tripsByTime = new Map();
-    
-    for (const trip of allTrips) {
-      const deptime = trip.deptime;
-      if (!tripsByTime.has(deptime)) {
-        tripsByTime.set(deptime, trip);
-      } else {
-        // If multiple trips exist for same time, prefer the one with more bookings or earlier created
-        const existingTrip = tripsByTime.get(deptime);
-        const existingBookings = existingTrip.totalbookings || 0;
-        const currentBookings = trip.totalbookings || 0;
-        
-        // Prefer trip with more bookings, or if equal, keep the existing one (first found)
-        if (currentBookings > existingBookings) {
-          tripsByTime.set(deptime, trip);
-        }
-      }
-    }
-    
-    // Convert map values back to array and sort by deptime
-    const uniqueTrips = Array.from(tripsByTime.values()).sort((a, b) => {
+
+    // Return all trips - don't filter out trips with same time but different direction or line
+    // Admin needs to see all trips for all lines and all directions
+    const sortedTrips = allTrips.sort((a, b) => {
       const timeA = new Date(a.deptime).getTime();
       const timeB = new Date(b.deptime).getTime();
+      // If same time, sort by lineid then direction for consistent ordering
+      if (timeA === timeB) {
+        const lineCompare = (a.lineid || '').localeCompare(b.lineid || '');
+        if (lineCompare !== 0) return lineCompare;
+        return (a.direction || '').localeCompare(b.direction || '');
+      }
       return timeA - timeB;
     });
-    
-    res.json(uniqueTrips);
+
+    res.json(sortedTrips);
   } catch (error) {
     next(error);
   }
@@ -60,58 +48,34 @@ export const getAllTrips = async (req, res, next) => {
 
 export const getUpcomingTrips = async (req, res, next) => {
   try {
-    const { lineid, status, date } = req.query;
+    const { lineid, status, date, direction } = req.query;
     const filters = {};
 
     if (lineid) filters.lineid = lineid;
     if (status) filters.status = status;
     if (date) filters.date = date;
+    if (direction) filters.direction = direction;
 
     const allTrips = await Trip.findUpcoming(filters);
-    
-    // Only group trips by deptime when filtering by a specific line
-    // When showing all lines, display all trips even if they have the same departure time
-    let uniqueTrips;
-    
-    if (lineid) {
-      // Group trips by deptime and show only the first trip for each time when filtering by line
-      // This ensures frontend shows one trip per time for a specific line
-      const tripsByTime = new Map();
-      
-      for (const trip of allTrips) {
-        const deptime = trip.deptime;
-        if (!tripsByTime.has(deptime)) {
-          tripsByTime.set(deptime, trip);
-        } else {
-          // If multiple trips exist for same time, prefer the one with more bookings or earlier created
-          const existingTrip = tripsByTime.get(deptime);
-          const existingBookings = existingTrip.totalbookings || 0;
-          const currentBookings = trip.totalbookings || 0;
-          
-          // Prefer trip with more bookings, or if equal, keep the existing one (first found)
-          if (currentBookings > existingBookings) {
-            tripsByTime.set(deptime, trip);
-          }
-        }
-      }
-      
-      // Convert map values back to array and sort by deptime
-      uniqueTrips = Array.from(tripsByTime.values()).sort((a, b) => {
-        const timeA = new Date(a.deptime).getTime();
-        const timeB = new Date(b.deptime).getTime();
-        return timeA - timeB;
-      });
-    } else {
-      // When showing all lines, return all trips sorted by deptime
-      // No grouping needed - show all trips from all lines
-      uniqueTrips = allTrips.sort((a, b) => {
-        const timeA = new Date(a.deptime).getTime();
-        const timeB = new Date(b.deptime).getTime();
-        return timeA - timeB;
-      });
-    }
-    
-    res.json(uniqueTrips);
+    // Sort all trips by deptime, then lineid, then direction
+    // This ensures all trips for all lines and directions are shown when filters are not applied
+    const sortedTrips = allTrips.sort((a, b) => {
+      const timeA = new Date(a.deptime).getTime();
+      const timeB = new Date(b.deptime).getTime();
+      if (timeA !== timeB) return timeA - timeB;
+
+      // If same time, sort by lineid
+      const lineA = a.lineid || '';
+      const lineB = b.lineid || '';
+      if (lineA !== lineB) return lineA.localeCompare(lineB);
+
+      // If same line and time, sort by direction
+      const directionA = a.direction || '';
+      const directionB = b.direction || '';
+      return directionA.localeCompare(directionB);
+    });
+
+    res.json(sortedTrips);
   } catch (error) {
     next(error);
   }
@@ -144,7 +108,7 @@ export const getTripById = async (req, res, next) => {
 
 export const createTrip = async (req, res, next) => {
   try {
-    const { lineid, vehicleid, deptime, availableseats } = req.body;
+    const { lineid, vehicleid, deptime, availableseats, direction } = req.body;
 
 
     const line = await Line.findById(lineid);
@@ -152,6 +116,22 @@ export const createTrip = async (req, res, next) => {
       return res.status(404).json({
         message: req.t('line.not_found') || 'Line not found'
       });
+    }
+
+    // Validate direction
+    const tripDirection = direction || 'going';
+    if (tripDirection !== 'going' && tripDirection !== 'return') {
+      return res.status(400).json({
+        message: req.t('trip.invalid_direction') || 'Invalid direction. Must be "going" or "return"',
+      });
+    }
+
+    // Determine origin_stationid based on direction
+    let origin_stationid = null;
+    if (tripDirection === 'going') {
+      origin_stationid = line.main_stationid || null;
+    } else if (tripDirection === 'return') {
+      origin_stationid = line.return_stationid || null;
     }
 
     // Vehicle is optional - if provided, validate it; otherwise will be assigned from queue
@@ -195,10 +175,31 @@ export const createTrip = async (req, res, next) => {
       trip_opening_time: openingTime.toISOString(),
       auto_departure_enabled: true,
       early_departure_allowed: true,
+      direction: tripDirection,
+      origin_stationid: origin_stationid,
       scheduled_departure_enforced: true,
     };
 
     const trip = await Trip.create(tripData);
+
+    // Assign any existing future bookings to this newly created trip
+    try {
+      const { distributeFutureBookings } = await import('../services/matchingService.js');
+      const futureResult = await distributeFutureBookings(deptime, lineid, trip.tripid);
+      if (futureResult.distributed > 0) {
+        logger.info(`[TripController] ✅ Assigned ${futureResult.distributed} existing future booking(s) to newly created trip ${trip.tripid}`);
+        // Refresh trip to get updated stats
+        const updatedTrip = await Trip.findById(trip.tripid);
+        if (updatedTrip) {
+          trip.totalbookings = updatedTrip.totalbookings;
+          trip.availableseats = updatedTrip.availableseats;
+        }
+      }
+    } catch (error) {
+      logger.warn(`[TripController] ⚠️ Error assigning future bookings to new trip ${trip.tripid}:`, error);
+      // Don't fail trip creation if booking assignment fails
+    }
+
     res.status(201).json({
       message: req.t('trip.created') || 'Trip created successfully',
       trip,
@@ -214,10 +215,62 @@ export const updateTrip = async (req, res, next) => {
     const { tripid } = req.params;
     const updates = req.body;
 
+    // If status is being updated to completed, check for returning trip creation
+    if (updates.status === TRIP_STATUS.COMPLETED) {
+      const currentTrip = await Trip.findById(tripid);
+      if (currentTrip && currentTrip.direction === 'going') {
+        // Set arrivaltime if not provided
+        if (!updates.arrivaltime) {
+          updates.arrivaltime = getUtcNow().toISOString();
+        }
+      }
+    }
+
     const trip = await Trip.update(tripid, updates);
+
+    // If status was updated to completed and it's a going trip, create returning trip
+    if (updates.status === TRIP_STATUS.COMPLETED) {
+      const updatedTrip = await Trip.findById(tripid);
+      if (updatedTrip && updatedTrip.direction === 'going') {
+        try {
+          const { processTripCompletion } = await import('../services/tripCompletionService.js');
+          const returnTrip = await processTripCompletion(tripid);
+          if (returnTrip) {
+            console.log(`[TripController] ✅ Created returning trip ${returnTrip.tripid} for going trip ${tripid}`);
+          }
+        } catch (error) {
+          console.error(`[TripController] ⚠️ Error creating returning trip:`, error);
+          // Don't fail the trip update if returning trip creation fails
+        }
+      }
+    }
+
     res.json({
       message: req.t('trip.updated') || 'Trip updated successfully',
       trip,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteTrip = async (req, res, next) => {
+  try {
+    const { tripid } = req.params;
+
+    // Check if trip exists
+    const trip = await Trip.findById(tripid);
+    if (!trip) {
+      return res.status(404).json({
+        message: req.t('trip.not_found') || 'Trip not found'
+      });
+    }
+
+    // Delete the trip
+    await Trip.delete(tripid);
+
+    res.json({
+      message: req.t('trip.deleted') || 'Trip has been deleted successfully',
     });
   } catch (error) {
     next(error);
@@ -254,6 +307,55 @@ export const startTrip = async (req, res, next) => {
       }
     }
 
+    // Send notifications to checked-in passengers asynchronously (non-blocking)
+    (async () => {
+      try {
+        const { sendNotification, NOTIFICATION_TYPES } = await import('../services/notificationService.js');
+        const Line = (await import('../models/Line.js')).default;
+        const Passenger = (await import('../models/Passenger.js')).default;
+        const line = await Line.findById(updatedTrip.lineid);
+        const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+
+        // Get all reservations for this trip
+        const reservations = await Reservation.findByTripId(tripid);
+        
+        // Filter to only checked-in passengers
+        const checkedInReservations = reservations.filter(
+          r => r.status === 'checked_in'
+        );
+
+        if (checkedInReservations.length > 0) {
+          // Send notification to each checked-in passenger
+          for (const reservation of checkedInReservations) {
+            const passenger = await Passenger.findById(reservation.passengerid);
+            if (passenger?.userid) {
+              try {
+                const tripDirection = updatedTrip.direction || 'going';
+                const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid, null, null, tripDirection);
+                await sendNotification(
+                  passenger.userid,
+                  NOTIFICATION_TYPES.TRIP_DEPARTED,
+                  {
+                    from: passengerFromName,
+                    to: passengerToName,
+                    tripid: tripid,
+                  },
+                  passengerLanguage,
+                  { line, trip: updatedTrip } // Pass raw data for separate Arabic/English formatting
+                );
+                logger.info(`[TripController] ✅ Sent TRIP_DEPARTED notification to checked-in passenger ${passenger.userid}`);
+              } catch (notifError) {
+                logger.warn(`[TripController] Failed to send notification to passenger ${passenger.userid}:`, notifError);
+              }
+            }
+          }
+        }
+      } catch (notifError) {
+        logger.warn(`[TripController] Failed to send departure notifications for trip ${tripid}:`, notifError);
+        // Don't fail the trip start if notification fails
+      }
+    })();
+
     res.json({
       message: req.t('trip.started') || 'Trip started successfully',
       trip: updatedTrip,
@@ -268,6 +370,9 @@ export const endTrip = async (req, res, next) => {
   try {
     const { tripid } = req.params;
 
+    // Get trip before updating to check direction
+    const currentTrip = await Trip.findById(tripid);
+
     const trip = await Trip.update(tripid, {
       status: TRIP_STATUS.COMPLETED,
       arrivaltime: getUtcNow().toISOString(),
@@ -275,6 +380,20 @@ export const endTrip = async (req, res, next) => {
 
     // Earnings are now recorded when passenger books, not when trip completes
     // No need to process earnings here anymore
+
+    // If this is a going trip, create returning trip
+    if (currentTrip && currentTrip.direction === 'going') {
+      try {
+        const { processTripCompletion } = await import('../services/tripCompletionService.js');
+        const returnTrip = await processTripCompletion(tripid);
+        if (returnTrip) {
+          console.log(`[TripController] ✅ Created returning trip ${returnTrip.tripid} for going trip ${tripid}`);
+        }
+      } catch (error) {
+        console.error(`[TripController] ⚠️ Error creating returning trip:`, error);
+        // Don't fail the trip end if returning trip creation fails
+      }
+    }
 
     res.json({
       message: req.t('trip.ended') || 'Trip ended successfully',
@@ -371,7 +490,7 @@ export const checkInstantBookingAvailability = async (req, res, next) => {
       // Trip has driver, check available seats on this trip using real-time calculation
       const { getAvailableSeats, findTripsAtSameTime } = await import('../services/matchingService.js');
       const Vehicle = (await import('../models/Vehicle.js')).default;
-      
+
       let availableSeats = 0;
       if (trip.vehicleid) {
         const vehicle = await Vehicle.findById(trip.vehicleid);
@@ -379,19 +498,19 @@ export const checkInstantBookingAvailability = async (req, res, next) => {
           availableSeats = await getAvailableSeats(vehicle, trip.tripid);
         }
       }
-      
+
       // If this trip is full, check if there are other trips at the same time with capacity
       // OR if there are drivers in queue that can be assigned
       if (availableSeats <= 0) {
         // Check other trips at the same time
         const tripsAtSameTime = await findTripsAtSameTime(trip.deptime, trip.lineid);
-        const otherTripsWithCapacity = tripsAtSameTime.filter(t => 
-          t.tripid !== trip.tripid && 
-          t.vehicleid && 
+        const otherTripsWithCapacity = tripsAtSameTime.filter(t =>
+          t.tripid !== trip.tripid &&
+          t.vehicleid &&
           t.assigned_driverid &&
           (t.status === 'scheduled' || t.status === 'open' || t.status === 'delayed')
         );
-        
+
         let totalAvailableSeats = 0;
         for (const otherTrip of otherTripsWithCapacity) {
           const vehicle = await Vehicle.findById(otherTrip.vehicleid);
@@ -400,16 +519,16 @@ export const checkInstantBookingAvailability = async (req, res, next) => {
             totalAvailableSeats += seats;
           }
         }
-        
+
         // Check if there are drivers in queue
         const DriverQueue = (await import('../models/DriverQueue.js')).default;
         const queueCheck = await DriverQueue.canAcceptInstantBooking(trip.lineid);
-        
+
         // Booking is available if:
         // 1. Other trips at same time have capacity, OR
         // 2. There are drivers in queue (can create new trip or assign to existing unassigned trips)
         const stillAvailable = totalAvailableSeats > 0 || (queueCheck.allowed && queueCheck.driversAvailable > 0);
-        
+
         return res.json({
           available: stillAvailable,
           reason: stillAvailable ? 'other_trips_or_drivers_available' : 'no_seats',
@@ -425,7 +544,7 @@ export const checkInstantBookingAvailability = async (req, res, next) => {
           driversInQueue: queueCheck.allowed ? queueCheck.driversAvailable : 0,
         });
       }
-      
+
       // Trip has seats available
       return res.json({
         available: true,
@@ -491,7 +610,7 @@ export const checkLineBookingAvailability = async (req, res, next) => {
       lineName: line.linename,
       instantBookingAvailable: queueCheck.allowed,
       driversInQueue: queueCheck.driversAvailable,
-      message: queueCheck.allowed 
+      message: queueCheck.allowed
         ? 'Instant booking is available'
         : req.t('reservation.no_drivers_available') || 'No drivers available. Instant booking is temporarily unavailable.',
     });
@@ -527,3 +646,163 @@ function generateSeatMap(layout, totalSeats, reservations, brokenSeats = []) {
   return seatMap;
 }
 
+/**
+ * Get available trips for a line on a specific date
+ * Returns actual trips if they exist, otherwise generates them based on schedule
+ */
+export const getAvailableTripTimes = async (req, res, next) => {
+  try {
+    const { lineid, date, direction } = req.query;
+
+    if (!lineid || !date) {
+      return res.status(400).json({
+        message: req.t('trip.lineid_and_date_required') || 'lineid and date are required',
+      });
+    }
+
+    // Direction is required to distinguish between going and returning schedules
+    if (!direction) {
+      return res.status(400).json({
+        message: req.t('trip.direction_required') || 'direction is required to fetch available trip times',
+      });
+    }
+
+    // Get schedule for the line and direction
+    // Direction is required to distinguish between going and returning schedules
+    const schedules = await ScheduleTemplate.findByLineId(lineid, direction);
+    if (!schedules || schedules.length === 0) {
+      const directionLabel = direction === 'going' 
+        ? (req.t('schedule.going') || 'going') 
+        : (req.t('schedule.return') || 'return');
+      return res.status(404).json({
+        message: req.t('schedule.not_found_for_direction') || `No ${directionLabel} schedule found for this line`,
+      });
+    }
+
+    const schedule = schedules[0]; // Get the schedule for the specified direction
+    const { start_hour, end_hour, interval_minutes } = schedule;
+
+    // Parse the date
+    const targetDate = new Date(date);
+    if (isNaN(targetDate.getTime())) {
+      return res.status(400).json({
+        message: req.t('trip.invalid_date') || 'Invalid date format',
+      });
+    }
+
+    // Build filters for trip queries
+    const tripFilters = {
+      lineid,
+      date,
+    };
+    if (direction) {
+      tripFilters.direction = direction;
+    }
+
+    // First, try to get existing trips for this line and date
+    const existingTrips = await Trip.findAll({
+      ...tripFilters,
+      status: 'scheduled',
+    });
+
+    // Also get open trips
+    const openTrips = await Trip.findAll({
+      ...tripFilters,
+      status: 'open',
+    });
+
+    const allTrips = [...existingTrips, ...openTrips];
+    const now = getUtcNow();
+
+    // Filter to only future trips and sort by deptime
+    const futureTrips = allTrips
+      .filter(trip => {
+        const deptime = parseUtcDate(trip.deptime);
+        return deptime && deptime.getTime() > now.getTime();
+      })
+      .sort((a, b) => {
+        const timeA = parseUtcDate(a.deptime)?.getTime() || 0;
+        const timeB = parseUtcDate(b.deptime)?.getTime() || 0;
+        return timeA - timeB;
+      });
+
+    // If we have trips, return them
+    if (futureTrips.length > 0) {
+      const tripsData = futureTrips.map(trip => {
+        const deptime = parseUtcDate(trip.deptime);
+        const localTime = deptime ? new Date(deptime.getTime()) : null;
+        
+        return {
+          tripid: trip.tripid,
+          deptime: trip.deptime,
+          time: trip.deptime,
+          hour: localTime ? localTime.getHours() : null,
+          minute: localTime ? localTime.getMinutes() : null,
+          status: trip.status,
+          availableseats: trip.availableseats || 0,
+          totalbookings: trip.totalbookings || 0,
+          interval_minutes: interval_minutes,
+        };
+      });
+
+      return res.json({
+        lineid,
+        date,
+        schedule: {
+          start_hour,
+          end_hour,
+          interval_minutes,
+        },
+        trips: tripsData,
+      });
+    }
+
+    // If no trips exist, generate trip times based on schedule
+    const timezoneOffset = await getServerTimezoneOffset();
+    const tripTimes = [];
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const day = String(targetDate.getDate()).padStart(2, '0');
+    const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+    const offsetHours = String(Math.abs(timezoneOffset)).padStart(2, '0');
+
+    let currentMinutes = start_hour * 60;
+    const endMinutes = end_hour * 60;
+
+    while (currentMinutes <= endMinutes) {
+      const hours = Math.floor(currentMinutes / 60);
+      const mins = currentMinutes % 60;
+      const localTimeString = `${year}-${month}-${day}T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00${offsetSign}${offsetHours}:00`;
+      const utcTime = parseUtcDate(localTimeString);
+      
+      if (utcTime && utcTime.getTime() > now.getTime()) {
+        tripTimes.push({
+          tripid: null, // No trip ID yet, will be created when booking
+          deptime: utcTime.toISOString(),
+          time: utcTime.toISOString(),
+          hour: hours,
+          minute: mins,
+          status: 'scheduled',
+          availableseats: 0,
+          totalbookings: 0,
+          interval_minutes: interval_minutes,
+        });
+      }
+
+      currentMinutes += interval_minutes;
+    }
+
+    res.json({
+      lineid,
+      date,
+      schedule: {
+        start_hour,
+        end_hour,
+        interval_minutes,
+      },
+      trips: tripTimes,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

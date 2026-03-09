@@ -58,7 +58,8 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result['message'] ?? 'Failed to load stations')),
+            SnackBar(
+                content: Text(result['message'] ?? 'Failed to load stations')),
           );
         }
       }
@@ -164,25 +165,26 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
-    
+
     return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => Dialog(
           insetPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0)
-          ),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 16.0 : 20.0)),
           child: Container(
             width: double.maxFinite,
             height: MediaQuery.of(context).size.height * 0.8,
-            padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
+            padding: EdgeInsets.all(
+                isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
             child: Column(
               children: [
                 Text(
                   station == null ? 'Create Base Station' : 'Edit Base Station',
                   style: TextStyle(
-                    fontSize: isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
+                    fontSize:
+                        isSmallScreen ? 18.0 : (isMediumScreen ? 19.0 : 20.0),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -203,7 +205,8 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                         if (pickerMapReady) {
                           setDialogState(() {
                             selectedLocation = point;
-                            pickerMapController.move(point, pickerMapController.camera.zoom);
+                            pickerMapController.move(
+                                point, pickerMapController.camera.zoom);
                           });
                         }
                       },
@@ -235,7 +238,9 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                           circles: [
                             CircleMarker(
                               point: selectedLocation,
-                              radius: (int.tryParse(radiusController.text) ?? 100).toDouble(),
+                              radius:
+                                  (int.tryParse(radiusController.text) ?? 100)
+                                      .toDouble(),
                               color: Colors.blue.withOpacity(0.2),
                               borderColor: Colors.blue,
                               useRadiusInMeter: true,
@@ -252,11 +257,12 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                   style: TextStyle(fontSize: isSmallScreen ? 14.0 : 16.0),
                   decoration: InputDecoration(
                     labelText: 'Name',
-                    labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                    labelStyle:
+                        TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
                     hintText: 'Main Station',
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
-                    ),
+                        borderRadius:
+                            BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)),
                     contentPadding: EdgeInsets.symmetric(
                       horizontal: isSmallScreen ? 16.0 : 20.0,
                       vertical: isSmallScreen ? 12.0 : 16.0,
@@ -274,10 +280,11 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                         style: TextStyle(fontSize: isSmallScreen ? 14.0 : 16.0),
                         decoration: InputDecoration(
                           labelText: 'Latitude',
-                          labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                          labelStyle:
+                              TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
-                          ),
+                              borderRadius: BorderRadius.circular(
+                                  isSmallScreen ? 10.0 : 12.0)),
                           contentPadding: EdgeInsets.symmetric(
                             horizontal: isSmallScreen ? 16.0 : 20.0,
                             vertical: isSmallScreen ? 12.0 : 16.0,
@@ -295,10 +302,11 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                         style: TextStyle(fontSize: isSmallScreen ? 14.0 : 16.0),
                         decoration: InputDecoration(
                           labelText: 'Longitude',
-                          labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                          labelStyle:
+                              TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
-                          ),
+                              borderRadius: BorderRadius.circular(
+                                  isSmallScreen ? 10.0 : 12.0)),
                           contentPadding: EdgeInsets.symmetric(
                             horizontal: isSmallScreen ? 16.0 : 20.0,
                             vertical: isSmallScreen ? 12.0 : 16.0,
@@ -315,11 +323,12 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                   style: TextStyle(fontSize: isSmallScreen ? 14.0 : 16.0),
                   decoration: InputDecoration(
                     labelText: 'Geofence Radius (meters)',
-                    labelStyle: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                    labelStyle:
+                        TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
                     hintText: '100',
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)
-                    ),
+                        borderRadius:
+                            BorderRadius.circular(isSmallScreen ? 10.0 : 12.0)),
                     contentPadding: EdgeInsets.symmetric(
                       horizontal: isSmallScreen ? 16.0 : 20.0,
                       vertical: isSmallScreen ? 12.0 : 16.0,
@@ -350,7 +359,8 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                             SnackBar(
                               content: Text(
                                 'Name is required',
-                                style: TextStyle(fontSize: isSmallScreen ? 13.0 : 14.0),
+                                style: TextStyle(
+                                    fontSize: isSmallScreen ? 13.0 : 14.0),
                               ),
                             ),
                           );
@@ -362,7 +372,8 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                             'name': nameController.text,
                             'latitude': selectedLocation.latitude,
                             'longitude': selectedLocation.longitude,
-                            'geofenceRadiusMeters': int.tryParse(radiusController.text) ?? 100,
+                            'geofenceRadiusMeters':
+                                int.tryParse(radiusController.text) ?? 100,
                           },
                         );
                       },
@@ -391,15 +402,16 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
-    
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(isSmallScreen ? 14.0 : 16.0)
-        ),
-        titlePadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
-        contentPadding: EdgeInsets.all(isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 14.0 : 16.0)),
+        titlePadding: EdgeInsets.all(
+            isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
+        contentPadding: EdgeInsets.all(
+            isSmallScreen ? 16.0 : (isMediumScreen ? 18.0 : 20.0)),
         actionsPadding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
         title: Text(
           'Delete Base Station',
@@ -455,7 +467,8 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(response['message'] ?? 'Failed to delete')),
+              SnackBar(
+                  content: Text(response['message'] ?? 'Failed to delete')),
             );
           }
         }
@@ -475,7 +488,7 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
-    
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
@@ -535,7 +548,9 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                           'No base stations found',
                           style: TextStyle(
                             fontSize: isSmallScreen ? 16.0 : 18.0,
-                            color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+                            color: AppTheme.isDarkMode
+                                ? Colors.white
+                                : AppTheme.textPrimary,
                           ),
                         ),
                         SizedBox(height: isSmallScreen ? 12.0 : 16.0),
@@ -559,12 +574,17 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                   ),
                 )
               : _showMap
-                  ? _buildMapView(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen)
-                  : _buildListView(isSmallScreen: isSmallScreen, isMediumScreen: isMediumScreen),
+                  ? _buildMapView(
+                      isSmallScreen: isSmallScreen,
+                      isMediumScreen: isMediumScreen)
+                  : _buildListView(
+                      isSmallScreen: isSmallScreen,
+                      isMediumScreen: isMediumScreen),
     );
   }
 
-  Widget _buildMapView({bool isSmallScreen = false, bool isMediumScreen = false}) {
+  Widget _buildMapView(
+      {bool isSmallScreen = false, bool isMediumScreen = false}) {
     // Determine center point
     LatLng center = _selectedStation != null
         ? LatLng(
@@ -603,8 +623,7 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
           ),
           children: [
             TileLayer(
-              urlTemplate:
-                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.example.taxi_palestine_app',
             ),
             // Base station markers
@@ -613,27 +632,29 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                 final lat = station['latitude']?.toDouble() ?? 0.0;
                 final lng = station['longitude']?.toDouble() ?? 0.0;
                 final isActive = station['is_active'] == true;
-                final isSelected = _selectedStation?['stationid'] == station['stationid'];
+                final isSelected =
+                    _selectedStation?['stationid'] == station['stationid'];
 
                 return Marker(
                   point: LatLng(lat, lng),
                   width: isSmallScreen ? 45.0 : 50.0,
                   height: isSmallScreen ? 45.0 : 50.0,
                   child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedStation = station;
-              });
-              if (_mapReady) {
-                _centerMapOnStation(station);
-              }
-            },
+                    onTap: () {
+                      setState(() {
+                        _selectedStation = station;
+                      });
+                      if (_mapReady) {
+                        _centerMapOnStation(station);
+                      }
+                    },
                     child: Icon(
                       Icons.location_city,
                       color: isSelected
                           ? Colors.blue
                           : (isActive ? Colors.green : Colors.grey),
-                      size: isSmallScreen ? 36.0 : (isMediumScreen ? 38.0 : 40.0),
+                      size:
+                          isSmallScreen ? 36.0 : (isMediumScreen ? 38.0 : 40.0),
                     ),
                   ),
                 );
@@ -644,8 +665,10 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
               circles: _stations.map((station) {
                 final lat = station['latitude']?.toDouble() ?? 0.0;
                 final lng = station['longitude']?.toDouble() ?? 0.0;
-                final radius = station['geofence_radius_meters']?.toInt() ?? 100;
-                final isSelected = _selectedStation?['stationid'] == station['stationid'];
+                final radius =
+                    station['geofence_radius_meters']?.toInt() ?? 100;
+                final isSelected =
+                    _selectedStation?['stationid'] == station['stationid'];
 
                 return CircleMarker(
                   point: LatLng(lat, lng),
@@ -669,7 +692,8 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
             child: Card(
               elevation: 8,
               child: Padding(
-                padding: EdgeInsets.all(isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
+                padding: EdgeInsets.all(
+                    isSmallScreen ? 12.0 : (isMediumScreen ? 14.0 : 16.0)),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -681,7 +705,9 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                           child: Text(
                             _selectedStation!['name'] ?? 'Unnamed Station',
                             style: TextStyle(
-                              fontSize: isSmallScreen ? 16.0 : (isMediumScreen ? 17.0 : 18.0),
+                              fontSize: isSmallScreen
+                                  ? 16.0
+                                  : (isMediumScreen ? 17.0 : 18.0),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -692,7 +718,8 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                             IconButton(
                               icon: Icon(Icons.edit),
                               iconSize: isSmallScreen ? 20.0 : 24.0,
-                              padding: EdgeInsets.all(isSmallScreen ? 4.0 : 8.0),
+                              padding:
+                                  EdgeInsets.all(isSmallScreen ? 4.0 : 8.0),
                               constraints: BoxConstraints(
                                 minWidth: isSmallScreen ? 36.0 : 48.0,
                                 minHeight: isSmallScreen ? 36.0 : 48.0,
@@ -704,12 +731,14 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                             IconButton(
                               icon: Icon(Icons.delete, color: Colors.red),
                               iconSize: isSmallScreen ? 20.0 : 24.0,
-                              padding: EdgeInsets.all(isSmallScreen ? 4.0 : 8.0),
+                              padding:
+                                  EdgeInsets.all(isSmallScreen ? 4.0 : 8.0),
                               constraints: BoxConstraints(
                                 minWidth: isSmallScreen ? 36.0 : 48.0,
                                 minHeight: isSmallScreen ? 36.0 : 48.0,
                               ),
-                              onPressed: () => _deleteStation(_selectedStation!),
+                              onPressed: () =>
+                                  _deleteStation(_selectedStation!),
                             ),
                           ],
                         ),
@@ -746,15 +775,18 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
     );
   }
 
-  Widget _buildListView({bool isSmallScreen = false, bool isMediumScreen = false}) {
-    final double basePadding = isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
-    
+  Widget _buildListView(
+      {bool isSmallScreen = false, bool isMediumScreen = false}) {
+    final double basePadding =
+        isSmallScreen ? 12.0 : (isMediumScreen ? 16.0 : 20.0);
+
     return ListView.builder(
       padding: EdgeInsets.all(basePadding),
       itemCount: _stations.length,
       itemBuilder: (context, index) {
         final station = _stations[index];
-        final isSelected = _selectedStation?['stationid'] == station['stationid'];
+        final isSelected =
+            _selectedStation?['stationid'] == station['stationid'];
 
         return Card(
           margin: EdgeInsets.symmetric(
@@ -788,21 +820,24 @@ class _AdminBaseStationPageState extends State<AdminBaseStationPage> {
                     'Lat: ${station['latitude']?.toStringAsFixed(6)}, '
                     'Lng: ${station['longitude']?.toStringAsFixed(6)}',
                     style: TextStyle(
-                      fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                      fontSize:
+                          isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
                     ),
                   ),
                   SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                   Text(
                     'Radius: ${station['geofence_radius_meters']}m',
                     style: TextStyle(
-                      fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                      fontSize:
+                          isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
                     ),
                   ),
                   SizedBox(height: isSmallScreen ? 2.0 : 4.0),
                   Text(
                     'Status: ${station['is_active'] == true ? 'Active' : 'Inactive'}',
                     style: TextStyle(
-                      fontSize: isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
+                      fontSize:
+                          isSmallScreen ? 11.0 : (isMediumScreen ? 12.0 : 13.0),
                     ),
                   ),
                 ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../theme/app_theme.dart';
+import 'line_route_editor_page.dart';
 
 class AdminLinesPage extends StatefulWidget {
   const AdminLinesPage({super.key});
@@ -21,14 +22,19 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
 
   
   final _formKey = GlobalKey<FormState>();
-  final _nameArController = TextEditingController();
-  final _nameEnController = TextEditingController();
+  final _nameArFirstController = TextEditingController(); // First station name in Arabic
+  final _nameArSecondController = TextEditingController(); // Second station name in Arabic
+  final _nameEnFirstController = TextEditingController(); // First station name in English
+  final _nameEnSecondController = TextEditingController(); // Second station name in English
   final _basePriceController = TextEditingController();
   final _additionalPriceController = TextEditingController();
   final _durationController = TextEditingController();
   final _distanceController = TextEditingController();
   bool _active = true;
   String? _editingLineId;
+  List<Map<String, dynamic>> _stations = [];
+  String? _selectedMainStationId;
+  String? _selectedReturnStationId;
 
   final Map<String, Map<String, String>> _texts = {
     'ar': {
@@ -38,6 +44,10 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'lineName': 'اسم الخط',
       'lineNameAr': 'الاسم بالعربية',
       'lineNameEn': 'الاسم بالإنجليزية',
+      'firstStationAr': 'المحطة الأولى (عربي)',
+      'secondStationAr': 'المحطة الثانية (عربي)',
+      'firstStationEn': 'First Station (English)',
+      'secondStationEn': 'Second Station (English)',
       'basePrice': 'السعر الأساسي',
       'additionalPrice': 'السعر الإضافي',
       'duration': 'المدة (دقيقة)',
@@ -61,6 +71,11 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'currency': 'شيكل',
       'min': 'دقيقة',
       'km': 'كم',
+      'editRoute': 'تعديل المسار',
+      'mainStation': 'محطة الذهاب',
+      'returnStation': 'محطة العودة',
+      'selectStation': 'اختر المحطة',
+      'noStation': 'لا توجد محطة',
     },
     'en': {
       'title': 'Lines Management',
@@ -69,6 +84,10 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'lineName': 'Line Name',
       'lineNameAr': 'Arabic Name',
       'lineNameEn': 'English Name',
+      'firstStationAr': 'First Station (Arabic)',
+      'secondStationAr': 'Second Station (Arabic)',
+      'firstStationEn': 'First Station (English)',
+      'secondStationEn': 'Second Station (English)',
       'basePrice': 'Base Price',
       'additionalPrice': 'Additional Price',
       'duration': 'Duration (minutes)',
@@ -92,10 +111,22 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
       'currency': 'NIS',
       'min': 'min',
       'km': 'km',
+      'editRoute': 'Edit Route',
+      'mainStation': 'Going Station',
+      'returnStation': 'Return Station',
+      'selectStation': 'Select Station',
+      'noStation': 'No Station',
     },
   };
 
-  String t(String key) => _texts[_isArabic ? 'ar' : 'en']![key]!;
+  String t(String key) {
+    final language = _isArabic ? 'ar' : 'en';
+    final languageMap = _texts[language];
+    if (languageMap == null) {
+      return key; // Return key as fallback
+    }
+    return languageMap[key] ?? key; // Return key as fallback if not found
+  }
 
   @override
   void initState() {
@@ -109,8 +140,10 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
   @override
   void dispose() {
     _searchController.dispose();
-    _nameArController.dispose();
-    _nameEnController.dispose();
+    _nameArFirstController.dispose();
+    _nameArSecondController.dispose();
+    _nameEnFirstController.dispose();
+    _nameEnSecondController.dispose();
     _basePriceController.dispose();
     _additionalPriceController.dispose();
     _durationController.dispose();
@@ -160,6 +193,25 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     }
   }
 
+  Future<void> _loadStations() async {
+    try {
+      final result = await ApiService.getAllBaseStations();
+      if (result['success'] == true) {
+        final stationsList = result['stations'];
+        if (stationsList is List) {
+          setState(() {
+            _stations = stationsList
+                .whereType<Map<String, dynamic>>()
+                .map((station) => Map<String, dynamic>.from(station))
+                .toList();
+          });
+        }
+      }
+    } catch (e) {
+      // Silently fail, stations will just be empty
+    }
+  }
+
   void _applyFilter() {
     _filteredLines = _lines.where((line) {
       final nameAr = (line['name_ar'] ?? '').toString().toLowerCase();
@@ -174,23 +226,33 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
   }
 
   Future<void> _handleSave() async {
-    if (!_formKey.currentState!.validate()) return;
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) return;
 
-    final nameAr = _nameArController.text.trim();
-    final nameEn = _nameEnController.text.trim();
+    // Combine station names with "-" separator
+    final nameArFirst = _nameArFirstController.text.trim();
+    final nameArSecond = _nameArSecondController.text.trim();
+    final nameEnFirst = _nameEnFirstController.text.trim();
+    final nameEnSecond = _nameEnSecondController.text.trim();
 
-    
-    if (nameAr.isEmpty) {
+    // Validate that both Arabic station names are provided
+    if (nameArFirst.isEmpty || nameArSecond.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              _isArabic ? 'الاسم بالعربية مطلوب' : 'Arabic name is required'),
+              _isArabic ? 'يرجى إدخال اسمي المحطتين بالعربية' : 'Please enter both Arabic station names'),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
+
+    // Combine station names with "-" separator
+    final nameAr = '$nameArFirst-$nameArSecond';
+    final nameEn = (nameEnFirst.isNotEmpty && nameEnSecond.isNotEmpty) 
+        ? '$nameEnFirst-$nameEnSecond' 
+        : '';
 
     
     showDialog(
@@ -211,6 +273,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
               estduration: int.tryParse(_durationController.text),
               distance: double.tryParse(_distanceController.text),
               active: _active,
+              mainStationId: _selectedMainStationId,
+              returnStationId: _selectedReturnStationId,
             )
           : await ApiService.createLine(
               nameAr: nameAr.isNotEmpty ? nameAr : null,
@@ -221,6 +285,8 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
               estduration: int.tryParse(_durationController.text),
               distance: double.tryParse(_distanceController.text),
               active: _active,
+              mainStationId: _selectedMainStationId,
+              returnStationId: _selectedReturnStationId,
             );
 
       
@@ -261,30 +327,52 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     }
   }
 
-  void _openFormDialog(BuildContext context, {Map<String, dynamic>? line}) {
+  Future<void> _openFormDialog(BuildContext context, {Map<String, dynamic>? line}) async {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 360;
     final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
     
+    // Load stations when opening the form
+    await _loadStations();
+
     if (line != null) {
       _editingLineId = line['lineid'];
-      _nameArController.text = line['name_ar'] ?? line['linename'] ?? '';
-      _nameEnController.text = line['name_en'] ?? '';
+      
+      // Split line names by "-" to populate the fields
+      final nameArFull = (line['name_ar'] ?? line['linename'] ?? '').toString();
+      final nameEnFull = (line['name_en'] ?? '').toString();
+      
+      // Split Arabic name
+      final nameArParts = nameArFull.split('-').map((s) => s.trim()).toList();
+      _nameArFirstController.text = nameArParts.isNotEmpty ? nameArParts[0] : '';
+      _nameArSecondController.text = nameArParts.length > 1 ? nameArParts[1] : '';
+      
+      // Split English name
+      final nameEnParts = nameEnFull.split('-').map((s) => s.trim()).toList();
+      _nameEnFirstController.text = nameEnParts.isNotEmpty ? nameEnParts[0] : '';
+      _nameEnSecondController.text = nameEnParts.length > 1 ? nameEnParts[1] : '';
+      
       _basePriceController.text = (line['baseprice'] ?? 0).toString();
       _additionalPriceController.text =
           (line['additionalprice'] ?? 0).toString();
       _durationController.text = (line['estduration'] ?? '').toString();
       _distanceController.text = (line['distance'] ?? '').toString();
       _active = line['active'] ?? true;
+      _selectedMainStationId = line['main_stationid']?.toString();
+      _selectedReturnStationId = line['return_stationid']?.toString();
     } else {
       _editingLineId = null;
-      _nameArController.clear();
-      _nameEnController.clear();
+      _nameArFirstController.clear();
+      _nameArSecondController.clear();
+      _nameEnFirstController.clear();
+      _nameEnSecondController.clear();
       _basePriceController.clear();
       _additionalPriceController.clear();
       _durationController.clear();
       _distanceController.clear();
       _active = true;
+      _selectedMainStationId = null;
+      _selectedReturnStationId = null;
     }
 
     showDialog(
@@ -316,22 +404,76 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildTextField(
-                    controller: _nameArController,
-                    label: t('lineNameAr'),
-                    icon: Icons.text_fields_rounded,
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? t('required') : null,
-                    isSmallScreen: isSmallScreen,
-                    isMediumScreen: isMediumScreen,
+                  // Arabic station names
+                  Text(
+                    t('lineNameAr'),
+                    style: TextStyle(
+                      color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: isSmallScreen ? 8.0 : 10.0),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _nameArFirstController,
+                          label: t('firstStationAr'),
+                          icon: Icons.location_on_rounded,
+                          validator: (value) =>
+                              value?.isEmpty ?? true ? t('required') : null,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                        ),
+                      ),
+                      SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _nameArSecondController,
+                          label: t('secondStationAr'),
+                          icon: Icons.location_on_rounded,
+                          validator: (value) =>
+                              value?.isEmpty ?? true ? t('required') : null,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                        ),
+                      ),
+                    ],
                   ),
                   SizedBox(height: isSmallScreen ? 12.0 : 16.0),
-                  _buildTextField(
-                    controller: _nameEnController,
-                    label: t('lineNameEn'),
-                    icon: Icons.language_rounded,
-                    isSmallScreen: isSmallScreen,
-                    isMediumScreen: isMediumScreen,
+                  // English station names
+                  Text(
+                    t('lineNameEn'),
+                    style: TextStyle(
+                      color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                      fontSize: isSmallScreen ? 13.0 : 14.0,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: isSmallScreen ? 8.0 : 10.0),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _nameEnFirstController,
+                          label: t('firstStationEn'),
+                          icon: Icons.location_on_rounded,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                        ),
+                      ),
+                      SizedBox(width: isSmallScreen ? 8.0 : 12.0),
+                      Expanded(
+                        child: _buildTextField(
+                          controller: _nameEnSecondController,
+                          label: t('secondStationEn'),
+                          icon: Icons.location_on_rounded,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                        ),
+                      ),
+                    ],
                   ),
                   SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                   Row(
@@ -388,6 +530,30 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                     ],
                   ),
                   SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                  _buildStationDropdown(
+                    label: t('mainStation'),
+                    value: _selectedMainStationId,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedMainStationId = value;
+                      });
+                    },
+                    isSmallScreen: isSmallScreen,
+                    isMediumScreen: isMediumScreen,
+                  ),
+                  SizedBox(height: isSmallScreen ? 12.0 : 16.0),
+                  _buildStationDropdown(
+                    label: t('returnStation'),
+                    value: _selectedReturnStationId,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedReturnStationId = value;
+                      });
+                    },
+                    isSmallScreen: isSmallScreen,
+                    isMediumScreen: isMediumScreen,
+                  ),
+                  SizedBox(height: isSmallScreen ? 12.0 : 16.0),
                   StatefulBuilder(
                     builder: (context, setState) => SwitchListTile(
                       title: Text(
@@ -440,6 +606,22 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openRouteEditor(Map<String, dynamic> line) {
+    final lineName = _isArabic
+        ? (line['name_ar'] ?? line['linename'] ?? line['name_en'] ?? '')
+        : (line['name_en'] ?? line['linename'] ?? line['name_ar'] ?? '');
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LineRouteEditorPage(
+          lineid: line['lineid'].toString(),
+          lineName: lineName,
+        ),
       ),
     );
   }
@@ -820,6 +1002,15 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
                     Row(
                       children: [
                         _buildActionButton(
+                          icon: Icons.route_rounded,
+                          color: Colors.green,
+                          isSmallScreen: isSmallScreen,
+                          isMediumScreen: isMediumScreen,
+                          onTap: () => _openRouteEditor(line),
+                          tooltip: t('editRoute'),
+                        ),
+                        SizedBox(width: isSmallScreen ? 6.0 : 8.0),
+                        _buildActionButton(
                           icon: Icons.edit_rounded,
                           color: Colors.blueAccent,
                           isSmallScreen: isSmallScreen,
@@ -909,8 +1100,9 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
     required VoidCallback onTap,
     bool isSmallScreen = false,
     bool isMediumScreen = false,
+    String? tooltip,
   }) {
-    return Material(
+    final button = Material(
       color: AppTheme.isDarkMode ? color.withOpacity(0.2) : color.withOpacity(0.1),
       borderRadius: BorderRadius.circular(isSmallScreen ? 6.0 : 8.0),
       child: InkWell(
@@ -926,6 +1118,14 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
         ),
       ),
     );
+
+    if (tooltip != null) {
+      return Tooltip(
+        message: tooltip,
+        child: button,
+      );
+    }
+    return button;
   }
 
   Widget _buildEmptyState({bool isSmallScreen = false, bool isMediumScreen = false}) {
@@ -963,6 +1163,76 @@ class _AdminLinesPageState extends State<AdminLinesPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStationDropdown({
+    required String label,
+    required String? value,
+    required Function(String?) onChanged,
+    bool isSmallScreen = false,
+    bool isMediumScreen = false,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(
+          color: AppTheme.isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+          fontWeight: FontWeight.w500,
+          fontSize: isSmallScreen ? 13.0 : 14.0,
+        ),
+        prefixIcon: Icon(
+          Icons.location_on_rounded,
+          color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+          size: isSmallScreen ? 20.0 : 24.0,
+        ),
+        filled: true,
+        fillColor: AppTheme.isDarkMode
+            ? Colors.white.withOpacity(0.05)
+            : Colors.grey.shade50,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+          borderSide: BorderSide(
+            color: AppTheme.isDarkMode ? Colors.white10 : Colors.grey.shade200,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(isSmallScreen ? 12.0 : 16.0),
+          borderSide: BorderSide(
+            color: AppTheme.isDarkMode ? Colors.blueAccent : AppTheme.appBarColor,
+            width: 2,
+          ),
+        ),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: isSmallScreen ? 16.0 : 20.0,
+          vertical: isSmallScreen ? 12.0 : 16.0,
+        ),
+      ),
+      style: TextStyle(
+        color: AppTheme.isDarkMode ? Colors.white : AppTheme.textPrimary,
+        fontWeight: FontWeight.w500,
+        fontSize: isSmallScreen ? 14.0 : (isMediumScreen ? 15.0 : 16.0),
+      ),
+      items: [
+        DropdownMenuItem<String>(
+          value: null,
+          child: Text(t('noStation')),
+        ),
+        ..._stations.map((station) {
+          final stationName = station['name']?.toString() ?? '';
+          final stationId = station['stationid']?.toString() ?? '';
+          return DropdownMenuItem<String>(
+            value: stationId,
+            child: Text(stationName),
+          );
+        }),
+      ],
+      onChanged: onChanged,
     );
   }
 }

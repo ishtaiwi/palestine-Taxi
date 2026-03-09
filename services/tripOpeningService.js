@@ -6,13 +6,14 @@ import { distributeAllBookings, syncTripStats } from './matchingService.js';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
 import logger from '../utils/logger.js';
 import { getUtcNow, parseUtcDate } from '../utils/timeUtils.js';
+import { TRIP_STATUS } from '../utils/constants.js';
 
 /**
  * Assign a vehicle to a trip from the driver queue
- * IMPORTANT: Only assigns driver if trip has reservations (bookings)
+ * IMPORTANT: Only assigns driver if trip has reservations (bookings) or future bookings matching the trip's deptime and lineid
  * @param {string} tripid - The trip ID
  * @param {string} lineid - The line ID
- * @returns {Promise<object|null>} - Assignment result or null if no driver available or no reservations
+ * @returns {Promise<object|null>} - Assignment result or null if no driver available or no reservations/future bookings
  */
 export const assignVehicleFromQueue = async (tripid, lineid) => {
   try {
@@ -37,21 +38,52 @@ export const assignVehicleFromQueue = async (tripid, lineid) => {
       r => r.status === 'confirmed' || r.status === 'checked_in'
     );
 
-    if (activeReservations.length === 0) {
-      logger.info(`[TripOpeningService] ⚠️ Trip ${tripid} has no reservations - driver will not be assigned until bookings exist`);
+    // ALSO check for future bookings that match this trip's deptime and lineid
+    // This handles the case where future bookings exist but trip hasn't been created yet
+    let futureBookingsCount = 0;
+    if (currentTrip && currentTrip.deptime) {
+      try {
+        const futureBookings = await Reservation.findFutureBookingsForTrip(
+          currentTrip.deptime,
+          { lineid: lineid }
+        );
+        // Count unassigned future bookings (those without tripid or with matching tripid)
+        futureBookingsCount = futureBookings.filter(b =>
+          (!b.tripid || b.tripid === tripid) &&
+          (b.status === 'confirmed' || b.status === 'checked_in')
+        ).length;
+
+        if (futureBookingsCount > 0) {
+          logger.info(`[TripOpeningService] 📅 Found ${futureBookingsCount} future booking(s) for trip ${tripid} at ${currentTrip.deptime}`);
+        }
+      } catch (error) {
+        logger.warn(`[TripOpeningService] ⚠️ Error checking future bookings:`, error);
+      }
+    }
+
+    const totalBookings = activeReservations.length + futureBookingsCount;
+
+    if (totalBookings === 0) {
+      logger.info(`[TripOpeningService] ⚠️ Trip ${tripid} has no reservations or future bookings - driver will not be assigned until bookings exist`);
       return null;
     }
 
-    logger.info(`[TripOpeningService] ✅ Trip ${tripid} has ${activeReservations.length} reservation(s) - proceeding with driver assignment`);
+    logger.info(`[TripOpeningService] ✅ Trip ${tripid} has ${activeReservations.length} reservation(s) and ${futureBookingsCount} future booking(s) - proceeding with driver assignment`);
 
+    // Get trip direction to filter queue
+    const tripDirection = currentTrip?.direction || 'going';
+    
+    // Map trip direction to queue direction
+    const { mapTripDirectionToQueueDirection } = await import('../utils/tripDirectionUtils.js');
+    const queueDirection = mapTripDirectionToQueueDirection(tripDirection);
 
-    const queue = await DriverQueue.getActiveByLine(lineid);
+    const queue = await DriverQueue.getActiveByLine(lineid, queueDirection);
     if (!queue || queue.length === 0) {
-      logger.info(`[TripOpeningService] ⚠️ No drivers available in queue for line ${lineid}`);
+      logger.info(`[TripOpeningService] ⚠️ No drivers available in ${queueDirection} queue for line ${lineid}`);
       return null;
     }
 
-    logger.info(`[TripOpeningService] 📋 Found ${queue.length} driver(s) in queue: ${queue.map((d, i) => `[${i + 1}] driver ${d.driverid}`).join(', ')}`);
+    logger.info(`[TripOpeningService] 📋 Found ${queue.length} driver(s) in ${queueDirection} queue: ${queue.map((d, i) => `[${i + 1}] driver ${d.driverid}`).join(', ')}`);
 
 
     const tripDeptime = parseUtcDate(currentTrip.deptime);
@@ -142,6 +174,98 @@ export const assignVehicleFromQueue = async (tripid, lineid) => {
 
     logger.info(`[TripOpeningService] ✅ Vehicle ${vehicle.vehicleid} and driver ${driverid} assigned to trip ${tripid}`);
 
+    // Send notifications
+    try {
+      const { sendNotification, sendBulkNotifications, NOTIFICATION_TYPES } = await import('./notificationService.js');
+      const Driver = (await import('../models/Driver.js')).default;
+      const Line = (await import('../models/Line.js')).default;
+      
+      // Get driver and line info
+      const driver = await Driver.findById(driverid);
+      const line = await Line.findById(updatedTrip.lineid);
+      const driverName = driver?.user?.fullname || 'Driver';
+      const plateNumber = vehicle.plateno || 'N/A';
+      const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+
+      // Notify driver
+      if (driver?.userid) {
+        const tripDirection = updatedTrip.direction || 'going';
+        const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid, null, null, tripDirection);
+        const { DateTime } = await import('luxon');
+        const deptime = DateTime.fromISO(new Date(updatedTrip.deptime).toISOString())
+          .setLocale(driverLanguage === 'en' ? 'en' : 'ar')
+          .toLocaleString({ 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: driverLanguage === 'en'
+          });
+
+        await sendNotification(
+          driver.userid,
+          NOTIFICATION_TYPES.TRIP_ASSIGNED,
+          {
+            from: driverFromName,
+            to: driverToName,
+            time: deptime,
+            tripid: tripid,
+          },
+          driverLanguage,
+          { line, trip: updatedTrip } // Pass raw data for separate Arabic/English formatting
+        );
+      }
+
+      // Notify all passengers on the trip (send individually to use per-user language)
+      const reservations = await Reservation.findByTripId(tripid);
+      const activeReservations = reservations.filter(
+        r => r.status === 'confirmed' || r.status === 'checked_in'
+      );
+
+      if (activeReservations.length > 0) {
+        for (const reservation of activeReservations) {
+          const Passenger = (await import('../models/Passenger.js')).default;
+          const passenger = await Passenger.findById(reservation.passengerid);
+          if (passenger?.userid) {
+            try {
+              const tripDirection = updatedTrip.direction || 'going';
+              const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid, null, null, tripDirection);
+              const { DateTime } = await import('luxon');
+              const deptime = DateTime.fromISO(new Date(updatedTrip.deptime).toISOString())
+                .setLocale(passengerLanguage === 'en' ? 'en' : 'ar')
+                .toLocaleString({ 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric', 
+                  hour: '2-digit', 
+                  minute: '2-digit',
+                  hour12: passengerLanguage === 'en'
+                });
+
+              await sendNotification(
+                passenger.userid,
+                NOTIFICATION_TYPES.DRIVER_ASSIGNED,
+                {
+                  driverName,
+                  plateNumber,
+                  from: passengerFromName,
+                  to: passengerToName,
+                  time: deptime,
+                },
+                passengerLanguage,
+                { line, trip: updatedTrip } // Pass raw data for separate Arabic/English formatting
+              );
+            } catch (notifError) {
+              logger.warn(`[TripOpeningService] Failed to send notification to passenger ${passenger.userid}:`, notifError);
+            }
+          }
+        }
+      }
+    } catch (notifError) {
+      logger.warn(`[TripOpeningService] Failed to send notifications for trip ${tripid}:`, notifError);
+    }
+
     return {
       success: true,
       vehicle,
@@ -198,21 +322,45 @@ export const openScheduledTrip = async (tripid) => {
       r => r.status === 'confirmed' || r.status === 'checked_in'
     );
 
+    // ALSO check for future bookings that match this trip's deptime and lineid
+    // This handles the case where future bookings exist but haven't been assigned to trip yet
+    let futureBookingsCount = 0;
+    if (trip.deptime) {
+      try {
+        const futureBookings = await Reservation.findFutureBookingsForTrip(
+          trip.deptime,
+          { lineid: trip.lineid }
+        );
+        // Count unassigned future bookings (those without tripid or with matching tripid)
+        futureBookingsCount = futureBookings.filter(b =>
+          (!b.tripid || b.tripid === tripid) &&
+          (b.status === 'confirmed' || b.status === 'checked_in')
+        ).length;
+
+        if (futureBookingsCount > 0) {
+          logger.info(`[TripOpeningService] 📅 Found ${futureBookingsCount} future booking(s) for trip ${tripid} at ${trip.deptime}`);
+        }
+      } catch (error) {
+        logger.warn(`[TripOpeningService] ⚠️ Error checking future bookings:`, error);
+      }
+    }
+
+    const totalBookings = activeReservations.length + futureBookingsCount;
 
     let vehicleAssigned = false;
     if (!trip.vehicleid) {
 
-      if (activeReservations.length === 0) {
-        logger.info(`[TripOpeningService] ⚠️ Trip ${tripid} opened but has no reservations - driver will not be assigned until bookings exist`);
+      if (totalBookings === 0) {
+        logger.info(`[TripOpeningService] ⚠️ Trip ${tripid} opened but has no reservations or future bookings - driver will not be assigned until bookings exist`);
         return {
           success: true,
           trip,
           vehicleAssigned: false,
-          message: 'Trip opened but no reservations - driver will be assigned when bookings are made',
+          message: 'Trip opened but no reservations or future bookings - driver will be assigned when bookings are made',
         };
       }
 
-      logger.info(`[TripOpeningService] 🔍 Trip ${tripid} has ${activeReservations.length} reservation(s) and no vehicle, attempting assignment from queue`);
+      logger.info(`[TripOpeningService] 🔍 Trip ${tripid} has ${activeReservations.length} reservation(s) and ${futureBookingsCount} future booking(s) and no vehicle, attempting assignment from queue`);
       const assignmentResult = await assignVehicleFromQueue(tripid, trip.lineid);
 
       if (assignmentResult) {
@@ -240,16 +388,36 @@ export const openScheduledTrip = async (tripid) => {
       vehicleAssigned = true;
     }
 
-
+    // Always try to distribute bookings, even if no vehicle yet
+    // This ensures future bookings get assigned to the trip
     let distributionResult = null;
-    if (vehicleAssigned) {
+    try {
       logger.info(`[TripOpeningService] 📋 Distributing bookings for trip ${tripid}`);
-      distributionResult = await distributeAllBookings(tripid);
+
+      // First, assign any unassigned future bookings to this trip
+      if (trip.deptime) {
+        const { distributeFutureBookings } = await import('./matchingService.js');
+        const futureResult = await distributeFutureBookings(trip.deptime, trip.lineid, tripid);
+        if (futureResult.distributed > 0) {
+          logger.info(`[TripOpeningService] ✅ Assigned ${futureResult.distributed} future booking(s) to trip ${tripid}`);
+        }
+      }
+
+      // Then distribute all bookings if vehicle is assigned
+      if (vehicleAssigned) {
+        distributionResult = await distributeAllBookings(tripid);
+      }
+    } catch (distError) {
+      logger.warn(`[TripOpeningService] ⚠️ Error distributing bookings:`, distError);
+      // Don't fail trip opening if distribution fails
     }
+
+    // Send trip opening notifications (already handled in openScheduledTrip, but ensure it's called)
+    const updatedTrip = await Trip.findById(tripid);
 
     return {
       success: true,
-      trip,
+      trip: updatedTrip || trip,
       vehicleAssigned,
       distribution: distributionResult,
     };
@@ -315,26 +483,47 @@ export const findWaitingTrips = async (lineid = null) => {
 
 
       let hasReservations = false;
+      let hasFutureBookings = false;
       try {
         const reservations = await Reservation.findByTripId(trip.tripid);
         hasReservations = reservations && reservations.length > 0;
         logger.debug(`[TripOpeningService] Trip ${trip.tripid} reservations check: found ${reservations?.length || 0} reservations, totalbookings: ${trip.totalbookings || 0}`);
+
+        // Also check for future bookings matching this trip's deptime and lineid
+        if (trip.deptime && trip.lineid) {
+          try {
+            const futureBookings = await Reservation.findFutureBookingsForTrip(
+              trip.deptime,
+              { lineid: trip.lineid }
+            );
+            hasFutureBookings = futureBookings && futureBookings.some(b =>
+              (!b.tripid || b.tripid === trip.tripid) &&
+              (b.status === 'confirmed' || b.status === 'checked_in')
+            );
+            if (hasFutureBookings) {
+              logger.debug(`[TripOpeningService] Trip ${trip.tripid} has future bookings matching deptime ${trip.deptime}`);
+            }
+          } catch (fbError) {
+            logger.warn(`[TripOpeningService] Error checking future bookings for trip ${trip.tripid}:`, fbError);
+          }
+        }
       } catch (error) {
         logger.error(`[TripOpeningService] Error checking reservations for trip ${trip.tripid}:`, error);
         continue;
       }
 
+      const hasAnyBookings = hasReservations || hasFutureBookings;
 
-      if (departureTimePassed && !hasReservations) {
+      if (departureTimePassed && !hasAnyBookings) {
         skippedCount.noReservations++;
-        logger.info(`[TripOpeningService] ⚠️ Trip ${trip.tripid} (line: ${trip.lineid}) passed departure time but has no reservations (totalbookings: ${trip.totalbookings || 0}), skipping assignment`);
+        logger.info(`[TripOpeningService] ⚠️ Trip ${trip.tripid} (line: ${trip.lineid}) passed departure time but has no reservations or future bookings (totalbookings: ${trip.totalbookings || 0}), skipping assignment`);
         continue;
       }
 
 
-      if (openingTimePassed && !departureTimePassed && !hasReservations) {
+      if (openingTimePassed && !departureTimePassed && !hasAnyBookings) {
         skippedCount.noReservations++;
-        logger.info(`[TripOpeningService] ⚠️ Trip ${trip.tripid} (line: ${trip.lineid}) opening time passed but has no reservations, skipping assignment - driver should wait in queue`);
+        logger.info(`[TripOpeningService] ⚠️ Trip ${trip.tripid} (line: ${trip.lineid}) opening time passed but has no reservations or future bookings, skipping assignment - driver should wait in queue`);
         continue;
       }
 
@@ -348,9 +537,9 @@ export const findWaitingTrips = async (lineid = null) => {
 
 
 
-      if (hasReservations && (openingTimePassed || departureTimePassed)) {
+      if (hasAnyBookings && (openingTimePassed || departureTimePassed)) {
         waitingTrips.push(trip);
-        logger.debug(`[TripOpeningService] ✅ Trip ${trip.tripid} (line: ${trip.lineid}) added to waiting list - openingTimePassed: ${openingTimePassed}, departureTimePassed: ${departureTimePassed}, hasReservations: ${hasReservations}`);
+        logger.debug(`[TripOpeningService] ✅ Trip ${trip.tripid} (line: ${trip.lineid}) added to waiting list - openingTimePassed: ${openingTimePassed}, departureTimePassed: ${departureTimePassed}, hasReservations: ${hasReservations}, hasFutureBookings: ${hasFutureBookings}`);
       }
     }
 
@@ -553,6 +742,89 @@ export const markTripsAsDelayed = async () => {
     };
   } catch (error) {
     logger.error('[TripOpeningService] ❌ Error marking trips as delayed:', error);
+    throw error;
+  }
+};
+
+/**
+ * Cancel delayed trips that have no bookings
+ * This should run periodically to clean up trips that were marked as delayed but never got any bookings
+ * @returns {Promise<object>} - Cancellation results
+ */
+export const cancelDelayedTripsWithNoBookings = async () => {
+  try {
+    logger.info('[TripOpeningService] 🔍 Checking delayed trips for cancellation (no bookings)');
+
+    // Get all delayed trips
+    const delayedTrips = await Trip.findAll({ status: TRIP_STATUS.DELAYED });
+
+    if (delayedTrips.length === 0) {
+      return {
+        success: true,
+        cancelled: 0,
+        trips: [],
+      };
+    }
+
+    logger.info(`[TripOpeningService] Found ${delayedTrips.length} delayed trips to check`);
+
+    const tripsToCancel = [];
+    const results = [];
+
+    for (const trip of delayedTrips) {
+      try {
+        // Check totalbookings field directly from trip table
+        const totalBookings = trip.totalbookings || 0;
+
+        // If total bookings is 0, mark for cancellation
+        if (totalBookings === 0) {
+          tripsToCancel.push(trip);
+          logger.info(`[TripOpeningService] ❌ Trip ${trip.tripid} has no bookings (totalbookings: ${totalBookings}) and is delayed - marking for cancellation`);
+        } else {
+          logger.debug(`[TripOpeningService] ✅ Trip ${trip.tripid} has ${totalBookings} booking(s) - keeping as delayed`);
+        }
+      } catch (error) {
+        logger.error(`[TripOpeningService] ❌ Error checking bookings for trip ${trip.tripid}:`, error);
+        // Continue with other trips if one fails
+      }
+    }
+
+    if (tripsToCancel.length === 0) {
+      return {
+        success: true,
+        cancelled: 0,
+        trips: [],
+      };
+    }
+
+    logger.info(`[TripOpeningService] 🚫 Cancelling ${tripsToCancel.length} delayed trips with no bookings`);
+
+    for (const trip of tripsToCancel) {
+      try {
+        await Trip.update(trip.tripid, { status: TRIP_STATUS.CANCELLED });
+        results.push({
+          tripid: trip.tripid,
+          success: true,
+        });
+        logger.info(`[TripOpeningService] ✅ Trip ${trip.tripid} cancelled (no bookings)`);
+      } catch (error) {
+        logger.error(`[TripOpeningService] ❌ Error cancelling trip ${trip.tripid}:`, error);
+        results.push({
+          tripid: trip.tripid,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      cancelled: results.filter(r => r.success).length,
+      total: tripsToCancel.length,
+      trips: results,
+    };
+  } catch (error) {
+    logger.error('[TripOpeningService] ❌ Error cancelling delayed trips with no bookings:', error);
     throw error;
   }
 };

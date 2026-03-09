@@ -993,10 +993,12 @@ class _DriverWalletPageState extends State<DriverWalletPage> {
                                   final time =
                                       transaction['time']?.toString() ?? '';
 
+                                  // For drivers, money is incoming if it goes TO their wallet
+                                  // This includes walk-in payments where fromwalletid is null (cash payments)
                                   final isIncoming =
                                       transaction['towalletid'] ==
                                               _wallet!['walletid'] &&
-                                          transaction['fromwalletid'] != null;
+                                          transaction['fromwalletid'] != _wallet!['walletid'];
                                   final isOutgoing =
                                       transaction['fromwalletid'] ==
                                           _wallet!['walletid'];
@@ -1075,6 +1077,22 @@ class _DriverWalletPageState extends State<DriverWalletPage> {
                                     dateStr = time;
                                   }
 
+                                  // Get transaction details for trip payments
+                                  final passengerName = transaction['passenger_name']?.toString();
+                                  final tripTime = transaction['trip_time']?.toString();
+                                  final tripDate = transaction['trip_date']?.toString();
+                                  
+                                  // Format trip date if available
+                                  String formattedTripDate = '';
+                                  if (tripDate != null && tripDate.isNotEmpty) {
+                                    try {
+                                      final dt = DateTime.parse(tripDate);
+                                      formattedTripDate = '${dt.day}/${dt.month}/${dt.year}';
+                                    } catch (_) {
+                                      formattedTripDate = tripDate;
+                                    }
+                                  }
+
                                   return Container(
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
@@ -1128,14 +1146,76 @@ class _DriverWalletPageState extends State<DriverWalletPage> {
                                                   ),
                                                 ),
                                               ],
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                dateStr,
-                                                style: TextStyle(
-                                                  color: textSecondary,
-                                                  fontSize: 12,
+                                              // Show passenger name for trip payments and refund deductions
+                                              if (passengerName != null && 
+                                                  passengerName.isNotEmpty &&
+                                                  (((type == 'reservation' || type == 'payment') && isIncoming) ||
+                                                   (type == 'refund' && isOutgoing))) ...[
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.person,
+                                                      size: 14,
+                                                      color: textSecondary,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      type == 'refund' && isOutgoing
+                                                          ? (_isArabic 
+                                                              ? 'ل: $passengerName'
+                                                              : 'To: $passengerName')
+                                                          : (_isArabic 
+                                                              ? 'من: $passengerName'
+                                                              : 'From: $passengerName'),
+                                                      style: TextStyle(
+                                                        color: textSecondary,
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
+                                              ],
+                                              // Show trip date and time for trip payments (only if trip date exists)
+                                              if ((tripDate != null && tripDate.isNotEmpty) || 
+                                                  (tripTime != null && tripTime.isNotEmpty)) ...[
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.calendar_today,
+                                                      size: 14,
+                                                      color: textSecondary,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      formattedTripDate.isNotEmpty 
+                                                          ? (tripTime != null && tripTime.isNotEmpty
+                                                              ? '$formattedTripDate ${_isArabic ? 'في' : 'at'} $tripTime'
+                                                              : formattedTripDate)
+                                                          : (tripTime != null && tripTime.isNotEmpty
+                                                              ? '${_isArabic ? 'في' : 'at'} $tripTime'
+                                                              : ''),
+                                                      style: TextStyle(
+                                                        color: textSecondary,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                              // Only show transaction date if we don't have trip date (to avoid duplicate)
+                                              if (tripDate == null || tripDate.isEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  dateStr,
+                                                  style: TextStyle(
+                                                    color: textSecondary,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
                                             ],
                                           ),
                                         ),
@@ -1206,7 +1286,7 @@ class _DriverWalletPageState extends State<DriverWalletPage> {
           ),
         ),
         bottomNavigationBar: DriverBottomNavBar(
-          currentIndex: 3,
+          currentIndex: 2,
           isDarkMode: _isDarkMode,
           isArabic: _isArabic,
           onTap: (index) {

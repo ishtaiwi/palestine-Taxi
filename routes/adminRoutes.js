@@ -5,6 +5,7 @@ import {
   getUserById,
   updateUser,
   deleteUser,
+  reactivateUser,
   getRevenueAnalytics,
   updateAdminPermissions,
   getRushHourPredictionsReport,
@@ -21,6 +22,8 @@ import {
   getLinePerformance,
   getTimezoneConfig,
   updateTimezoneConfig,
+  getQueueLocationValidationConfig,
+  updateQueueLocationValidationConfig,
   getPendingDrivers,
   getAllDriversWithApprovalStatus,
   approveDriver,
@@ -66,6 +69,7 @@ router.get('/users', getAllUsers);
 router.get('/users/:userid', getUserById);
 router.put('/users/:userid', updateUser);
 router.delete('/users/:userid', deleteUser);
+router.post('/users/:userid/reactivate', reactivateUser);
 router.put('/admins/:adminid/permissions', updateAdminPermissions);
 
 router.get('/base-station', getAllBaseStations);
@@ -81,6 +85,8 @@ router.delete('/lines/:lineid/path', deleteLinePath);
 
 router.get('/config/timezone', getTimezoneConfig);
 router.put('/config/timezone', updateTimezoneConfig);
+router.get('/config/queue-location-validation', getQueueLocationValidationConfig);
+router.put('/config/queue-location-validation', updateQueueLocationValidationConfig);
 
 router.get('/drivers/pending', getPendingDrivers);
 router.get('/drivers', getAllDriversWithApprovalStatus);

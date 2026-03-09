@@ -163,7 +163,7 @@ class Reservation {
 
     let query = supabase
       .from('reservation')
-      .select('bookingid, booking_type, status, bookedat, scheduled_trip_time, trip(tripid, deptime, lineid, line(lineid, linename))')
+      .select('bookingid, booking_type, status, bookedat, scheduled_trip_time, trip(tripid, deptime, lineid, direction, line(lineid, linename))')
       .gte('bookedat', start.toISOString())
       .lte('bookedat', end.toISOString());
 
@@ -183,10 +183,16 @@ class Reservation {
       rows = rows.filter((reservation) => resolveLineId(reservation) === filters.lineid);
     }
 
+    // Filter by direction if specified
+    if (filters.direction) {
+      rows = rows.filter((reservation) => resolveDirection(reservation) === filters.direction);
+    }
+
     const buckets = {};
     for (const reservation of rows) {
       const lineid = resolveLineId(reservation);
       const eventDate = resolveEventDate(reservation);
+      const direction = resolveDirection(reservation);
 
       if (!eventDate || !lineid) {
         continue;
@@ -194,11 +200,13 @@ class Reservation {
 
       const dayOfWeek = eventDate.getUTCDay();
       const hour = eventDate.getUTCHours();
-      const key = `${lineid}|${dayOfWeek}|${hour}`;
+      // Include direction in bucket key for direction-specific training
+      const key = `${lineid}|${direction}|${dayOfWeek}|${hour}`;
 
       if (!buckets[key]) {
         buckets[key] = {
           lineid,
+          direction,
           dayOfWeek,
           hour,
           totalBookings: 0,
@@ -216,6 +224,7 @@ class Reservation {
         bookedat: reservation.bookedat,
         scheduled_trip_time: reservation.scheduled_trip_time,
         tripid: reservation.trip?.tripid ?? null,
+        direction,
       });
     }
 
@@ -282,6 +291,56 @@ class Reservation {
     if (error) throw error;
     return true;
   }
+
+  static async findByPassengerType(passengerType, filters = {}) {
+    let query = supabase
+      .from('reservation')
+      .select('*, passenger(*, user(*)), trip(*, line(*), vehicle(*, driver(*, user!driver_userid_fkey(*)))), payment(*)')
+      .eq('passenger_type', passengerType);
+
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+
+    if (filters.booking_type) {
+      query = query.eq('booking_type', filters.booking_type);
+    }
+
+    if (filters.tripid) {
+      if (filters.tripid === null) {
+        query = query.is('tripid', null);
+      } else {
+        query = query.eq('tripid', filters.tripid);
+      }
+    }
+
+    if (filters.lineid) {
+      query = query.eq('lineid', filters.lineid);
+    }
+
+    const { data, error } = await query.order('bookedat', { ascending: true });
+    if (error) throw error;
+    return data;
+  }
+
+  static async findByPhoneNumber(phone, filters = {}) {
+    let query = supabase
+      .from('reservation')
+      .select('*, passenger(*, user(*)), trip(*, line(*)), payment(*)')
+      .eq('phone_number', phone);
+
+    if (filters.status) {
+      query = query.eq('status', filters.status);
+    }
+
+    if (filters.booking_type) {
+      query = query.eq('booking_type', filters.booking_type);
+    }
+
+    const { data, error } = await query.order('bookedat', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
 }
 
 export default Reservation;
@@ -291,6 +350,10 @@ function resolveLineId(reservation) {
     || reservation.trip?.lineid
     || reservation.trip?.line?.lineid
     || null;
+}
+
+function resolveDirection(reservation) {
+  return reservation.trip?.direction || 'going'; // Default to 'going' if no direction specified
 }
 
 function resolveEventDate(reservation) {

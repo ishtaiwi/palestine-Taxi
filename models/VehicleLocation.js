@@ -165,6 +165,63 @@ class VehicleLocation {
         if (error) throw error;
         return true;
     }
+
+    /**
+     * Get driver's current location
+     * @param {string} driverid - Driver ID
+     * @returns {Promise<Object|null>} - Location object or null
+     */
+    static async getDriverLocation(driverid) {
+        return await this.findByDriverId(driverid);
+    }
+
+    /**
+     * Validate if driver is at a specific station
+     * @param {string} driverid - Driver ID
+     * @param {number} stationLat - Station latitude
+     * @param {number} stationLng - Station longitude
+     * @param {number} geofenceRadius - Geofence radius in meters
+     * @returns {Promise<{isAtStation: boolean, distance?: number}>} - Validation result
+     */
+    static async validateDriverAtStation(driverid, stationLat, stationLng, geofenceRadius) {
+        const location = await this.findByDriverId(driverid);
+        
+        if (!location || !location.latitude || !location.longitude) {
+            return {
+                isAtStation: false,
+                error: 'Driver location not found',
+            };
+        }
+
+        const distance = BaseStation.calculateDistance(
+            location.latitude,
+            location.longitude,
+            stationLat,
+            stationLng
+        );
+
+        const isAtStation = distance <= geofenceRadius;
+
+        return {
+            isAtStation,
+            distance,
+            driverLat: location.latitude,
+            driverLng: location.longitude,
+        };
+    }
+
+    /**
+     * Check if driver is at a station
+     * @param {string} driverid - Driver ID
+     * @param {number} stationLat - Station latitude
+     * @param {number} stationLng - Station longitude
+     * @param {number} geofenceRadius - Geofence radius in meters
+     * @returns {Promise<boolean>} - True if driver is at station
+     */
+    static async isDriverAtStation(driverid, stationLat, stationLng, geofenceRadius) {
+        const result = await this.validateDriverAtStation(driverid, stationLat, stationLng, geofenceRadius);
+        return result.isAtStation || false;
+    }
 }
 
 export default VehicleLocation;

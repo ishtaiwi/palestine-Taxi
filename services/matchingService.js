@@ -2,6 +2,9 @@ import Reservation from '../models/Reservation.js';
 import Trip from '../models/Trip.js';
 import DriverQueue from '../models/DriverQueue.js';
 import Vehicle from '../models/Vehicle.js';
+import Payment from '../models/Payment.js';
+import Wallet from '../models/Wallet.js';
+import Driver from '../models/Driver.js';
 import { BOOKING_TYPE } from '../utils/constants.js';
 import { calculateAvailablePassengerSeats } from '../utils/seatCalculation.js';
 import { parseUtcDate } from '../utils/timeUtils.js';
@@ -9,17 +12,17 @@ import logger from '../utils/logger.js';
 import { assignVehicleFromQueue } from './tripOpeningService.js';
 
 /**
- * Get the next driver from the queue for a specific line
+ * Get the next driver from the queue for a specific line and direction
  * @param {string} lineid - The line ID
+ * @param {string} direction - The direction ('going' or 'returning')
  * @returns {Promise<object|null>} - The next driver in queue or null
  */
-export const getNextDriverFromQueue = async (lineid) => {
+export const getNextDriverFromQueue = async (lineid, direction = null) => {
   try {
-    const queue = await DriverQueue.getActiveByLine(lineid);
+    const queue = await DriverQueue.getActiveByLine(lineid, direction);
     if (!queue || queue.length === 0) {
       return null;
     }
-
 
     return queue[0];
   } catch (error) {
@@ -247,7 +250,9 @@ export const checkAndAssignAdditionalDrivers = async (tripid) => {
         }
 
 
-        const newTrip = await findOrAssignExistingTrip(driverid, trip.lineid, trip.deptime, true);
+        // Get direction from trip
+        const tripDirection = trip.direction || 'going';
+        const newTrip = await findOrAssignExistingTrip(driverid, trip.lineid, trip.deptime, true, tripDirection);
 
         if (newTrip) {
 
@@ -434,6 +439,8 @@ export const createNewTripForFullTripBooking = async (fullTripId, bookingId) => 
       auto_departure_enabled: true,
       early_departure_allowed: true,
       scheduled_departure_enforced: true,
+      direction: fullTrip.direction || 'going', // Copy direction from the full trip
+      origin_stationid: fullTrip.origin_stationid || null, // Copy origin_stationid if available
     };
 
     const newTrip = await Trip.create(newTripData);
@@ -468,6 +475,88 @@ export const createNewTripForFullTripBooking = async (fullTripId, bookingId) => 
 
     const finalTrip = await Trip.findById(newTrip.tripid);
     logger.info(`[MatchingService] ✅ Created new trip ${newTrip.tripid} with driver ${driverid} for booking ${bookingId}`);
+
+    // Send notifications
+    try {
+      const { sendNotification, NOTIFICATION_TYPES } = await import('./notificationService.js');
+      const Driver = (await import('../models/Driver.js')).default;
+      const Line = (await import('../models/Line.js')).default;
+      const Passenger = (await import('../models/Passenger.js')).default;
+
+      // Get driver, line, and passenger info
+      const driver = await Driver.findById(driverid);
+      const line = await Line.findById(finalTrip.lineid);
+      const reservation = await Reservation.findById(bookingId);
+      const passenger = reservation ? await Passenger.findById(reservation.passengerid) : null;
+
+      const driverName = driver?.user?.fullname || 'Driver';
+      const vehicle = await Vehicle.findById(vehicle.vehicleid);
+      const plateNumber = vehicle?.plateno || 'N/A';
+      const { getLineNamesForNotification } = await import('../utils/lineHelpers.js');
+
+      // Notify driver
+      if (driver?.userid) {
+        const tripDirection = finalTrip.direction || 'going';
+        const { fromName: driverFromName, toName: driverToName, language: driverLanguage } = await getLineNamesForNotification(line, driver.userid, null, null, tripDirection);
+        const { DateTime } = await import('luxon');
+        const deptime = DateTime.fromISO(new Date(finalTrip.deptime).toISOString())
+          .setLocale(driverLanguage === 'en' ? 'en' : 'ar')
+          .toLocaleString({
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: driverLanguage === 'en'
+          });
+
+        await sendNotification(
+          driver.userid,
+          NOTIFICATION_TYPES.TRIP_ASSIGNED,
+          {
+            from: driverFromName,
+            to: driverToName,
+            time: deptime,
+            tripid: finalTrip.tripid,
+          },
+          driverLanguage,
+          { line, trip: finalTrip } // Pass raw data for separate Arabic/English formatting
+        );
+      }
+
+      // Notify passenger
+      if (passenger?.userid) {
+        const tripDirection = finalTrip.direction || 'going';
+        const { fromName: passengerFromName, toName: passengerToName, language: passengerLanguage } = await getLineNamesForNotification(line, passenger.userid, null, null, tripDirection);
+        const { DateTime } = await import('luxon');
+        const deptime = DateTime.fromISO(new Date(finalTrip.deptime).toISOString())
+          .setLocale(passengerLanguage === 'en' ? 'en' : 'ar')
+          .toLocaleString({
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: passengerLanguage === 'en'
+          });
+
+        await sendNotification(
+          passenger.userid,
+          NOTIFICATION_TYPES.DRIVER_ASSIGNED,
+          {
+            driverName,
+            plateNumber,
+            from: passengerFromName,
+            to: passengerToName,
+            time: deptime,
+          },
+          passengerLanguage,
+          { line, trip: finalTrip } // Pass raw data for separate Arabic/English formatting
+        );
+      }
+    } catch (notifError) {
+      logger.warn(`[MatchingService] Failed to send notifications for new trip ${newTrip.tripid}:`, notifError);
+    }
 
     return finalTrip;
   } catch (error) {
@@ -520,9 +609,10 @@ export const getAvailableSeats = async (vehicle, tripid = null) => {
  * @param {string} lineid - The line ID
  * @param {string} deptime - The departure time
  * @param {boolean} hasBookingsWaiting - Whether there are bookings waiting to be assigned (required to create new trip)
+ * @param {string} direction - The trip direction ('going' or 'return')
  * @returns {Promise<object|null>} - The trip object or null if no suitable trip found
  */
-const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWaiting = false) => {
+const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWaiting = false, direction = 'going') => {
   try {
 
     const vehicles = await Vehicle.findByDriverId(driverid);
@@ -549,15 +639,16 @@ const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWa
     }
 
 
-    const allTrips = await Trip.findAll({ lineid, status: 'scheduled' });
-    const openTrips = await Trip.findAll({ lineid, status: 'open' });
+    const allTrips = await Trip.findAll({ lineid, status: 'scheduled', direction });
+    const openTrips = await Trip.findAll({ lineid, status: 'open', direction });
     const candidateTrips = [...allTrips, ...openTrips];
 
     const unassignedTripAtTime = candidateTrips.find(t => {
       const tripDeptime = parseUtcDate(t.deptime);
       const timeMatches = tripDeptime && deptimeUtc && tripDeptime.getTime() === deptimeUtc.getTime();
       const noDriver = !t.vehicleid || !t.assigned_driverid;
-      return timeMatches && noDriver;
+      const directionMatches = !t.direction || t.direction === direction;
+      return timeMatches && noDriver && directionMatches;
     });
 
     if (unassignedTripAtTime) {
@@ -637,6 +728,18 @@ const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWa
     const openingTime = new Date(deptimeUtc.getTime() - 45 * 60 * 1000);
     const maxPassengerSeats = calculateAvailablePassengerSeats(vehicle.seatnum, 0, 0);
 
+    // Get line to determine origin_stationid
+    const Line = (await import('../models/Line.js')).default;
+    const line = await Line.findById(lineid);
+
+    // Set origin_stationid based on direction
+    let origin_stationid = null;
+    if (direction === 'going') {
+      origin_stationid = line?.main_stationid || null;
+    } else if (direction === 'return') {
+      origin_stationid = line?.return_stationid || null;
+    }
+
     const newTripData = {
       tripid: uuidv4(),
       lineid,
@@ -649,6 +752,8 @@ const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWa
       auto_departure_enabled: true,
       early_departure_allowed: true,
       scheduled_departure_enforced: true,
+      direction: direction,
+      origin_stationid: origin_stationid,
     };
 
     const newTrip = await Trip.create(newTripData);
@@ -673,6 +778,88 @@ const findOrAssignExistingTrip = async (driverid, lineid, deptime, hasBookingsWa
   } catch (error) {
     logger.error('[MatchingService] Error finding/assigning trip:', error);
     throw error;
+  }
+};
+
+/**
+ * Transfer payments for a trip to the driver's wallet
+ * @param {string} tripid - The trip ID
+ * @returns {Promise<void>}
+ */
+const transferPaymentsToDriver = async (tripid) => {
+  try {
+    const trip = await Trip.findById(tripid);
+    if (!trip || !trip.assigned_driverid) {
+      console.log(`[MatchingService] ⚠️ Trip ${tripid} has no assigned driver, skipping payment transfer`);
+      return;
+    }
+
+    // Get driver's userid - try from trip object first, then fetch driver directly
+    let driverUserid = trip.vehicle?.driver?.userid || trip.vehicle?.driver?.user?.userid;
+
+    if (!driverUserid) {
+      // Fallback: fetch driver directly
+      try {
+        const driver = await Driver.findById(trip.assigned_driverid);
+        driverUserid = driver?.userid;
+      } catch (error) {
+        console.error(`[MatchingService] Error fetching driver ${trip.assigned_driverid}:`, error);
+      }
+    }
+
+    if (!driverUserid) {
+      console.log(`[MatchingService] ⚠️ Could not find driver userid for trip ${tripid}, skipping payment transfer`);
+      return;
+    }
+
+    // Get driver's wallet
+    const driverWallets = await Wallet.findByUserId(driverUserid, 'main');
+    const driverWallet = driverWallets?.[0];
+    if (!driverWallet) {
+      console.log(`[MatchingService] ⚠️ Driver wallet not found for user ${driverUserid}, skipping payment transfer`);
+      return;
+    }
+
+    // Get all reservations for this trip
+    const reservations = await Reservation.findByTripId(tripid);
+
+    // Process payments for each reservation
+    for (const reservation of reservations) {
+      if (!reservation.paymentid) {
+        continue;
+      }
+
+      try {
+        const payment = await Payment.findById(reservation.paymentid);
+        if (!payment || payment.status !== 'completed') {
+          continue;
+        }
+
+        // Skip if payment already has towalletid set
+        if (payment.towalletid) {
+          continue;
+        }
+
+        // Update payment tripid if it was null, and set towalletid
+        const paymentUpdates = {
+          tripid: tripid,
+          towalletid: driverWallet.walletid,
+        };
+
+        await Payment.update(payment.paymentid, paymentUpdates);
+
+        // Add payment amount to driver wallet
+        await Wallet.updateBalance(driverWallet.walletid, payment.amount, 'add');
+
+        console.log(`[MatchingService] ✅ Transferred payment ${payment.paymentid} (${payment.amount}) to driver wallet for trip ${tripid}`);
+      } catch (error) {
+        console.error(`[MatchingService] Error transferring payment for reservation ${reservation.bookingid}:`, error);
+        // Continue with other payments even if one fails
+      }
+    }
+  } catch (error) {
+    console.error(`[MatchingService] Error in transferPaymentsToDriver for trip ${tripid}:`, error);
+    // Don't throw - allow the distribution to continue
   }
 };
 
@@ -713,8 +900,8 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
     let targetTrip = null;
     if (tripid) {
       targetTrip = await Trip.findById(tripid);
-      if (!targetTrip || !targetTrip.vehicleid) {
-        logger.warn(`[MatchingService] ⚠️ Trip ${tripid} not found or has no vehicle, cannot distribute bookings`);
+      if (!targetTrip) {
+        logger.warn(`[MatchingService] ⚠️ Trip ${tripid} not found, cannot distribute bookings`);
         return {
           success: false,
           distributed: 0,
@@ -729,13 +916,26 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
     while (remainingBookings.length > 0) {
 
       if (targetTrip) {
-        const driverVehicle = await Vehicle.findById(targetTrip.vehicleid);
-        let availableSeats = await getAvailableSeats(driverVehicle, targetTrip.tripid);
+        // If trip has a vehicle, check capacity; otherwise assign all bookings (capacity will be checked later)
+        let bookingsToAssign = [];
 
-        if (availableSeats > 0) {
+        if (targetTrip.vehicleid) {
+          const driverVehicle = await Vehicle.findById(targetTrip.vehicleid);
+          let availableSeats = await getAvailableSeats(driverVehicle, targetTrip.tripid);
 
-          const bookingsToAssign = remainingBookings.slice(0, availableSeats);
+          if (availableSeats > 0) {
+            bookingsToAssign = remainingBookings.slice(0, availableSeats);
+          } else {
+            // Trip is full, break to look for other trips
+            break;
+          }
+        } else {
+          // Trip has no vehicle yet - assign all bookings to this trip
+          // Capacity will be checked when vehicle is assigned
+          bookingsToAssign = [...remainingBookings];
+        }
 
+        if (bookingsToAssign.length > 0) {
           for (const booking of bookingsToAssign) {
             await Reservation.update(booking.bookingid, {
               tripid: targetTrip.tripid,
@@ -754,11 +954,10 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
             distributedCount++;
           }
 
-
           if (bookingsToAssign.length > 0) {
             await syncTripStats(targetTrip.tripid);
 
-            // Transfer payments for this trip to the driver
+            // Transfer payments for this trip to the driver (only if driver is assigned)
             if (targetTrip.assigned_driverid) {
               try {
                 const { transferPaymentsForTrip } = await import('./paymentService.js');
@@ -774,14 +973,64 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
 
           remainingBookings = remainingBookings.slice(bookingsToAssign.length);
 
+          const vehicleInfo = targetTrip.vehicleid ? await Vehicle.findById(targetTrip.vehicleid) : null;
           driversUsed.push({
-            driverid: targetTrip.assigned_driverid,
+            driverid: targetTrip.assigned_driverid || null,
             tripid: targetTrip.tripid,
             bookingsAssigned: bookingsToAssign.length,
-            vehicle: driverVehicle,
+            vehicle: vehicleInfo,
           });
 
-          logger.info(`[MatchingService] ✅ Assigned ${bookingsToAssign.length} future bookings to trip ${targetTrip.tripid}`);
+          logger.info(`[MatchingService] ✅ Assigned ${bookingsToAssign.length} future bookings to trip ${targetTrip.tripid}${!targetTrip.vehicleid ? ' (no vehicle yet)' : ''}`);
+        }
+
+        // If tripid was provided, only assign to that specific trip (don't look for other trips)
+        // Exit the while loop and return
+        break;
+      }
+
+      // Code below only executes when tripid is null (no specific trip provided)
+      if (remainingBookings.length > 0) {
+        const tripsAtSameTime = await findTripsAtSameTime(scheduledTripTime, lineid);
+        const otherTrips = tripsAtSameTime.filter(t =>
+          t.tripid !== targetTrip.tripid &&
+          t.vehicleid &&
+          t.assigned_driverid &&
+          (t.status === 'scheduled' || t.status === 'open' || t.status === 'delayed')
+        );
+
+
+        for (const otherTrip of otherTrips) {
+          if (remainingBookings.length === 0) break;
+
+          const otherVehicle = await Vehicle.findById(otherTrip.vehicleid);
+          const otherAvailableSeats = await getAvailableSeats(otherVehicle, otherTrip.tripid);
+
+          if (otherAvailableSeats > 0) {
+            const bookingsToAssign = remainingBookings.slice(0, otherAvailableSeats);
+
+            for (const booking of bookingsToAssign) {
+              await Reservation.update(booking.bookingid, {
+                tripid: otherTrip.tripid,
+              });
+              distributedCount++;
+            }
+
+            if (bookingsToAssign.length > 0) {
+              await syncTripStats(otherTrip.tripid);
+            }
+
+            remainingBookings = remainingBookings.slice(bookingsToAssign.length);
+
+            driversUsed.push({
+              driverid: otherTrip.assigned_driverid,
+              tripid: otherTrip.tripid,
+              bookingsAssigned: bookingsToAssign.length,
+              vehicle: otherVehicle,
+            });
+
+            logger.info(`[MatchingService] ✅ Assigned ${bookingsToAssign.length} future bookings to additional trip ${otherTrip.tripid} at same time`);
+          }
         }
 
 
@@ -847,21 +1096,44 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
         } else {
           break;
         }
+      } else {
+        break;
       }
+    }
 
+    // Code below only executes when tripid is null (no specific trip provided)
+    // It creates new trips with drivers from the queue
+    if (tripid) {
+      // If tripid was provided, we've already assigned bookings to that trip, so return
+      return {
+        success: true,
+        distributed: distributedCount,
+        remaining: remainingBookings.length,
+        driversUsed,
+      };
+    }
 
-      const driverQueueEntry = await getNextDriverFromQueue(lineid);
+    // Continue with creating new trips for remaining bookings
+    while (remainingBookings.length > 0) {
+      // For future bookings, we need to determine direction from bookings or use default 'going'
+      // For now, we'll get drivers from 'going' queue by default
+      // TODO: Determine direction from booking context if needed
+      const queueDirection = 'going'; // Default for future bookings
+      const driverQueueEntry = await getNextDriverFromQueue(lineid, queueDirection);
 
       if (!driverQueueEntry) {
-        logger.warn(`[MatchingService] ⚠️ No more drivers available in queue`);
+        logger.warn(`[MatchingService] ⚠️ No more drivers available in ${queueDirection} queue`);
         break;
       }
 
       const driverid = driverQueueEntry.driverid;
+      const queueEntryDirection = driverQueueEntry.direction || queueDirection;
 
+      // Map queue direction to trip direction
+      const { mapQueueDirectionToTripDirection } = await import('../utils/tripDirectionUtils.js');
+      const tripDirection = mapQueueDirectionToTripDirection(queueEntryDirection);
 
-
-      const driverTrip = await findOrAssignExistingTrip(driverid, lineid, scheduledTripTime, true);
+      const driverTrip = await findOrAssignExistingTrip(driverid, lineid, scheduledTripTime, true, tripDirection);
 
       if (!driverTrip) {
         logger.warn(`[MatchingService] ⚠️ Failed to find or create trip for driver ${driverid} at ${scheduledTripTime}`);
@@ -939,6 +1211,9 @@ export const distributeFutureBookings = async (scheduledTripTime, lineid, tripid
 
 
       remainingBookings = remainingBookings.slice(bookingsToAssign.length);
+
+      // Transfer payments to driver wallet after assigning reservations
+      await transferPaymentsToDriver(driverTrip.tripid);
 
       driversUsed.push({
         driverid,
@@ -1166,18 +1441,24 @@ export const distributeInstantBookings = async (lineid, nextTripTime = null, tri
       }
 
 
-      const driverQueueEntry = await getNextDriverFromQueue(lineid);
+      // For instant bookings, get drivers from 'going' queue by default
+      // TODO: Determine direction from booking context if needed
+      const queueDirection = 'going'; // Default for instant bookings
+      const driverQueueEntry = await getNextDriverFromQueue(lineid, queueDirection);
 
       if (!driverQueueEntry) {
-        logger.warn(`[MatchingService] ⚠️ No more drivers available in queue`);
+        logger.warn(`[MatchingService] ⚠️ No more drivers available in ${queueDirection} queue`);
         break;
       }
 
       const driverid = driverQueueEntry.driverid;
+      const queueEntryDirection = driverQueueEntry.direction || queueDirection;
 
+      // Map queue direction to trip direction
+      const { mapQueueDirectionToTripDirection } = await import('../utils/tripDirectionUtils.js');
+      const tripDirection = mapQueueDirectionToTripDirection(queueEntryDirection);
 
-
-      const driverTrip = await findOrAssignExistingTrip(driverid, lineid, targetTripTime, true);
+      const driverTrip = await findOrAssignExistingTrip(driverid, lineid, targetTripTime, true, tripDirection);
 
       if (!driverTrip) {
         logger.warn(`[MatchingService] ⚠️ Failed to find or create trip for driver ${driverid} at ${targetTripTime}`);
@@ -1370,3 +1651,127 @@ export const distributeAllBookings = async (tripid) => {
   }
 };
 
+/**
+ * Adjust future reservations when schedule interval changes
+ * Moves reservations to the next available trip time based on new schedule
+ */
+export const adjustReservationsForScheduleChange = async (
+  lineid,
+  oldInterval,
+  newInterval,
+  startHour,
+  endHour
+) => {
+  try {
+    logger.info(`[MatchingService] 🔄 Adjusting reservations for schedule change: line=${lineid}, oldInterval=${oldInterval}, newInterval=${newInterval}`);
+
+    // Get all future reservations for this line
+    const Reservation = (await import('../models/Reservation.js')).default;
+    const futureReservations = await Reservation.findByBookingType('future', {
+      status: 'confirmed',
+    });
+
+    const lineReservations = futureReservations.filter(r => r.lineid === lineid);
+
+    if (lineReservations.length === 0) {
+      logger.info(`[MatchingService] No future reservations found for line ${lineid}`);
+      return { adjusted: 0, errors: [] };
+    }
+
+    logger.info(`[MatchingService] Found ${lineReservations.length} future reservation(s) to adjust`);
+
+    const adjusted = [];
+    const errors = [];
+    const timezoneOffset = await getServerTimezoneOffset();
+
+    for (const reservation of lineReservations) {
+      try {
+        if (!reservation.scheduled_trip_time) {
+          logger.warn(`[MatchingService] Reservation ${reservation.bookingid} has no scheduled_trip_time, skipping`);
+          continue;
+        }
+
+        const oldScheduledTime = parseUtcDate(reservation.scheduled_trip_time);
+        if (!oldScheduledTime) {
+          logger.warn(`[MatchingService] Invalid scheduled_trip_time for reservation ${reservation.bookingid}`);
+          continue;
+        }
+
+        // Generate new trip times based on new schedule
+        const year = oldScheduledTime.getFullYear();
+        const month = String(oldScheduledTime.getMonth() + 1).padStart(2, '0');
+        const day = String(oldScheduledTime.getDate()).padStart(2, '0');
+        const offsetSign = timezoneOffset >= 0 ? '+' : '-';
+        const offsetHours = String(Math.abs(timezoneOffset)).padStart(2, '0');
+
+        // Generate all possible trip times for the day with new interval
+        const newTripTimes = [];
+        let currentMinutes = startHour * 60;
+        const endMinutes = endHour * 60;
+
+        while (currentMinutes <= endMinutes) {
+          const hours = Math.floor(currentMinutes / 60);
+          const mins = currentMinutes % 60;
+          const localTimeString = `${year}-${month}-${day}T${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:00${offsetSign}${offsetHours}:00`;
+          const utcTime = parseUtcDate(localTimeString);
+          if (utcTime) {
+            newTripTimes.push(utcTime);
+          }
+          currentMinutes += newInterval;
+        }
+
+        // Find the next available trip time (equal or after the old scheduled time)
+        const nextAvailableTime = newTripTimes.find(time =>
+          time.getTime() >= oldScheduledTime.getTime()
+        ) || newTripTimes[newTripTimes.length - 1]; // If no time found, use the last one
+
+        if (!nextAvailableTime) {
+          logger.warn(`[MatchingService] No available trip time found for reservation ${reservation.bookingid}`);
+          errors.push(`No available time for reservation ${reservation.bookingid}`);
+          continue;
+        }
+
+        // Update the reservation's scheduled_trip_time
+        const newScheduledTime = nextAvailableTime.toISOString();
+        await Reservation.update(reservation.bookingid, {
+          scheduled_trip_time: newScheduledTime,
+          tripid: null, // Clear tripid so it gets reassigned to the new trip
+        });
+
+        // Update payment if exists
+        if (reservation.paymentid) {
+          try {
+            const Payment = (await import('../models/Payment.js')).default;
+            await Payment.update(reservation.paymentid, {
+              tripid: null, // Clear tripid
+            });
+          } catch (error) {
+            logger.warn(`[MatchingService] ⚠️ Failed to update payment.tripid for reservation ${reservation.bookingid}:`, error);
+          }
+        }
+
+        adjusted.push({
+          bookingid: reservation.bookingid,
+          oldTime: oldScheduledTime.toISOString(),
+          newTime: newScheduledTime,
+        });
+
+        logger.info(`[MatchingService] ✅ Adjusted reservation ${reservation.bookingid} from ${oldScheduledTime.toISOString()} to ${newScheduledTime}`);
+      } catch (error) {
+        logger.error(`[MatchingService] ❌ Error adjusting reservation ${reservation.bookingid}:`, error);
+        errors.push(`Error adjusting reservation ${reservation.bookingid}: ${error.message}`);
+      }
+    }
+
+    logger.info(`[MatchingService] ✅ Adjusted ${adjusted.length} reservation(s), ${errors.length} error(s)`);
+
+    return {
+      adjusted: adjusted.length,
+      errors,
+      details: adjusted,
+    };
+  } catch (error) {
+    logger.error('[MatchingService] Error adjusting reservations for schedule change:', error);
+    throw error;
+  }
+};

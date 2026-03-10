@@ -6,7 +6,7 @@
 
 <br/>
 
-<img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js" />
+<img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=whsite" alt="Node.js" />
 <img src="https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express" />
 <img src="https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
 <img src="https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart" />
@@ -17,8 +17,7 @@
 
 <br/><br/>
 
-[Features](#-features) &nbsp;&bull;&nbsp; [Architecture](#-architecture) &nbsp;&bull;&nbsp; [Quick Start](#-quick-start) &nbsp;&bull;&nbsp; [API Reference](#-api-reference) &nbsp;&bull;&nbsp; [Full Wiki](WIKI.md)
-
+[Features](#-features) &nbsp;&bull;&nbsp; [Architecture](#-architecture) &nbsp;&bull;&nbsp; [Quick Start](#-quick-start) &nbsp;&bull;&nbsp; [API Reference](#-api-reference) &nbsp;&bull;&nbsp; 
 <br/>
 
 </div>
@@ -550,16 +549,6 @@ CORS_ORIGINS=http://localhost:3000,http://localhost:5000
 **Supervisor:** Dr. Samer Arandi
 
 **Institution:** An-Najah National University — Faculty of Engineering & IT, Computer Engineering Department
-
----
-
-## 📄 Documentation
-
-| Document | Description |
-|:---|:---|
-| 📖 [WIKI.md](WIKI.md) | Full technical wiki documentation |
-| 🧪 [TESTING_GUIDE.md](TESTING_GUIDE.md) | Testing procedures & guide |
-| 📡 `/api/docs` | Interactive Swagger API docs (run server first) |
 
 ---
 

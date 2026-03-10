@@ -17,7 +17,7 @@
 
 <br/><br/>
 
-[Features](#-features) &nbsp;&bull;&nbsp; [Architecture](#-architecture) &nbsp;&bull;&nbsp; [Quick Start](#-quick-start) &nbsp;&bull;&nbsp; [API Reference](#-api-reference) &nbsp;&bull;&nbsp; 
+[Features](#-features) &nbsp;&bull;&nbsp; [Architecture](#-architecture) &nbsp;&bull;&nbsp; [Quick Start](#-quick-start) &nbsp;&bull;&nbsp; [API Reference](#-api-reference) 
 <br/>
 
 </div>
